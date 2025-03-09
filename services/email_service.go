@@ -5,6 +5,7 @@ import (
 	"dklautomationgo/models"
 	"fmt"
 	"html/template"
+	"log"
 	"os"
 	"strconv"
 
@@ -78,22 +79,27 @@ func (s *EmailService) SendContactEmail(data *models.ContactEmailData) error {
 		templateName = "contact_admin"
 		subject = "Nieuw contactformulier ontvangen"
 		recipient = data.AdminEmail
+		log.Printf("Sending admin email to: %s using template: %s", recipient, templateName)
 	} else {
 		templateName = "contact_user"
 		subject = "Bedankt voor je bericht"
 		recipient = data.Contact.Email
+		log.Printf("Sending user email to: %s using template: %s", recipient, templateName)
 	}
 
 	template := s.templates[templateName]
 	if template == nil {
+		log.Printf("Template not found: %s", templateName)
 		return fmt.Errorf("template not found: %s", templateName)
 	}
 
 	var body bytes.Buffer
 	if err := template.Execute(&body, data); err != nil {
+		log.Printf("Failed to execute template: %v", err)
 		return fmt.Errorf("failed to execute template: %v", err)
 	}
 
+	log.Printf("Successfully generated email body for template: %s", templateName)
 	return s.sendEmail(recipient, subject, body.String())
 }
 
@@ -126,6 +132,8 @@ func (s *EmailService) SendAanmeldingEmail(data *models.AanmeldingEmailData) err
 }
 
 func (s *EmailService) sendEmail(to, subject, body string) error {
+	log.Printf("Attempting to send email to: %s with subject: %s", to, subject)
+
 	m := gomail.NewMessage()
 	m.SetHeader("From", "noreply@dekoninklijkeloop.nl")
 	m.SetHeader("To", to)
@@ -137,14 +145,18 @@ func (s *EmailService) sendEmail(to, subject, body string) error {
 	smtpUsername := os.Getenv("SMTP_USERNAME")
 	smtpPassword := os.Getenv("SMTP_PASSWORD")
 
+	log.Printf("SMTP Configuration - Host: %s, Port: %s, Username: %s", smtpHost, smtpPortStr, smtpUsername)
+
 	if smtpHost == "" || smtpPortStr == "" || smtpUsername == "" || smtpPassword == "" {
-		return fmt.Errorf("missing SMTP configuration")
+		return fmt.Errorf("missing SMTP configuration - Host: %s, Port: %s, Username: %s", smtpHost, smtpPortStr, smtpUsername)
 	}
 
 	// Parse SMTP port
 	smtpPort := 587 // Default to 587 if parsing fails
 	if port, err := strconv.Atoi(smtpPortStr); err == nil {
 		smtpPort = port
+	} else {
+		log.Printf("Failed to parse SMTP port, using default 587: %v", err)
 	}
 
 	d := gomail.NewDialer(smtpHost, smtpPort, smtpUsername, smtpPassword)
@@ -152,9 +164,12 @@ func (s *EmailService) sendEmail(to, subject, body string) error {
 	// Enable SSL/TLS
 	d.SSL = true
 
+	log.Printf("Attempting to connect to SMTP server: %s:%d", smtpHost, smtpPort)
 	if err := d.DialAndSend(m); err != nil {
+		log.Printf("Failed to send email: %v", err)
 		return fmt.Errorf("failed to send email: %v", err)
 	}
 
+	log.Printf("Successfully sent email to: %s", to)
 	return nil
 }
