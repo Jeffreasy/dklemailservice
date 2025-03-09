@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"os"
+	"strconv"
 
 	"gopkg.in/gomail.v2"
 )
@@ -31,27 +32,33 @@ type EmailService struct {
 func NewEmailService() (*EmailService, error) {
 	templates := make(map[string]*template.Template)
 
+	// Get the current working directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get working directory: %v", err)
+	}
+
 	// Load contact email templates
-	contactAdminTemplate, err := template.ParseFiles("templates/contact_admin_email.html")
+	contactAdminTemplate, err := template.ParseFiles(fmt.Sprintf("%s/templates/contact_admin_email.html", cwd))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse contact admin template: %v", err)
 	}
 	templates["contact_admin"] = contactAdminTemplate
 
-	contactUserTemplate, err := template.ParseFiles("templates/contact_email.html")
+	contactUserTemplate, err := template.ParseFiles(fmt.Sprintf("%s/templates/contact_email.html", cwd))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse contact user template: %v", err)
 	}
 	templates["contact_user"] = contactUserTemplate
 
 	// Load aanmelding email templates
-	aanmeldingAdminTemplate, err := template.ParseFiles("templates/aanmelding_admin_email.html")
+	aanmeldingAdminTemplate, err := template.ParseFiles(fmt.Sprintf("%s/templates/aanmelding_admin_email.html", cwd))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse aanmelding admin template: %v", err)
 	}
 	templates["aanmelding_admin"] = aanmeldingAdminTemplate
 
-	aanmeldingUserTemplate, err := template.ParseFiles("templates/aanmelding_email.html")
+	aanmeldingUserTemplate, err := template.ParseFiles(fmt.Sprintf("%s/templates/aanmelding_email.html", cwd))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse aanmelding user template: %v", err)
 	}
@@ -134,7 +141,17 @@ func (s *EmailService) sendEmail(to, subject, body string) error {
 		return fmt.Errorf("missing SMTP configuration")
 	}
 
-	d := gomail.NewDialer(smtpHost, 587, smtpUsername, smtpPassword)
+	// Parse SMTP port
+	smtpPort := 587 // Default to 587 if parsing fails
+	if port, err := strconv.Atoi(smtpPortStr); err == nil {
+		smtpPort = port
+	}
+
+	d := gomail.NewDialer(smtpHost, smtpPort, smtpUsername, smtpPassword)
+
+	// Enable SSL/TLS
+	d.SSL = true
+
 	if err := d.DialAndSend(m); err != nil {
 		return fmt.Errorf("failed to send email: %v", err)
 	}
