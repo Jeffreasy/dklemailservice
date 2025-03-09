@@ -14,7 +14,7 @@ import (
 func main() {
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error loading .env file")
+		log.Printf("No .env file found, using environment variables")
 	}
 
 	// Initialize services
