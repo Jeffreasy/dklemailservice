@@ -69,8 +69,7 @@ func main() {
 
 	// Email routes
 	api.Post("/contact-email", emailHandler.HandleContactEmail)
-	// Temporarily disabled until templates are ready
-	// api.Post("/aanmelding-email", emailHandler.HandleAanmeldingEmail)
+	api.Post("/aanmelding-email", emailHandler.HandleAanmeldingEmail)
 
 	// Start server
 	port := os.Getenv("PORT")

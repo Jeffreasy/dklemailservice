@@ -5,6 +5,7 @@ import (
 	"dklautomationgo/services"
 	"log"
 	"os"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -20,12 +21,31 @@ func NewEmailHandler(emailService *services.EmailService) *EmailHandler {
 }
 
 func (h *EmailHandler) HandleContactEmail(c *fiber.Ctx) error {
-	var contact models.ContactFormulier
-	if err := c.BodyParser(&contact); err != nil {
+	// Parse simplified contact form data
+	var formData struct {
+		Naam           string `json:"naam"`
+		Email          string `json:"email"`
+		Bericht        string `json:"bericht"`
+		PrivacyAkkoord bool   `json:"privacy_akkoord"`
+	}
+
+	if err := c.BodyParser(&formData); err != nil {
 		log.Printf("Error parsing contact form: %v", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
+	}
+
+	// Create full contact form data
+	contact := models.ContactFormulier{
+		Naam:           formData.Naam,
+		Email:          formData.Email,
+		Bericht:        formData.Bericht,
+		PrivacyAkkoord: formData.PrivacyAkkoord,
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+		Status:         "nieuw",
+		EmailVerzonden: false,
 	}
 
 	log.Printf("Sending admin email to: %s", os.Getenv("ADMIN_EMAIL"))
