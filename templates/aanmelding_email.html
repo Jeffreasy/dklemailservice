@@ -2,246 +2,64 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bedankt voor je aanmelding - De Koninklijke Loop</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        
         body {
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            font-family: Arial, sans-serif;
             line-height: 1.6;
             color: #333;
-            margin: 0;
-            padding: 0;
-            background-color: #f9fafb;
-        }
-        .container {
             max-width: 600px;
             margin: 0 auto;
             padding: 20px;
-            background-color: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
         .header {
             background-color: #ff9328;
             color: white;
+            padding: 20px;
             text-align: center;
-            padding: 32px;
-            border-radius: 8px 8px 0 0;
-            margin: -20px -20px 20px -20px;
-        }
-        .logo {
-            max-height: 96px;
-            margin-bottom: 20px;
+            border-radius: 5px;
         }
         .content {
-            padding: 32px;
-            background-color: #ffffff;
-        }
-        .details {
-            margin: 24px 0;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        .detail-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 12px 16px;
-            border-bottom: 1px solid #e5e7eb;
-        }
-        .detail-row:last-child {
-            border-bottom: none;
-        }
-        .label {
-            color: #6b7280;
-            font-weight: 500;
-        }
-        .value {
-            color: #111827;
-            font-weight: 600;
-        }
-        .info-box {
-            background-color: #fff7ed;
-            border: 1px solid #fed7aa;
-            border-radius: 8px;
-            padding: 24px;
-            margin: 24px 0;
-        }
-        .info-box h3 {
-            color: #ff9328;
-            margin-top: 0;
-            font-size: 18px;
-        }
-        .info-box ul {
-            list-style-type: none;
-            padding: 0;
-            margin: 16px 0;
-        }
-        .info-box li {
-            padding-left: 20px;
-            position: relative;
-            margin-bottom: 8px;
-        }
-        .info-box li:before {
-            content: "•";
-            color: #ff9328;
-            position: absolute;
-            left: 0;
-        }
-        .location-section {
-            background-color: #f9fafb;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 24px;
-            margin: 24px 0;
-        }
-        .location-header {
-            display: flex;
-            align-items: center;
-            margin-bottom: 16px;
-            color: #ff9328;
-        }
-        .location-details {
-            margin-top: 12px;
-        }
-        .location-details p {
-            margin: 4px 0;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            margin-top: 20px;
         }
         .footer {
             text-align: center;
-            padding-top: 24px;
-            border-top: 1px solid #e5e7eb;
-            margin-top: 32px;
-        }
-        .social-links {
-            margin: 20px 0;
-        }
-        .social-links a {
-            color: #ff9328;
-            text-decoration: none;
-            margin: 0 12px;
-        }
-        .qr-section {
-            text-align: center;
-            margin: 24px 0;
-        }
-        .qr-code {
-            width: 128px;
-            height: 128px;
-            margin: 0 auto;
+            margin-top: 20px;
+            font-size: 0.9em;
+            color: #666;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <img src="https://res.cloudinary.com/dgfuv7wif/image/upload/v1733267882/664b8c1e593a1e81556b4238_0760849fb8_yn6vdm.png" 
-                 alt="De Koninklijke Loop Logo" 
-                 class="logo">
-            <h1 style="font-size: 24px; margin: 0 0 8px 0;">Bedankt voor je aanmelding!</h1>
-            <p style="margin: 0; opacity: 0.9;">We hebben je aanmelding in goede orde ontvangen</p>
-        </div>
+    <div class="header">
+        <h1>Bedankt voor je aanmelding!</h1>
+    </div>
 
-        <div class="content">
-            {{if .ToAdmin}}
-            <h2>Nieuwe aanmelding ontvangen</h2>
-            <div class="details">
-                <div class="detail-row">
-                    <span class="label">Naam:</span>
-                    <span class="value">{{.Aanmelding.Naam}}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="label">E-mail:</span>
-                    <span class="value">{{.Aanmelding.Email}}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="label">Telefoonnummer:</span>
-                    <span class="value">{{.Aanmelding.Telefoonnummer}}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="label">Rol:</span>
-                    <span class="value">{{.Aanmelding.Rol}}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="label">Afstand:</span>
-                    <span class="value">{{.Aanmelding.Afstand}}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="label">Ondersteuning:</span>
-                    <span class="value">{{.Aanmelding.Ondersteuning}}</span>
-                </div>
-                {{if .Aanmelding.Bijzonderheden}}
-                <div class="detail-row">
-                    <span class="label">Bijzonderheden:</span>
-                    <span class="value">{{.Aanmelding.Bijzonderheden}}</span>
-                </div>
-                {{end}}
-            </div>
-            {{else}}
-            <h2 style="font-size: 20px; color: #111827; margin-bottom: 24px;">Je aanmeldgegevens</h2>
-            <div class="details">
-                <div class="detail-row">
-                    <span class="label">Naam</span>
-                    <span class="value">{{.Aanmelding.Naam}}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="label">Rol</span>
-                    <span class="value">{{.Aanmelding.Rol}}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="label">Afstand</span>
-                    <span class="value">{{.Aanmelding.Afstand}}</span>
-                </div>
-                {{if .Aanmelding.Telefoonnummer}}
-                <div class="detail-row">
-                    <span class="label">Telefoon</span>
-                    <span class="value">{{.Aanmelding.Telefoonnummer}}</span>
-                </div>
-                {{end}}
-                {{if .Aanmelding.Ondersteuning}}
-                <div class="detail-row">
-                    <span class="label">Ondersteuning</span>
-                    <span class="value">{{.Aanmelding.Ondersteuning}}</span>
-                </div>
-                {{end}}
-            </div>
+    <div class="content">
+        <p>Beste {{.Aanmelding.Naam}},</p>
 
-            <div class="info-box">
-                <h3>Belangrijke informatie</h3>
-                <ul>
-                    <li>Het evenement vindt plaats op 17 mei 2025</li>
-                    <li>Zorg dat je op tijd aanwezig bent voor je start</li>
-                    <li>Houd onze website in de gaten voor het laatste nieuws</li>
-                    <li>Bewaar deze bevestiging goed</li>
-                </ul>
-            </div>
+        <p>Bedankt voor je aanmelding voor De Koninklijke Loop. We hebben je inschrijving goed ontvangen.</p>
 
-            <div class="location-section">
-                <div class="location-header">
-                    <svg style="width: 24px; height: 24px; margin-right: 12px;" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
-                    </svg>
-                    <h3 style="margin: 0; color: #111827;">Startlocatie</h3>
-                </div>
-                <div class="location-details">
-                    <p style="font-weight: 600; color: #111827;">Grote Kerk</p>
-                    <p>Loolaan 16</p>
-                    <p>7315 AB Apeldoorn</p>
-                </div>
-            </div>
+        <h3>Je gegevens:</h3>
+        <ul>
+            <li><strong>Naam:</strong> {{.Aanmelding.Naam}}</li>
+            <li><strong>Rol:</strong> {{.Aanmelding.Rol}}</li>
+            <li><strong>Gekozen Afstand:</strong> {{.Aanmelding.Afstand}}</li>
+            {{if ne .Aanmelding.Ondersteuning "Nee"}}
+            <li><strong>Ondersteuning:</strong> {{.Aanmelding.Ondersteuning}}</li>
             {{end}}
+        </ul>
 
-            <div class="footer">
-                <div class="social-links">
-                    <a href="https://www.instagram.com/koninklijkeloop" target="_blank">Instagram</a> |
-                    <a href="https://www.youtube.com/@DeKoninklijkeLoop" target="_blank">YouTube</a> |
-                    <a href="https://www.facebook.com/p/De-Koninklijke-Loop-61556315443279/" target="_blank">Facebook</a>
-                </div>
-                <p style="color: #6b7280; font-size: 14px;">De Koninklijke Loop {{.CurrentYear}}</p>
-                <p style="color: #6b7280; font-size: 14px;">www.dekoninklijkeloop.nl | info@dekoninklijkeloop.nl</p>
-            </div>
-        </div>
+        <p>We nemen binnenkort contact met je op voor de verdere afhandeling van je inschrijving.</p>
+
+        <p>Heb je in de tussentijd vragen? Neem dan gerust contact met ons op via info@dekoninklijkeloop.nl</p>
+    </div>
+
+    <div class="footer">
+        <p>Met sportieve groet,<br>Team De Koninklijke Loop</p>
     </div>
 </body>
 </html> 

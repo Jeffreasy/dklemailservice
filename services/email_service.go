@@ -5,9 +5,7 @@ import (
 	"dklautomationgo/models"
 	"fmt"
 	"html/template"
-	"log"
 	"os"
-	"path/filepath"
 
 	"gopkg.in/gomail.v2"
 )
@@ -27,39 +25,39 @@ const emailStyle = `
 </style>`
 
 type EmailService struct {
-	dialer    *gomail.Dialer
 	templates map[string]*template.Template
 }
 
 func NewEmailService() (*EmailService, error) {
-	// Initialize email dialer
-	dialer := gomail.NewDialer(
-		os.Getenv("SMTP_HOST"),
-		587,
-		os.Getenv("SMTP_USER"),
-		os.Getenv("SMTP_PASSWORD"),
-	)
-
-	// Load email templates
 	templates := make(map[string]*template.Template)
-	templateDir := "templates"
 
-	// Only load contact form templates for now
-	templateFiles := []string{
-		"contact_email.html",
-		"contact_admin_email.html",
+	// Load contact email templates
+	contactAdminTemplate, err := template.ParseFiles("templates/contact_admin_email.html")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse contact admin template: %v", err)
 	}
+	templates["contact_admin"] = contactAdminTemplate
 
-	for _, file := range templateFiles {
-		tmpl, err := template.ParseFiles(filepath.Join(templateDir, file))
-		if err != nil {
-			return nil, fmt.Errorf("error loading template %s: %v", file, err)
-		}
-		templates[file] = tmpl
+	contactUserTemplate, err := template.ParseFiles("templates/contact_email.html")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse contact user template: %v", err)
 	}
+	templates["contact_user"] = contactUserTemplate
+
+	// Load aanmelding email templates
+	aanmeldingAdminTemplate, err := template.ParseFiles("templates/aanmelding_admin_email.html")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse aanmelding admin template: %v", err)
+	}
+	templates["aanmelding_admin"] = aanmeldingAdminTemplate
+
+	aanmeldingUserTemplate, err := template.ParseFiles("templates/aanmelding_email.html")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse aanmelding user template: %v", err)
+	}
+	templates["aanmelding_user"] = aanmeldingUserTemplate
 
 	return &EmailService{
-		dialer:    dialer,
 		templates: templates,
 	}, nil
 }
@@ -81,47 +79,79 @@ func formatEmptyField(value string) string {
 func (s *EmailService) SendContactEmail(data *models.ContactEmailData) error {
 	var templateName string
 	var subject string
-	var toEmail string
+	var recipient string
 
 	if data.ToAdmin {
-		templateName = "contact_admin_email.html"
-		subject = fmt.Sprintf("Nieuw contactformulier van %s", data.Contact.Naam)
-		toEmail = data.AdminEmail
+		templateName = "contact_admin"
+		subject = "Nieuw contactformulier ontvangen"
+		recipient = data.AdminEmail
 	} else {
-		templateName = "contact_email.html"
-		subject = "Bedankt voor je bericht - De Koninklijke Loop"
-		toEmail = data.Contact.Email
+		templateName = "contact_user"
+		subject = "Bedankt voor je bericht"
+		recipient = data.Contact.Email
 	}
 
-	// Execute template
+	template := s.templates[templateName]
+	if template == nil {
+		return fmt.Errorf("template not found: %s", templateName)
+	}
+
 	var body bytes.Buffer
-	if err := s.templates[templateName].Execute(&body, data); err != nil {
-		log.Printf("Template execution error: %v", err)
-		return fmt.Errorf("error executing template: %v", err)
+	if err := template.Execute(&body, data); err != nil {
+		return fmt.Errorf("failed to execute template: %v", err)
 	}
 
-	// Create email message
+	return s.sendEmail(recipient, subject, body.String())
+}
+
+func (s *EmailService) SendAanmeldingEmail(data *models.AanmeldingEmailData) error {
+	var templateName string
+	var subject string
+	var recipient string
+
+	if data.ToAdmin {
+		templateName = "aanmelding_admin"
+		subject = "Nieuwe aanmelding ontvangen"
+		recipient = data.AdminEmail
+	} else {
+		templateName = "aanmelding_user"
+		subject = "Bedankt voor je aanmelding"
+		recipient = data.Aanmelding.Email
+	}
+
+	template := s.templates[templateName]
+	if template == nil {
+		return fmt.Errorf("template not found: %s", templateName)
+	}
+
+	var body bytes.Buffer
+	if err := template.Execute(&body, data); err != nil {
+		return fmt.Errorf("failed to execute template: %v", err)
+	}
+
+	return s.sendEmail(recipient, subject, body.String())
+}
+
+func (s *EmailService) sendEmail(to, subject, body string) error {
 	m := gomail.NewMessage()
-	m.SetHeader("From", fmt.Sprintf("De Koninklijke Loop <%s>", os.Getenv("SMTP_FROM")))
-	m.SetHeader("To", toEmail)
-	if !data.ToAdmin {
-		m.SetHeader("Reply-To", os.Getenv("ADMIN_EMAIL"))
-	}
+	m.SetHeader("From", "noreply@dekoninklijkeloop.nl")
+	m.SetHeader("To", to)
 	m.SetHeader("Subject", subject)
-	m.SetBody("text/html", body.String())
+	m.SetBody("text/html", body)
 
-	// Send email
-	if err := s.dialer.DialAndSend(m); err != nil {
-		log.Printf("Error sending email: %v", err)
-		return fmt.Errorf("error sending email: %v", err)
+	smtpHost := os.Getenv("SMTP_HOST")
+	smtpPortStr := os.Getenv("SMTP_PORT")
+	smtpUsername := os.Getenv("SMTP_USERNAME")
+	smtpPassword := os.Getenv("SMTP_PASSWORD")
+
+	if smtpHost == "" || smtpPortStr == "" || smtpUsername == "" || smtpPassword == "" {
+		return fmt.Errorf("missing SMTP configuration")
+	}
+
+	d := gomail.NewDialer(smtpHost, 587, smtpUsername, smtpPassword)
+	if err := d.DialAndSend(m); err != nil {
+		return fmt.Errorf("failed to send email: %v", err)
 	}
 
 	return nil
 }
-
-// Tijdelijk uitgeschakeld tot we de aanmelding templates hebben
-/*
-func (s *EmailService) SendAanmeldingEmail(data *models.AanmeldingEmailData) error {
-	return fmt.Errorf("aanmelding email service temporarily disabled")
-}
-*/

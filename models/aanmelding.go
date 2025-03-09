@@ -19,3 +19,15 @@ type Aanmelding struct {
 	EmailVerzonden bool       `json:"email_verzonden"`
 	EmailVerzondOp *time.Time `json:"email_verzonden_op"`
 }
+
+// AanmeldingFormulier represents the registration form data from the frontend
+type AanmeldingFormulier struct {
+	Naam           string `json:"naam"`
+	Email          string `json:"email"`
+	Telefoonnummer string `json:"telefoon"`
+	Rol            string `json:"rol"`
+	Afstand        string `json:"afstand"`
+	Ondersteuning  string `json:"ondersteuning"`
+	Bijzonderheden string `json:"bijzonderheden"`
+	Terms          bool   `json:"terms"`
+}

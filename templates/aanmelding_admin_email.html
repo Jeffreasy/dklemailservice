@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Nieuwe Aanmelding - De Koninklijke Loop</title>
+</head>
+<body>
+    <h2>Nieuwe Aanmelding Ontvangen</h2>
+    <p>Er is een nieuwe aanmelding binnengekomen via het aanmeldformulier:</p>
+
+    <h3>Deelnemer Gegevens:</h3>
+    <ul>
+        <li><strong>Naam:</strong> {{.Aanmelding.Naam}}</li>
+        <li><strong>E-mail:</strong> {{.Aanmelding.Email}}</li>
+        <li><strong>Telefoonnummer:</strong> {{.Aanmelding.Telefoonnummer}}</li>
+        <li><strong>Rol:</strong> {{.Aanmelding.Rol}}</li>
+        <li><strong>Gekozen Afstand:</strong> {{.Aanmelding.Afstand}}</li>
+        <li><strong>Ondersteuning nodig:</strong> {{.Aanmelding.Ondersteuning}}</li>
+        {{if .Aanmelding.Bijzonderheden}}
+        <li><strong>Bijzonderheden:</strong> {{.Aanmelding.Bijzonderheden}}</li>
+        {{end}}
+    </ul>
+
+    <p>De deelnemer heeft de algemene voorwaarden geaccepteerd: {{if .Aanmelding.Terms}}Ja{{else}}Nee{{end}}</p>
+</body>
+</html> 

@@ -9,7 +9,7 @@ type ContactEmailData struct {
 
 // AanmeldingEmailData bevat de data nodig voor het versturen van aanmelding emails
 type AanmeldingEmailData struct {
-	ToAdmin    bool
-	Aanmelding *Aanmelding
-	AdminEmail string
+	ToAdmin    bool                 `json:"to_admin"`
+	Aanmelding *AanmeldingFormulier `json:"aanmelding"`
+	AdminEmail string               `json:"admin_email,omitempty"`
 }

@@ -64,11 +64,47 @@ func (h *EmailHandler) HandleContactEmail(c *fiber.Ctx) error {
 	})
 }
 
-// Temporarily disabled until templates are ready
-/*
 func (h *EmailHandler) HandleAanmeldingEmail(c *fiber.Ctx) error {
-	return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{
-		"error": "Registration email service temporarily disabled",
+	var aanmelding models.AanmeldingFormulier
+	if err := c.BodyParser(&aanmelding); err != nil {
+		log.Printf("Error parsing aanmelding form: %v", err)
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	log.Printf("Sending admin email to: %s", os.Getenv("ADMIN_EMAIL"))
+
+	// Stuur email naar admin
+	adminEmailData := &models.AanmeldingEmailData{
+		ToAdmin:    true,
+		Aanmelding: &aanmelding,
+		AdminEmail: os.Getenv("ADMIN_EMAIL"),
+	}
+	if err := h.emailService.SendAanmeldingEmail(adminEmailData); err != nil {
+		log.Printf("Error sending admin email: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to send admin notification",
+		})
+	}
+
+	log.Printf("Successfully sent admin email to: %s", os.Getenv("ADMIN_EMAIL"))
+
+	// Stuur bevestigingsemail naar gebruiker
+	userEmailData := &models.AanmeldingEmailData{
+		ToAdmin:    false,
+		Aanmelding: &aanmelding,
+	}
+	if err := h.emailService.SendAanmeldingEmail(userEmailData); err != nil {
+		log.Printf("Error sending user email: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to send confirmation email",
+		})
+	}
+
+	log.Printf("Successfully sent confirmation email to: %s", aanmelding.Email)
+
+	return c.JSON(fiber.Map{
+		"message": "Emails sent successfully",
 	})
 }
-*/
