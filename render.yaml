@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: dklautomatie-backend
+    env: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+    healthCheckPath: /api/health
+    buildCommand: docker build -t dklautomatie-backend .
+    startCommand: docker run -p 8080:8080 dklautomatie-backend 

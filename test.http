@@ -1,0 +1,33 @@
+### Health Check
+GET http://localhost:8080/health
+
+### Test Contact Form Email
+POST http://localhost:8080/api/contact-email
+Content-Type: application/json
+
+{
+    "id": "3b7fadbd-85a1-4d54-988f-6ad378bde0df",
+    "naam": "Test Persoon",
+    "email": "test@example.com",
+    "bericht": "Dit is een test bericht om de email service te controleren.",
+    "privacy_akkoord": true,
+    "status": "nieuw"
+}
+
+### Test Aanmelding Email
+POST http://localhost:8080/api/aanmelding-email
+Content-Type: application/json
+
+{
+    "id": "26ea058b-2608-49d0-862a-611e98d7dc61",
+    "naam": "Janny van de Wall",
+    "email": "test@example.com",
+    "telefoon": null,
+    "rol": "Deelnemer",
+    "afstand": "10 KM",
+    "ondersteuning": "Nee",
+    "bijzonderheden": "",
+    "terms": true,
+    "email_verzonden": false,
+    "email_verzonden_op": null
+} 
