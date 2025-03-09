@@ -10,7 +10,7 @@ type Aanmelding struct {
 	UpdatedAt      time.Time  `json:"updated_at"`
 	Naam           string     `json:"naam"`
 	Email          string     `json:"email"`
-	Telefoonnummer string     `json:"telefoon"`
+	Telefoon       string     `json:"telefoon"`
 	Rol            string     `json:"rol"`
 	Afstand        string     `json:"afstand"`
 	Ondersteuning  string     `json:"ondersteuning"`
@@ -24,7 +24,7 @@ type Aanmelding struct {
 type AanmeldingFormulier struct {
 	Naam           string `json:"naam"`
 	Email          string `json:"email"`
-	Telefoonnummer string `json:"telefoon"`
+	Telefoon       string `json:"telefoon"`
 	Rol            string `json:"rol"`
 	Afstand        string `json:"afstand"`
 	Ondersteuning  string `json:"ondersteuning"`
