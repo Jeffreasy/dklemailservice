@@ -1,7 +1,7 @@
 services:
   - type: web
     name: dklautomatie-backend
-    env: docker
+    runtime: docker
     dockerfilePath: ./Dockerfile
     envVars:
       - key: ADMIN_EMAIL
@@ -13,6 +13,8 @@ services:
       - key: SMTP_USERNAME
         sync: false
       - key: SMTP_PASSWORD
+        sync: false
+      - key: ALLOWED_ORIGINS
         sync: false
     healthCheckPath: /api/health
     buildCommand: docker build -t dklautomatie-backend .
