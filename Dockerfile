@@ -29,8 +29,8 @@ RUN apk --no-cache add ca-certificates
 # Copy the binary from builder
 COPY --from=builder /app/main .
 
-# Copy .env file if it exists (for development)
-COPY --from=builder /app/.env ./.env 2>/dev/null || true
+# Copy templates directory
+COPY --from=builder /app/templates ./templates
 
 # Expose port
 EXPOSE 8080
