@@ -51,17 +51,20 @@ func main() {
 		})
 	})
 
+	// API routes group
+	api := app.Group("/api")
+
 	// Health check endpoint
-	app.Get("/api/health", func(c *fiber.Ctx) error {
+	api.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"status": "healthy",
 		})
 	})
 
-	// Routes
-	app.Post("/contact-email", emailHandler.HandleContactEmail)
+	// Email routes
+	api.Post("/contact-email", emailHandler.HandleContactEmail)
 	// Temporarily disabled until templates are ready
-	// app.Post("/aanmelding-email", emailHandler.HandleAanmeldingEmail)
+	// api.Post("/aanmelding-email", emailHandler.HandleAanmeldingEmail)
 
 	// Start server
 	port := os.Getenv("PORT")
