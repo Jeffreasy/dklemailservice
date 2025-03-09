@@ -43,6 +43,14 @@ func main() {
 		AllowMethods: "GET,POST,OPTIONS",
 	}))
 
+	// Root route
+	app.Get("/", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"message": "DKL Email Service API",
+			"version": "1.0.0",
+		})
+	})
+
 	// Health check endpoint
 	app.Get("/api/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
@@ -58,7 +66,7 @@ func main() {
 	// Start server
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080"
+		port = "8080" // Default to 8080 for web traffic
 	}
 
 	log.Printf("Server starting on port %s", port)
