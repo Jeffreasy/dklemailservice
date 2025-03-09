@@ -136,27 +136,34 @@ func (s *EmailService) sendEmail(to, subject, body string) error {
 	log.Printf("Attempting to send email to: %s with subject: %s", to, subject)
 
 	m := gomail.NewMessage()
-	m.SetHeader("From", "noreply@dekoninklijkeloop.nl")
+	fromEmail := os.Getenv("SMTP_FROM")
+	if fromEmail == "" {
+		fromEmail = "noreply@dekoninklijkeloop.nl"
+	}
+	m.SetHeader("From", fromEmail)
 	m.SetHeader("To", to)
 	m.SetHeader("Subject", subject)
 	m.SetBody("text/html", body)
 
 	smtpHost := os.Getenv("SMTP_HOST")
 	smtpPortStr := os.Getenv("SMTP_PORT")
-	smtpUsername := os.Getenv("SMTP_USERNAME")
+	if smtpPortStr == "" {
+		smtpPortStr = "587" // Default port for TLS
+	}
+	smtpUsername := os.Getenv("SMTP_USER") // Changed from SMTP_USERNAME to SMTP_USER
 	smtpPassword := os.Getenv("SMTP_PASSWORD")
 
-	log.Printf("SMTP Configuration - Host: %s, Port: %s, Username: %s", smtpHost, smtpPortStr, smtpUsername)
+	log.Printf("SMTP Configuration - Host: %s, Port: %s, Username: %s, From: %s", smtpHost, smtpPortStr, smtpUsername, fromEmail)
 
-	if smtpHost == "" || smtpPortStr == "" || smtpUsername == "" || smtpPassword == "" {
-		return fmt.Errorf("missing SMTP configuration - Host: %s, Port: %s, Username: %s", smtpHost, smtpPortStr, smtpUsername)
+	if smtpHost == "" || smtpUsername == "" || smtpPassword == "" {
+		return fmt.Errorf("missing SMTP configuration - Host: %s, Username: %s", smtpHost, smtpUsername)
 	}
 
 	// Parse SMTP port
 	smtpPort, err := strconv.Atoi(smtpPortStr)
 	if err != nil {
-		log.Printf("Invalid SMTP port number: %v", err)
-		return fmt.Errorf("invalid SMTP port number: %v", err)
+		log.Printf("Invalid SMTP port number: %v, using default 587", err)
+		smtpPort = 587
 	}
 
 	d := gomail.NewDialer(smtpHost, smtpPort, smtpUsername, smtpPassword)
