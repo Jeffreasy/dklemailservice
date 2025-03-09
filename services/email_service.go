@@ -62,20 +62,6 @@ func NewEmailService() (*EmailService, error) {
 	}, nil
 }
 
-type templateData struct {
-	ToAdmin     bool
-	Contact     *models.ContactFormulier
-	Aanmelding  *models.Aanmelding
-	CurrentYear int
-}
-
-func formatEmptyField(value string) string {
-	if value == "" {
-		return `<span class="empty-field">Niet opgegeven</span>`
-	}
-	return value
-}
-
 func (s *EmailService) SendContactEmail(data *models.ContactEmailData) error {
 	var templateName string
 	var subject string
