@@ -2,6 +2,7 @@ package services
 
 import (
 	"bytes"
+	"crypto/tls"
 	"dklautomationgo/models"
 	"fmt"
 	"html/template"
@@ -152,19 +153,20 @@ func (s *EmailService) sendEmail(to, subject, body string) error {
 	}
 
 	// Parse SMTP port
-	smtpPort := 587 // Default to 587 if parsing fails
-	if port, err := strconv.Atoi(smtpPortStr); err == nil {
-		smtpPort = port
-	} else {
-		log.Printf("Failed to parse SMTP port, using default 587: %v", err)
+	smtpPort, err := strconv.Atoi(smtpPortStr)
+	if err != nil {
+		log.Printf("Invalid SMTP port number: %v", err)
+		return fmt.Errorf("invalid SMTP port number: %v", err)
 	}
 
 	d := gomail.NewDialer(smtpHost, smtpPort, smtpUsername, smtpPassword)
 
-	// Enable SSL/TLS
-	d.SSL = true
+	// Configure TLS
+	d.TLSConfig = &tls.Config{
+		ServerName: smtpHost,
+	}
 
-	log.Printf("Attempting to connect to SMTP server: %s:%d", smtpHost, smtpPort)
+	log.Printf("Attempting to connect to SMTP server: %s:%d with TLS", smtpHost, smtpPort)
 	if err := d.DialAndSend(m); err != nil {
 		log.Printf("Failed to send email: %v", err)
 		return fmt.Errorf("failed to send email: %v", err)
