@@ -237,6 +237,7 @@ type mockRateLimiter struct {
 		period   time.Duration
 		perEmail bool
 	}
+	currentCounts map[string]int
 }
 
 func newMockRateLimiter() *mockRateLimiter {
@@ -247,11 +248,28 @@ func newMockRateLimiter() *mockRateLimiter {
 			period   time.Duration
 			perEmail bool
 		}),
+		currentCounts: make(map[string]int),
 	}
 }
 
 func (m *mockRateLimiter) AllowEmail(operation, email string) bool {
 	return !m.shouldLimit
+}
+
+func (m *mockRateLimiter) GetLimits() map[string]services.RateLimit {
+	limits := make(map[string]services.RateLimit)
+	for op, l := range m.limits {
+		limits[op] = services.RateLimit{
+			Count:  l.limit,
+			Period: l.period,
+			PerIP:  l.perEmail,
+		}
+	}
+	return limits
+}
+
+func (m *mockRateLimiter) GetCurrentCount(operationType string, key string) int {
+	return m.currentCounts[operationType]
 }
 
 func (m *mockRateLimiter) SetShouldLimit(limit bool) {
@@ -268,6 +286,11 @@ func (m *mockRateLimiter) AddLimit(operation string, limit int, period time.Dura
 		period:   period,
 		perEmail: perEmail,
 	}
+}
+
+// SetCurrentCount is een helper functie voor tests
+func (m *mockRateLimiter) SetCurrentCount(operationType string, count int) {
+	m.currentCounts[operationType] = count
 }
 
 // mockPrometheusMetrics implementeert de PrometheusMetrics interface voor tests

@@ -11,6 +11,8 @@ import (
 // RateLimiterInterface definieert de interface voor rate limiting
 type RateLimiterInterface interface {
 	AllowEmail(operation, key string) bool
+	GetLimits() map[string]RateLimit
+	GetCurrentCount(operationType string, key string) int
 }
 
 // RateLimit definieert beperkingen voor email verzending
@@ -219,4 +221,18 @@ func (rl *RateLimiter) cleanup() {
 func (rl *RateLimiter) Shutdown() {
 	rl.cleanupTicker.Stop()
 	rl.done <- true
+}
+
+// GetLimits geeft alle geconfigureerde limieten terug
+func (rl *RateLimiter) GetLimits() map[string]RateLimit {
+	rl.mutex.Lock()
+	defer rl.mutex.Unlock()
+
+	// Maak een kopie van de limieten map
+	limits := make(map[string]RateLimit, len(rl.limits))
+	for k, v := range rl.limits {
+		limits[k] = v
+	}
+
+	return limits
 }
