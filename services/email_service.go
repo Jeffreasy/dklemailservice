@@ -2,106 +2,64 @@ package services
 
 import (
 	"bytes"
-	"crypto/tls"
+	"dklautomationgo/logger"
 	"dklautomationgo/models"
 	"fmt"
 	"html/template"
-	"log"
-	"os"
-	"strconv"
-
-	"gopkg.in/gomail.v2"
+	"path/filepath"
+	"time"
 )
 
-const emailStyle = `
-<style>
-	body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-	.container { max-width: 600px; margin: 0 auto; padding: 20px; }
-	h2 { color: #2c5282; margin-bottom: 20px; }
-	h3 { color: #2d3748; margin-top: 20px; }
-	.info-item { margin: 10px 0; }
-	.info-label { font-weight: bold; color: #4a5568; }
-	ul { list-style-type: none; padding-left: 0; }
-	li { margin: 10px 0; }
-	.footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; }
-	.empty-field { color: #718096; font-style: italic; }
-</style>`
+var RetryDelayFactor = 100 // milliseconden
 
-type EmailService struct {
-	templates map[string]*template.Template
+// SMTPClient interface definieert de methode voor het verzenden van emails
+type SMTPClient interface {
+	Send(msg *EmailMessage) error
+	SendRegistration(msg *EmailMessage) error
+	SendEmail(to, subject, body string) error
 }
 
-func NewEmailService() (*EmailService, error) {
-	templates := make(map[string]*template.Template)
+// EmailService beheert email templates en afhandeling van email verzending
+type EmailService struct {
+	templates         map[string]*template.Template
+	rateLimiter       RateLimiterInterface
+	smtpClient        SMTPClient
+	metrics           *EmailMetrics
+	prometheusMetrics PrometheusMetricsInterface
+}
 
-	// Get the current working directory
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get working directory: %v", err)
-	}
+// EmailMessage representeert een te verzenden email
+type EmailMessage struct {
+	To      string
+	Subject string
+	Body    string
+}
 
-	// Load contact email templates
-	contactAdminTemplate, err := template.ParseFiles(fmt.Sprintf("%s/templates/contact_admin_email.html", cwd))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse contact admin template: %v", err)
-	}
-	templates["contact_admin"] = contactAdminTemplate
-
-	contactUserTemplate, err := template.ParseFiles(fmt.Sprintf("%s/templates/contact_email.html", cwd))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse contact user template: %v", err)
-	}
-	templates["contact_user"] = contactUserTemplate
-
-	// Load aanmelding email templates
-	aanmeldingAdminTemplate, err := template.ParseFiles(fmt.Sprintf("%s/templates/aanmelding_admin_email.html", cwd))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse aanmelding admin template: %v", err)
-	}
-	templates["aanmelding_admin"] = aanmeldingAdminTemplate
-
-	aanmeldingUserTemplate, err := template.ParseFiles(fmt.Sprintf("%s/templates/aanmelding_email.html", cwd))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse aanmelding user template: %v", err)
-	}
-	templates["aanmelding_user"] = aanmeldingUserTemplate
-
+// NewEmailService maakt een nieuwe EmailService met de opgegeven SMTP client
+// Laadt templates uit de configureerbare template directory
+// en configureert rate limiting op basis van omgevingsvariabelen
+func NewEmailService(smtpClient SMTPClient, metrics *EmailMetrics, rateLimiter RateLimiterInterface, prometheusMetrics PrometheusMetricsInterface) *EmailService {
 	return &EmailService{
-		templates: templates,
-	}, nil
+		smtpClient:        smtpClient,
+		metrics:           metrics,
+		rateLimiter:       rateLimiter,
+		prometheusMetrics: prometheusMetrics,
+	}
 }
 
 func (s *EmailService) SendContactEmail(data *models.ContactEmailData) error {
-	var templateName string
-	var subject string
-	var recipient string
-
+	// Log appropriately
 	if data.ToAdmin {
-		templateName = "contact_admin"
-		subject = "Nieuw contactformulier ontvangen"
-		recipient = data.AdminEmail
-		log.Printf("Sending admin email to: %s using template: %s", recipient, templateName)
-	} else {
-		templateName = "contact_user"
-		subject = "Bedankt voor je bericht"
-		recipient = data.Contact.Email
-		log.Printf("Sending user email to: %s using template: %s", recipient, templateName)
+		logger.Debug("Contact admin email wordt voorbereid",
+			"naam", data.Contact.Naam,
+			"email", data.Contact.Email)
+		return s.sendEmailWithTemplate("contact_admin", data.AdminEmail, "Nieuw contactformulier", data)
 	}
 
-	template := s.templates[templateName]
-	if template == nil {
-		log.Printf("Template not found: %s", templateName)
-		return fmt.Errorf("template not found: %s", templateName)
-	}
-
-	var body bytes.Buffer
-	if err := template.Execute(&body, data); err != nil {
-		log.Printf("Failed to execute template: %v", err)
-		return fmt.Errorf("failed to execute template: %v", err)
-	}
-
-	log.Printf("Successfully generated email body for template: %s", templateName)
-	return s.sendEmail(recipient, subject, body.String())
+	logger.Debug("Contact bevestigingsemail wordt voorbereid",
+		"naam", data.Contact.Naam,
+		"email", data.Contact.Email)
+	return s.sendEmailWithTemplate("contact_user", data.Contact.Email, "Bedankt voor je bericht", data)
 }
 
 func (s *EmailService) SendAanmeldingEmail(data *models.AanmeldingEmailData) error {
@@ -129,56 +87,196 @@ func (s *EmailService) SendAanmeldingEmail(data *models.AanmeldingEmailData) err
 		return fmt.Errorf("failed to execute template: %v", err)
 	}
 
-	return s.sendEmail(recipient, subject, body.String())
+	msg := &EmailMessage{
+		To:      recipient,
+		Subject: subject,
+		Body:    body.String(),
+	}
+
+	if !s.rateLimiter.AllowEmail("email_generic", "") {
+		return fmt.Errorf("rate limit exceeded")
+	}
+
+	var err error
+	if data.ToAdmin {
+		err = s.smtpClient.Send(msg) // Gebruik standaard SMTP voor admin emails
+	} else {
+		err = s.smtpClient.SendRegistration(msg) // Gebruik registratie SMTP voor gebruiker emails
+	}
+
+	if err != nil {
+		if s.metrics != nil {
+			s.metrics.RecordEmailFailed("aanmelding_email")
+		}
+		s.prometheusMetrics.RecordEmailFailed("aanmelding_email", "smtp_error")
+		return err
+	}
+
+	if s.metrics != nil {
+		s.metrics.RecordEmailSent("aanmelding_email")
+	}
+	s.prometheusMetrics.RecordEmailSent("aanmelding_email", "success")
+	return nil
 }
 
 func (s *EmailService) sendEmail(to, subject, body string) error {
-	log.Printf("Attempting to send email to: %s with subject: %s", to, subject)
-
-	m := gomail.NewMessage()
-	fromEmail := os.Getenv("SMTP_FROM")
-	if fromEmail == "" {
-		fromEmail = "noreply@dekoninklijkeloop.nl"
-	}
-	m.SetHeader("From", fromEmail)
-	m.SetHeader("To", to)
-	m.SetHeader("Subject", subject)
-	m.SetBody("text/html", body)
-
-	smtpHost := os.Getenv("SMTP_HOST")
-	smtpPortStr := os.Getenv("SMTP_PORT")
-	if smtpPortStr == "" {
-		smtpPortStr = "587" // Default port for TLS
-	}
-	smtpUsername := os.Getenv("SMTP_USER") // Changed from SMTP_USERNAME to SMTP_USER
-	smtpPassword := os.Getenv("SMTP_PASSWORD")
-
-	log.Printf("SMTP Configuration - Host: %s, Port: %s, Username: %s, From: %s", smtpHost, smtpPortStr, smtpUsername, fromEmail)
-
-	if smtpHost == "" || smtpUsername == "" || smtpPassword == "" {
-		return fmt.Errorf("missing SMTP configuration - Host: %s, Username: %s", smtpHost, smtpUsername)
+	if !s.rateLimiter.AllowEmail("email_generic", "") {
+		return fmt.Errorf("rate limit exceeded")
 	}
 
-	// Parse SMTP port
-	smtpPort, err := strconv.Atoi(smtpPortStr)
+	msg := &EmailMessage{
+		To:      to,
+		Subject: subject,
+		Body:    body,
+	}
+
+	err := s.smtpClient.Send(msg)
 	if err != nil {
-		log.Printf("Invalid SMTP port number: %v, using default 587", err)
-		smtpPort = 587
+		if s.metrics != nil {
+			s.metrics.RecordEmailFailed("email_generic")
+		}
+		return err
 	}
 
-	d := gomail.NewDialer(smtpHost, smtpPort, smtpUsername, smtpPassword)
-
-	// Configure TLS
-	d.TLSConfig = &tls.Config{
-		ServerName: smtpHost,
+	if s.metrics != nil {
+		s.metrics.RecordEmailSent("email_generic")
 	}
 
-	log.Printf("Attempting to connect to SMTP server: %s:%d with TLS", smtpHost, smtpPort)
-	if err := d.DialAndSend(m); err != nil {
-		log.Printf("Failed to send email: %v", err)
-		return fmt.Errorf("failed to send email: %v", err)
-	}
-
-	log.Printf("Successfully sent email to: %s", to)
 	return nil
+}
+
+func (s *EmailService) GetTemplate(name string) *template.Template {
+	return s.templates[name]
+}
+
+func ValidateTemplate(tmpl *template.Template, data interface{}) error {
+	var buf bytes.Buffer
+	return tmpl.Execute(&buf, data)
+}
+
+func (s *EmailService) SendEmail(to, subject, body string) error {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start)
+		s.prometheusMetrics.ObserveEmailLatency("email_generic", duration.Seconds())
+	}()
+
+	if !s.rateLimiter.AllowEmail("email_generic", "") {
+		return fmt.Errorf("rate limit exceeded")
+	}
+
+	msg := &EmailMessage{
+		To:      to,
+		Subject: subject,
+		Body:    body,
+	}
+
+	err := s.smtpClient.Send(msg)
+	if err != nil {
+		if s.metrics != nil {
+			s.metrics.RecordEmailFailed("email_generic")
+		}
+		s.prometheusMetrics.RecordEmailFailed("email", "smtp_error")
+		return err
+	}
+
+	if s.metrics != nil {
+		s.metrics.RecordEmailSent("email_generic")
+	}
+	s.prometheusMetrics.RecordEmailSent("email", "success")
+	return nil
+}
+
+func NewTestEmailService(smtpClient SMTPClient) (*EmailService, error) {
+	// Maak een eenvoudige template voor testen
+	tmpl, err := template.New("test").Parse("<p>Test template</p>")
+	if err != nil {
+		return nil, err
+	}
+
+	templates := make(map[string]*template.Template)
+	templates["contact_admin"] = tmpl
+	templates["contact_user"] = tmpl
+	templates["aanmelding_admin"] = tmpl
+	templates["aanmelding_user"] = tmpl
+
+	// Maak een metrics tracker voor testen
+	metrics := NewEmailMetrics(24 * time.Hour)
+
+	// Maak een test RateLimiter
+	rateLimiter := NewRateLimiter(nil)
+	rateLimiter.AddLimit("email_generic", 1000, time.Minute, false)
+
+	return &EmailService{
+		templates:         templates,
+		rateLimiter:       rateLimiter,
+		smtpClient:        smtpClient,
+		metrics:           metrics,
+		prometheusMetrics: nil,
+	}, nil
+}
+
+func (s *EmailService) sendEmailWithTemplate(templateName, to, subject string, data interface{}) error {
+	template := s.templates[templateName]
+	if template == nil {
+		logger.Error("Template not found", "template", templateName)
+		return fmt.Errorf("template not found: %s", templateName)
+	}
+
+	var body bytes.Buffer
+	if err := template.Execute(&body, data); err != nil {
+		logger.Error("Failed to execute template", "error", err)
+		return fmt.Errorf("failed to execute template: %v", err)
+	}
+
+	logger.Debug("Successfully generated email body for template", "template", templateName)
+	return s.sendEmail(to, subject, body.String())
+}
+
+// SendTemplateEmail verzendt een email met template (voor batcher)
+func (s *EmailService) SendTemplateEmail(recipient, subject, templateName string, templateData map[string]interface{}) error {
+	// Template verwerken
+	body, err := s.renderEmailTemplate(templateName, templateData)
+	if err != nil {
+		s.metrics.RecordEmailFailed(templateName)
+		return err
+	}
+
+	// Email verzenden
+	err = s.smtpClient.SendEmail(recipient, subject, body)
+	if err != nil {
+		s.metrics.RecordEmailFailed(templateName)
+		return err
+	}
+
+	s.metrics.RecordEmailSent(templateName)
+	return nil
+}
+
+// renderEmailTemplate verwerkt een template bestand met data
+func (s *EmailService) renderEmailTemplate(templateFile string, data interface{}) (string, error) {
+	templatePath := filepath.Join("templates", templateFile)
+	tmpl, err := template.ParseFiles(templatePath)
+	if err != nil {
+		logger.Error("Template parsing fout", "error", err, "template", templateFile)
+		return "", err
+	}
+
+	var rendered bytes.Buffer
+	if err := tmpl.Execute(&rendered, data); err != nil {
+		logger.Error("Template rendering fout", "error", err, "template", templateFile)
+		return "", err
+	}
+
+	return rendered.String(), nil
+}
+
+// SetMetrics stelt een nieuwe metrics tracker in (voor testen)
+func (s *EmailService) SetMetrics(metrics *EmailMetrics) {
+	s.metrics = metrics
+}
+
+// SetRateLimiter stelt een nieuwe rate limiter in (voor testen)
+func (s *EmailService) SetRateLimiter(limiter RateLimiterInterface) {
+	s.rateLimiter = limiter
 }
