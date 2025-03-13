@@ -21,11 +21,21 @@ import (
 // ValidateEnv controleert of alle benodigde omgevingsvariabelen zijn ingesteld
 func ValidateEnv() error {
 	required := []string{
+		// Algemene SMTP configuratie
 		"SMTP_HOST",
 		"SMTP_USER",
 		"SMTP_PASSWORD",
 		"SMTP_FROM",
+
+		// Registratie SMTP configuratie
+		"REGISTRATION_SMTP_HOST",
+		"REGISTRATION_SMTP_USER",
+		"REGISTRATION_SMTP_PASSWORD",
+		"REGISTRATION_SMTP_FROM",
+
+		// Email adressen
 		"ADMIN_EMAIL",
+		"REGISTRATION_EMAIL",
 	}
 
 	for _, env := range required {
@@ -81,8 +91,11 @@ func main() {
 		os.Getenv("SMTP_USER"),
 		os.Getenv("SMTP_PASSWORD"),
 		os.Getenv("SMTP_FROM"),
-		os.Getenv("REGISTRATION_EMAIL"),
-		os.Getenv("REGISTRATION_PASSWORD"),
+		os.Getenv("REGISTRATION_SMTP_HOST"),
+		os.Getenv("REGISTRATION_SMTP_PORT"),
+		os.Getenv("REGISTRATION_SMTP_USER"),
+		os.Getenv("REGISTRATION_SMTP_PASSWORD"),
+		os.Getenv("REGISTRATION_SMTP_FROM"),
 	)
 
 	// Initialize services

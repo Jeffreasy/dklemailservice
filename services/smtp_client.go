@@ -30,26 +30,31 @@ type RealSMTPClient struct {
 }
 
 // NewRealSMTPClient creates a new SMTP client with the given configuration
-func NewRealSMTPClient(host, port, user, password, from, regUser, regPassword string) *RealSMTPClient {
-	portNum, err := strconv.Atoi(port)
+func NewRealSMTPClient(host, port, user, password, from, regHost, regPort, regUser, regPassword, regFrom string) *RealSMTPClient {
+	defaultPortNum, err := strconv.Atoi(port)
 	if err != nil {
-		portNum = 587 // Default SMTP port
+		defaultPortNum = 587 // Default SMTP port
+	}
+
+	regPortNum, err := strconv.Atoi(regPort)
+	if err != nil {
+		regPortNum = defaultPortNum
 	}
 
 	defaultConf := &SMTPConfig{
 		Host:     host,
-		Port:     portNum,
+		Port:     defaultPortNum,
 		Username: user,
 		Password: password,
 		From:     from,
 	}
 
 	regConf := &SMTPConfig{
-		Host:     host,
-		Port:     portNum,
+		Host:     regHost,
+		Port:     regPortNum,
 		Username: regUser,
 		Password: regPassword,
-		From:     from,
+		From:     regFrom,
 	}
 
 	return &RealSMTPClient{

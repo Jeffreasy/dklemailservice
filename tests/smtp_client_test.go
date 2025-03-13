@@ -9,15 +9,30 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func createTestClient() *services.RealSMTPClient {
+// createTestClientWithConfig maakt een test SMTP client met aangepaste configuratie
+func createTestClientWithConfig(host, port, user, pass, from string) *services.RealSMTPClient {
+	// Voor tests gebruiken we dezelfde configuratie voor zowel standaard als registratie
 	return services.NewRealSMTPClient(
-		"smtp.test.com",
-		"587",
-		"test@test.com",
-		"testpass",
-		"noreply@test.com",
-		"registration@test.com",
-		"regpass",
+		host, // host
+		port, // port
+		user, // user
+		pass, // password
+		from, // from
+		host, // regHost
+		port, // regPort
+		user, // regUser
+		pass, // regPassword
+		from, // regFrom
+	)
+}
+
+func createTestClient() *services.RealSMTPClient {
+	return createTestClientWithConfig(
+		"smtp.test.com",    // host
+		"587",              // port
+		"test@test.com",    // user
+		"testpass",         // password
+		"noreply@test.com", // from
 	)
 }
 
@@ -142,14 +157,12 @@ func TestSMTPClientBatch(t *testing.T) {
 }
 
 func TestSMTPClientWithInvalidConfig(t *testing.T) {
-	client := services.NewRealSMTPClient(
-		"", // Invalid host
-		"587",
-		"test@test.com",
-		"testpass",
-		"noreply@test.com",
-		"registration@test.com",
-		"regpass",
+	client := createTestClientWithConfig(
+		"",                 // Invalid host
+		"587",              // port
+		"test@test.com",    // user
+		"testpass",         // password
+		"noreply@test.com", // from
 	)
 
 	mockSMTP := newMockSMTP()
@@ -167,14 +180,12 @@ func TestSMTPClientWithInvalidConfig(t *testing.T) {
 }
 
 func TestSMTPClientWithInvalidPort(t *testing.T) {
-	client := services.NewRealSMTPClient(
-		"smtp.test.com",
-		"invalid", // Invalid port
-		"test@test.com",
-		"testpass",
-		"noreply@test.com",
-		"registration@test.com",
-		"regpass",
+	client := createTestClientWithConfig(
+		"smtp.test.com",    // host
+		"invalid",          // Invalid port
+		"test@test.com",    // user
+		"testpass",         // password
+		"noreply@test.com", // from
 	)
 
 	mockSMTP := newMockSMTP()
@@ -192,15 +203,7 @@ func TestSMTPClientWithInvalidPort(t *testing.T) {
 }
 
 func TestSMTPClientWithEmptyRecipient(t *testing.T) {
-	client := services.NewRealSMTPClient(
-		"smtp.test.com",
-		"587",
-		"test@test.com",
-		"testpass",
-		"noreply@test.com",
-		"registration@test.com",
-		"regpass",
-	)
+	client := createTestClient()
 
 	msg := &services.EmailMessage{
 		To:      "", // Empty recipient
@@ -247,15 +250,7 @@ func TestSMTPClientWithMockDialer(t *testing.T) {
 }
 
 func TestSMTPClientWithMissingConfig(t *testing.T) {
-	client := services.NewRealSMTPClient(
-		"smtp.test.com",
-		"587",
-		"test@test.com",
-		"testpass",
-		"noreply@test.com",
-		"registration@test.com",
-		"regpass",
-	)
+	client := createTestClient()
 
 	mockSMTP := newMockSMTP()
 	mockSMTP.SetShouldFail(true)
@@ -272,15 +267,7 @@ func TestSMTPClientWithMissingConfig(t *testing.T) {
 }
 
 func TestSMTPClientWithInvalidCredentials(t *testing.T) {
-	client := services.NewRealSMTPClient(
-		"smtp.test.com",
-		"587",
-		"", // Invalid username
-		"", // Invalid password
-		"noreply@test.com",
-		"registration@test.com",
-		"regpass",
-	)
+	client := createTestClient()
 
 	mockSMTP := newMockSMTP()
 	mockSMTP.SetShouldFail(true)
@@ -297,15 +284,7 @@ func TestSMTPClientWithInvalidCredentials(t *testing.T) {
 }
 
 func TestSMTPClientWithEmptyMessage(t *testing.T) {
-	client := services.NewRealSMTPClient(
-		"smtp.test.com",
-		"587",
-		"test@test.com",
-		"testpass",
-		"noreply@test.com",
-		"registration@test.com",
-		"regpass",
-	)
+	client := createTestClient()
 
 	mockSMTP := newMockSMTP()
 	client.SetDialer(mockSMTP)
@@ -321,15 +300,7 @@ func TestSMTPClientWithEmptyMessage(t *testing.T) {
 }
 
 func TestSMTPClientWithRegistrationConfig(t *testing.T) {
-	client := services.NewRealSMTPClient(
-		"smtp.test.com",
-		"587",
-		"test@test.com",
-		"testpass",
-		"noreply@test.com",
-		"registration@test.com",
-		"regpass",
-	)
+	client := createTestClient()
 
 	mockSMTP := newMockSMTP()
 	client.SetDialer(mockSMTP)
