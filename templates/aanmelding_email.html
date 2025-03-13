@@ -98,8 +98,17 @@
                     <strong>Je inschrijfgegevens:</strong><br>
                     Naam: {{.Aanmelding.Naam}}<br>
                     Email: {{.Aanmelding.Email}}<br>
+                    {{if ne .Aanmelding.Telefoon ""}}<br>
+                    Telefoon: {{.Aanmelding.Telefoon}}<br>
+                    {{end}}
+                    Rol: {{.Aanmelding.Rol}}<br>
                     Afstand: {{.Aanmelding.Afstand}}<br>
-                    Geboortedatum: {{.Aanmelding.Geboortedatum}}
+                    {{if ne .Aanmelding.Ondersteuning ""}}<br>
+                    Ondersteuning: {{.Aanmelding.Ondersteuning}}<br>
+                    {{end}}
+                    {{if ne .Aanmelding.Bijzonderheden ""}}<br>
+                    Bijzonderheden: {{.Aanmelding.Bijzonderheden}}<br>
+                    {{end}}
                 </div>
                 
                 <p>Heb je vragen over je inschrijving? Bekijk dan onze website voor meer informatie:</p>

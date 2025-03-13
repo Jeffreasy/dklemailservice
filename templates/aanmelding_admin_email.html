@@ -80,13 +80,16 @@
                     <strong>Inschrijfgegevens:</strong><br>
                     Naam: {{.Aanmelding.Naam}}<br>
                     Email: {{.Aanmelding.Email}}<br>
+                    {{if ne .Aanmelding.Telefoon ""}}<br>
+                    Telefoon: {{.Aanmelding.Telefoon}}<br>
+                    {{end}}
+                    Rol: {{.Aanmelding.Rol}}<br>
                     Afstand: {{.Aanmelding.Afstand}}<br>
-                    Geboortedatum: {{.Aanmelding.Geboortedatum}}<br>
                     {{if ne .Aanmelding.Ondersteuning ""}}<br>
                     Ondersteuning: {{.Aanmelding.Ondersteuning}}<br>
                     {{end}}
-                    {{if ne .Aanmelding.Opmerkingen ""}}<br>
-                    Opmerkingen: {{.Aanmelding.Opmerkingen}}<br>
+                    {{if ne .Aanmelding.Bijzonderheden ""}}<br>
+                    Bijzonderheden: {{.Aanmelding.Bijzonderheden}}<br>
                     {{end}}
                     IP: {{.Aanmelding.IP}}
                 </div>
