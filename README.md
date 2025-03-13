@@ -1,196 +1,478 @@
 # DKL Email Service
 
-## 📋 Overzicht
+Een robuuste en schaalbare email service voor De Koninklijke Loop, geschreven in Go. Deze service verzorgt alle email communicatie voor het evenement, inclusief aanmeldingen, contactformulieren en administratieve notificaties.
 
-De DKL Email Service verzorgt betrouwbare en schaalbare e-mailcommunicatie voor de Koninklijke Loop website. De service is gebouwd met Go en biedt uitgebreide functionaliteit voor het versturen van diverse soorten e-mails met ingebouwde bescherming, monitoring en metrics.
+## 🌟 Functionaliteiten
 
-## ✨ Functionaliteit
+- **Email Afhandeling**
+  - Contactformulier emails met automatische bevestigingen
+  - Aanmeldingsformulier emails met gepersonaliseerde content
+  - Automatische bevestigingsmails met event-specifieke informatie
+  - Admin notificaties voor nieuwe aanmeldingen en contactverzoeken
+  - Ondersteuning voor HTML templates met dynamische content
+  - Fallback naar plaintext voor betere deliverability
 
-- **Template-gebaseerde e-mails**: HTML templates voor professionele en consistente communicatie
-- **Administratieve notificaties**: Automatische meldingen bij nieuwe contactaanvragen en inschrijvingen
-- **Rate limiting**: Bescherming tegen misbruik op globaal en per-IP niveau
-- **Retry mechanisme**: Automatische nieuwe pogingen bij tijdelijke fouten
-- **Batch verwerking**: Efficiënte verzending van grote aantallen e-mails
-- **Gestructureerde logging**: JSON-logs met verschillende detailniveaus en ELK-integratie
-- **Metrics tracking**: Statistieken over verzonden e-mails en prestaties
-- **Prometheus integratie**: Real-time monitoring en alerting
-- **Uitgebreide testsuite**: Unit en integratietests voor alle componenten
+- **Beveiliging & Stabiliteit**
+  - Rate limiting per IP en globaal voor spam preventie
+  - CORS beveiliging met configureerbare origins
+  - Graceful shutdown met cleanup van resources
+  - Retry mechanisme voor failed emails met exponentiële backoff
+  - Input validatie en sanitization
+  - Secure SMTP configuratie met TLS support
+  - XSS preventie in email templates
 
-## 🏗️ Architectuur
+- **Monitoring & Observability**
+  - Prometheus metrics voor real-time monitoring
+  - ELK logging integratie voor centrale log aggregatie
+  - Gedetailleerde email metrics per template en type
+  - Health check endpoints met uitgebreide status informatie
+  - Performance metrics voor email verzending
+  - Rate limit statistieken
+  - Error tracking en reporting
 
-De service is modulair en volgens moderne software-architectuurprincipes opgebouwd:
+- **Performance**
+  - Email batching voor efficiënte bulk verzending
+  - Configureerbare rate limits per email type
+  - Efficiënte template caching met auto-reload
+  - Non-blocking email verzending met goroutines
+  - Connection pooling voor SMTP verbindingen
+  - Optimale resource utilizatie
+  - Automatische cleanup van oude data
 
-### Core Componenten
+## 📋 Vereisten
 
-- **Email Service**: Centrale component die e-mailverzending coördineert
-- **SMTP Client**: Verzorgt de daadwerkelijke communicatie met SMTP-servers
-- **Rate Limiter**: Voorkomt overbelasting en misbruik
-- **Email Metrics**: Verzamelt statistieken over verzonden e-mails
-- **Email Batcher**: Groepeert e-mails voor efficiënte verwerking
-- **Prometheus Metrics**: Real-time monitoring van alle services
-
-## ⚙️ Configuratie
-
-De service wordt geconfigureerd via omgevingsvariabelen:
-
-### Vereiste instellingen
-```
-SMTP_HOST=smtp.example.com
-SMTP_USER=username
-SMTP_PASSWORD=password
-SMTP_FROM=noreply@example.com
-ADMIN_EMAIL=info@dekoninklijkeloop.nl        # Voor contactformulieren
-REGISTRATION_EMAIL=inschrijving@dekoninklijkeloop.nl  # Voor aanmeldingen
-```
-
-### Optionele instellingen
-```
-PORT=8080                        # Serverpoort (standaard 8080)
-SMTP_PORT=587                    # SMTP poort (standaard 587)
-EMAIL_RATE_LIMIT=10              # Aantal e-mails per minuut (standaard 10)
-TEMPLATE_DIR=./templates         # Map met e-mail templates 
-LOG_LEVEL=info                   # Log niveau (debug, info, warn, error)
-ELK_ENDPOINT=http://elk:9200     # ELK stack endpoint voor logging
-ALLOWED_ORIGINS=https://www.dekoninklijkeloop.nl,https://dekoninklijkeloop.nl
-```
-
-## 🚀 Installatie en gebruik
-
-### Vereisten
 - Go 1.21 of hoger
-- SMTP server toegang
-- Prometheus (optioneel voor monitoring)
+- SMTP server voor email verzending
+  - Ondersteuning voor TLS
+  - Voldoende verzendlimieten voor verwacht volume
+- (Optioneel) ELK stack voor logging
+  - Elasticsearch 7.x of hoger
+  - Logstash voor log processing
+  - Kibana voor visualisatie
+- (Optioneel) Prometheus voor metrics
+  - Prometheus server
+  - Grafana voor dashboards
 
-### Setup
-1. Clone de repository
-2. Kopieer `.env.example` naar `.env` en configureer:
-    ```
-    cp .env.example .env
-    ```
-3. Installeer dependencies:
-    ```
-    go mod download
-    ```
-4. Start de service:
-    ```
-    go run main.go
-    ```
+## 🚀 Installatie
+
+1. Clone de repository:
+```bash
+git clone https://github.com/Jeffreasy/dklemailservice.git
+cd dklemailservice
+```
+
+2. Installeer dependencies:
+```bash
+go mod download
+go mod verify
+```
+
+3. Kopieer het voorbeeld configuratie bestand:
+```bash
+cp .env.example .env
+```
+
+4. Configureer de omgevingsvariabelen in `.env`:
+```env
+# Algemene SMTP configuratie
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=user@example.com
+SMTP_PASSWORD=your_password
+SMTP_FROM=noreply@example.com
+SMTP_TLS_ENABLED=true
+SMTP_TIMEOUT=10s
+
+# Registratie SMTP configuratie
+REGISTRATION_SMTP_HOST=smtp.example.com
+REGISTRATION_SMTP_PORT=587
+REGISTRATION_SMTP_USER=registration@example.com
+REGISTRATION_SMTP_PASSWORD=your_password
+REGISTRATION_SMTP_FROM=registration@example.com
+REGISTRATION_SMTP_TLS_ENABLED=true
+REGISTRATION_SMTP_TIMEOUT=10s
+
+# Email adressen
+ADMIN_EMAIL=admin@example.com
+REGISTRATION_EMAIL=registration@example.com
+
+# Rate Limiting
+GLOBAL_RATE_LIMIT=1000
+IP_RATE_LIMIT=50
+RATE_LIMIT_WINDOW=1h
+
+# Monitoring & Logging
+LOG_LEVEL=info
+LOG_FORMAT=json
+ELK_ENDPOINT=http://elk:9200
+ELK_INDEX=dkl-emails
+ELK_BATCH_SIZE=100
+PROMETHEUS_ENABLED=true
+
+# Security
+ALLOWED_ORIGINS=https://www.dekoninklijkeloop.nl,https://dekoninklijkeloop.nl
+TLS_ENABLED=true
+TLS_CERT_FILE=./certs/server.crt
+TLS_KEY_FILE=./certs/server.key
+
+# Performance
+EMAIL_BATCH_SIZE=50
+EMAIL_BATCH_INTERVAL=15m
+TEMPLATE_RELOAD_INTERVAL=1h
+MAX_CONCURRENT_SENDS=10
+```
+
+## 🏃‍♂️ Gebruik
+
+### Service Starten
+
+Development mode:
+```bash
+go run main.go
+```
+
+Production mode:
+```bash
+go build -ldflags="-s -w" -o dklemailservice
+./dklemailservice
+```
+
+### API Endpoints
+
+#### Health & Monitoring
+- `GET /api/health` - Health check met uitgebreide service status
+- `GET /api/metrics/email` - Gedetailleerde email statistieken
+- `GET /api/metrics/rate-limits` - Rate limit status en statistieken
+- `GET /metrics` - Prometheus metrics endpoint
+
+#### Email Verzending
+- `POST /api/contact-email` - Verstuur contact formulier
+  ```json
+  {
+    "naam": "string",
+    "email": "string",
+    "bericht": "string",
+    "privacy_akkoord": true
+  }
+  ```
+- `POST /api/aanmelding-email` - Verstuur aanmelding formulier
+  ```json
+  {
+    "naam": "string",
+    "email": "string",
+    "telefoon": "string",
+    "rol": "string",
+    "afstand": "string",
+    "ondersteuning": "string",
+    "bijzonderheden": "string",
+    "terms": true
+  }
+  ```
 
 ### Docker
+
+Build de Docker image:
+```bash
+# Development build
+docker build -t dklemailservice:dev .
+
+# Production build
+docker build --build-arg GO_ENV=production -t dklemailservice:latest .
 ```
-docker build -t dklemailservice .
-docker run -p 8080:8080 --env-file .env dklemailservice
+
+Run de container:
+```bash
+# Development
+docker run -p 8080:8080 --env-file .env dklemailservice:dev
+
+# Production
+docker run -d --restart=always -p 8080:8080 --env-file .env dklemailservice:latest
 ```
 
-## 📡 API Endpoints
-
-### Email endpoints
-- **POST /api/contact-email**: Verzendt een contact e-mail
-- **POST /api/aanmelding-email**: Verzendt een aanmeldings e-mail
-
-### Monitoring endpoints
-- **GET /api/health**: Service status en gezondheidscheck
-- **GET /api/metrics/email**: E-mail statistieken (verzonden, mislukt, etc.)
-- **GET /api/metrics/rate-limits**: Informatie over rate limiting status
-- **GET /metrics**: Prometheus metrics endpoint
+Docker Compose setup:
+```yaml
+version: '3.8'
+services:
+  emailservice:
+    build: .
+    ports:
+      - "8080:8080"
+    env_file: .env
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+```
 
 ## 📊 Monitoring
 
-### Email Metrics
-De service houdt interne statistieken bij via het `EmailMetrics` subsysteem:
-- Aantal verzonden e-mails per type
-- Aantal mislukte verzendingen
-- Succespercentage
-
 ### Prometheus Metrics
-Voor geavanceerde monitoring biedt de service Prometheus metrics:
 
-```
-# Belangrijkste beschikbare metrics
-email_service_emails_sent_total{type="contact_email",template="contact_admin"}
-email_service_emails_failed_total{type="aanmelding_email",error_type="connection"}
-email_service_latency_seconds{type="generic"}
-email_service_rate_limit_exceeded_total{type="contact_email",limit_type="per_user"}
-email_service_active_batches
-```
+De service exporteert de volgende metrics:
 
-### Prometheus configuratie
-Voeg de volgende configuratie toe aan je Prometheus `prometheus.yml`:
+#### Email Metrics
+- `email_sent_total{type="contact|aanmelding",template="admin|user"}` - Aantal verzonden emails
+- `email_failed_total{type="contact|aanmelding",error="smtp|template|validation"}` - Aantal gefaalde emails
+- `email_latency_seconds{type="contact|aanmelding"}` - Email verzend latency
+- `email_batch_size{type="contact|aanmelding"}` - Huidige batch grootte
+- `email_template_render_duration_seconds` - Template render tijd
 
-```
-scrape_configs:
-  - job_name: 'email-service'
-    scrape_interval: 15s
-    static_configs:
-      - targets: ['localhost:8080']
-```
+#### Rate Limiting
+- `rate_limit_exceeded_total{type="ip|global"}` - Rate limit overschrijdingen
+- `rate_limit_remaining{type="ip|global"}` - Resterende requests
+- `rate_limit_reset_seconds` - Tijd tot rate limit reset
+
+#### System Metrics
+- `go_goroutines` - Aantal actieve goroutines
+- `go_memory_alloc_bytes` - Geheugengebruik
+- `process_cpu_seconds_total` - CPU gebruik
 
 ### Grafana Dashboard
-Voor visualisatie kun je Grafana gebruiken met dashboards voor:
-- Email verzending per tijdseenheid
-- Success/failure ratio's
-- Latency distributies
-- Rate limit overtredingen
 
-## 🔒 Rate Limiting
+Een voorgedefinieerd Grafana dashboard is beschikbaar in `./dashboards/email-service.json` met:
+- Email verzending statistieken
+- Rate limiting overzicht
+- Performance metrics
+- Error tracking
+- System resource gebruik
 
-De service implementeert geavanceerde rate limiting:
+### Logging
 
-- **Globale limieten**: Beperkt het totale aantal e-mails
-- **Per-IP limieten**: Voorkomt misbruik vanaf specifieke IP-adressen
-- **Configureerbare tijdsperiodes**: Limieten per minuut/uur/dag
+Logs worden geschreven in JSON formaat en kunnen worden doorgestuurd naar ELK:
 
-Voorbeeld configuratie:
+#### Log Levels
+- `DEBUG` - Gedetailleerde debug informatie
+  - Template rendering details
+  - SMTP communicatie
+  - Rate limit checks
+- `INFO` - Algemene operationele informatie
+  - Email verzendingen
+  - Service start/stop
+  - Configuratie wijzigingen
+- `WARN` - Waarschuwingen
+  - Rate limit overschrijdingen
+  - Template parsing issues
+  - Connectie timeouts
+- `ERROR` - Fouten die aandacht vereisen
+  - SMTP fouten
+  - Template fouten
+  - Validatie fouten
+- `FATAL` - Kritieke fouten die de service stoppen
+  - Configuratie fouten
+  - Port binding fouten
+  - Database connectie fouten
+
+#### Log Format
+```json
+{
+  "level": "info",
+  "timestamp": "2024-03-20T15:04:05Z",
+  "caller": "email_service.go:42",
+  "message": "Email verzonden",
+  "email_type": "contact",
+  "template": "admin",
+  "duration_ms": 150,
+  "success": true
+}
 ```
-// 100 contact emails per uur globaal
-rateLimiter.AddLimit("contact_email", 100, time.Hour, false)    
-// 5 contact emails per uur per IP
-rateLimiter.AddLimit("contact_email", 5, time.Hour, true)       
-```
-
-## 📝 Logging
-
-De service gebruikt gestructureerde JSON-logging met meerdere niveaus:
-
-| Niveau | Beschrijving |
-|--------|--------------|
-| debug  | Gedetailleerde debug informatie |
-| info   | Algemene operationele informatie (standaard) |
-| warn   | Waarschuwingen die aandacht kunnen vereisen |
-| error  | Fouten die normale werking verstoren |
-
-```
-{"niveau":"INFO","caller":"main.go:50","bericht":"DKL Email Service wordt gestart","tijd":"2023-07-01T15:04:05Z","version":"1.0.0"}
-```
-
-De logs kunnen naar een ELK stack worden gestuurd voor geavanceerde analyse.
 
 ## 🧪 Testen
 
-```
-# Alle tests uitvoeren
+### Unit Tests
+```bash
+# Run alle tests
 go test ./... -v
 
-# Specifieke test uitvoeren
-go test -v ./tests -run TestEmailRateLimiting
+# Run specifieke test package
+go test ./services -v
+go test ./handlers -v
 
-# Test coverage rapportage
-go test -coverprofile=coverage.out ./...
-go tool cover -html=coverage.out
+# Run met race condition detection
+go test -race ./...
 ```
 
-## 🔄 CI/CD
+### Coverage Tests
+```bash
+# Generate coverage report
+go test ./... -coverprofile=coverage.out
 
-De service is voorbereid voor continuous integration via GitHub Actions:
-- Automatische tests bij elke pull request
-- Linting en code kwaliteitscontrole
-- Automatische Docker builds
+# View coverage in browser
+go tool cover -html=coverage.out
 
-## 📦 Deployment
+# Check coverage percentage
+go tool cover -func=coverage.out
+```
 
-### Render
-1. Maak een nieuwe Web Service aan op Render
-2. Verbind met je GitHub repository
-3. Kies "Docker" als runtime
-4. Configureer de environment variables
-5. Deploy! 
+### Integration Tests
+```bash
+# Run integration tests
+go test ./tests -tags=integration
+
+# Run specific integration test
+go test ./tests -run TestEmailFlow -tags=integration
+```
+
+### Load Tests
+```bash
+# Install k6
+go install go.k6.io/k6@latest
+
+# Run load tests
+k6 run ./tests/load/email_load_test.js
+```
+
+## 📝 Email Templates
+
+De service gebruikt HTML templates voor emails met de volgende features:
+- Responsive design voor mobile devices
+- Toegankelijk voor screen readers
+- Ondersteuning voor verschillende email clients
+- Dynamische content injectie
+- Fallback plaintext versies
+
+### Template Locaties
+- `templates/contact_email.html` - Bevestiging voor contactformulier
+- `templates/contact_admin_email.html` - Admin notificatie voor contactformulier
+- `templates/aanmelding_email.html` - Bevestiging voor aanmelding
+- `templates/aanmelding_admin_email.html` - Admin notificatie voor aanmelding
+
+### Template Data
+Beschikbare variabelen in templates:
+
+#### Contact Templates
+```go
+type ContactData struct {
+    Naam    string
+    Email   string
+    Bericht string
+}
+```
+
+#### Aanmelding Templates
+```go
+type AanmeldingData struct {
+    Naam           string
+    Email          string
+    Telefoon       string
+    Rol            string
+    Afstand        string
+    Ondersteuning  string
+    Bijzonderheden string
+}
+```
+
+## 🔒 Rate Limiting
+
+### Standaard Limieten
+- Contact emails:
+  - 100 emails per uur globaal
+  - 5 emails per uur per IP
+- Aanmelding emails:
+  - 200 emails per uur globaal
+  - 10 emails per uur per IP
+
+### Configuratie
+Rate limits kunnen worden aangepast via environment variables of runtime configuratie:
+
+```go
+rateLimiter.AddLimit("contact_email", 100, time.Hour, false)    // Globaal
+rateLimiter.AddLimit("contact_email", 5, time.Hour, true)       // Per IP
+rateLimiter.AddLimit("aanmelding_email", 200, time.Hour, false) // Globaal
+rateLimiter.AddLimit("aanmelding_email", 10, time.Hour, true)   // Per IP
+```
+
+## 🛠 Architectuur
+
+De service volgt een modulaire architectuur met de volgende componenten:
+
+### Core Components
+- `handlers/` - HTTP request handlers
+  - `email_handler.go` - Email verzending endpoints
+  - `health_handler.go` - Health check endpoint
+  - `metrics_handler.go` - Metrics endpoints
+
+- `services/` - Business logic
+  - `email_service.go` - Email verzending logica
+  - `smtp_client.go` - SMTP communicatie
+  - `rate_limiter.go` - Rate limiting
+  - `email_batcher.go` - Batch processing
+  - `email_metrics.go` - Metrics tracking
+  - `prometheus_metrics.go` - Prometheus integratie
+
+- `models/` - Data structuren
+  - `email.go` - Email gerelateerde structs
+  - `contact.go` - Contact formulier model
+  - `aanmelding.go` - Aanmelding formulier model
+
+- `logger/` - Logging configuratie
+  - `logger.go` - Logger setup
+  - `elk_writer.go` - ELK integratie
+
+- `templates/` - Email templates
+  - HTML templates
+  - Partials voor herbruikbare componenten
+
+- `tests/` - Test suites
+  - Unit tests
+  - Integration tests
+  - Load tests
+  - Mocks
+
+### Design Patterns
+- Repository pattern voor data access
+- Factory pattern voor service instantiatie
+- Strategy pattern voor email verzending
+- Observer pattern voor metrics
+- Builder pattern voor email constructie
+
+### Concurrency
+- Goroutines voor non-blocking operations
+- Channels voor communicatie
+- Mutex voor thread-safe operations
+- Context voor cancellation
+- Worker pools voor batch processing
+
+## 👥 Bijdragen
+
+1. Fork de repository
+2. Maak een feature branch
+```bash
+git checkout -b feature/mijn-feature
+```
+3. Commit je wijzigingen
+```bash
+git commit -m 'Voeg nieuwe feature toe'
+```
+4. Push naar de branch
+```bash
+git push origin feature/mijn-feature
+```
+5. Open een Pull Request
+
+### Development Guidelines
+- Volg Go best practices en idioms
+- Schrijf tests voor nieuwe functionaliteit
+- Update documentatie waar nodig
+- Voeg relevante logging toe
+- Zorg voor adequate error handling
+- Valideer input data
+- Overweeg performance implicaties
+
+## 📄 Licentie
+
+Copyright (c) 2024 De Koninklijke Loop. Alle rechten voorbehouden.
+
+Deze software is eigendom van De Koninklijke Loop en mag niet worden gebruikt, gekopieerd, gemodificeerd of gedistribueerd zonder uitdrukkelijke toestemming van De Koninklijke Loop.
+
+## 📚 Documentatie
+
+Uitgebreide documentatie is beschikbaar in de `/docs` directory:
+- `API.md` - API documentatie
+- `DEPLOYMENT.md` - Deployment instructies
+- `DEVELOPMENT.md` - Development guidelines
+- `MONITORING.md` - Monitoring setup
+- `SECURITY.md` - Security best practices
+- `TEMPLATES.md` - Template documentatie
+- `TESTING.md` - Test procedures
