@@ -39,7 +39,28 @@ type EmailMessage struct {
 // Laadt templates uit de configureerbare template directory
 // en configureert rate limiting op basis van omgevingsvariabelen
 func NewEmailService(smtpClient SMTPClient, metrics *EmailMetrics, rateLimiter RateLimiterInterface, prometheusMetrics PrometheusMetricsInterface) *EmailService {
+	// Laad alle templates bij initialisatie
+	templates := make(map[string]*template.Template)
+	templateFiles := []string{
+		"contact_admin_email",
+		"contact_email",
+		"aanmelding_admin_email",
+		"aanmelding_email",
+	}
+
+	for _, name := range templateFiles {
+		templatePath := filepath.Join("templates", name+".html")
+		tmpl, err := template.ParseFiles(templatePath)
+		if err != nil {
+			logger.Error("Failed to load template", "template", name, "error", err)
+			continue
+		}
+		templates[name] = tmpl
+		logger.Info("Template loaded successfully", "template", name)
+	}
+
 	return &EmailService{
+		templates:         templates,
 		smtpClient:        smtpClient,
 		metrics:           metrics,
 		rateLimiter:       rateLimiter,
@@ -235,15 +256,20 @@ func (s *EmailService) sendEmailWithTemplate(templateName, to, subject string, d
 
 // SendTemplateEmail verzendt een email met template (voor batcher)
 func (s *EmailService) SendTemplateEmail(recipient, subject, templateName string, templateData map[string]interface{}) error {
-	// Template verwerken
-	body, err := s.renderEmailTemplate(templateName, templateData)
-	if err != nil {
-		s.metrics.RecordEmailFailed(templateName)
+	template := s.templates[templateName]
+	if template == nil {
+		logger.Error("Template not found", "template", templateName)
+		return fmt.Errorf("template not found: %s", templateName)
+	}
+
+	var body bytes.Buffer
+	if err := template.Execute(&body, templateData); err != nil {
+		logger.Error("Template rendering fout", "error", err, "template", templateName)
 		return err
 	}
 
 	// Email verzenden
-	err = s.smtpClient.SendEmail(recipient, subject, body)
+	err := s.smtpClient.SendEmail(recipient, subject, body.String())
 	if err != nil {
 		s.metrics.RecordEmailFailed(templateName)
 		return err
@@ -251,24 +277,6 @@ func (s *EmailService) SendTemplateEmail(recipient, subject, templateName string
 
 	s.metrics.RecordEmailSent(templateName)
 	return nil
-}
-
-// renderEmailTemplate verwerkt een template bestand met data
-func (s *EmailService) renderEmailTemplate(templateFile string, data interface{}) (string, error) {
-	templatePath := filepath.Join("templates", templateFile)
-	tmpl, err := template.ParseFiles(templatePath)
-	if err != nil {
-		logger.Error("Template parsing fout", "error", err, "template", templateFile)
-		return "", err
-	}
-
-	var rendered bytes.Buffer
-	if err := tmpl.Execute(&rendered, data); err != nil {
-		logger.Error("Template rendering fout", "error", err, "template", templateFile)
-		return "", err
-	}
-
-	return rendered.String(), nil
 }
 
 // SetMetrics stelt een nieuwe metrics tracker in (voor testen)
