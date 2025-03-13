@@ -144,7 +144,9 @@ func main() {
 
 	// Specific route for favicon.ico
 	app.Get("/favicon.ico", func(c *fiber.Ctx) error {
-		return c.SendFile("./public/favicon.ico")
+		c.Set("Content-Type", "image/x-icon")
+		c.Set("Cache-Control", "public, max-age=31536000") // Cache voor 1 jaar
+		return c.SendFile("./public/favicon.ico", false)
 	})
 
 	// Root route
