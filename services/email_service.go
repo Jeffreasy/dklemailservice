@@ -74,13 +74,13 @@ func (s *EmailService) SendContactEmail(data *models.ContactEmailData) error {
 		logger.Debug("Contact admin email wordt voorbereid",
 			"naam", data.Contact.Naam,
 			"email", data.Contact.Email)
-		return s.sendEmailWithTemplate("contact_admin", data.AdminEmail, "Nieuw contactformulier", data)
+		return s.sendEmailWithTemplate("contact_admin_email", data.AdminEmail, "Nieuw contactformulier", data)
 	}
 
 	logger.Debug("Contact bevestigingsemail wordt voorbereid",
 		"naam", data.Contact.Naam,
 		"email", data.Contact.Email)
-	return s.sendEmailWithTemplate("contact_user", data.Contact.Email, "Bedankt voor je bericht", data)
+	return s.sendEmailWithTemplate("contact_email", data.Contact.Email, "Bedankt voor je bericht", data)
 }
 
 func (s *EmailService) SendAanmeldingEmail(data *models.AanmeldingEmailData) error {
