@@ -139,6 +139,14 @@ func main() {
 		AllowMethods: "GET,POST,OPTIONS",
 	}))
 
+	// Serve static files from public directory
+	app.Static("/", "./public")
+
+	// Specific route for favicon.ico
+	app.Get("/favicon.ico", func(c *fiber.Ctx) error {
+		return c.SendFile("./public/favicon.ico")
+	})
+
 	// Root route
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
