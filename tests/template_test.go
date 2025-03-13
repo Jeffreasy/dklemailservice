@@ -16,7 +16,7 @@ func TestEmailTemplateRendering(t *testing.T) {
 	}{
 		{
 			name:     "Contact admin template - alle velden",
-			template: "contact_admin",
+			template: "contact_admin_email",
 			data: &models.ContactEmailData{
 				Contact: &models.ContactFormulier{
 					Naam:           "Test Persoon",
@@ -29,7 +29,7 @@ func TestEmailTemplateRendering(t *testing.T) {
 		},
 		{
 			name:     "Contact admin template - minimale velden",
-			template: "contact_admin",
+			template: "contact_admin_email",
 			data: &models.ContactEmailData{
 				Contact: &models.ContactFormulier{
 					Naam:  "Minimaal",
@@ -39,7 +39,7 @@ func TestEmailTemplateRendering(t *testing.T) {
 		},
 		{
 			name:     "Aanmelding template - optionele velden",
-			template: "aanmelding_user",
+			template: "aanmelding_email",
 			data: &models.AanmeldingEmailData{
 				Aanmelding: &models.AanmeldingFormulier{
 					Naam:  "Test Deelnemer",

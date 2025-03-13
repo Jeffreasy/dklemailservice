@@ -68,11 +68,11 @@ func (s *EmailService) SendAanmeldingEmail(data *models.AanmeldingEmailData) err
 	var recipient string
 
 	if data.ToAdmin {
-		templateName = "aanmelding_admin"
+		templateName = "aanmelding_admin_email"
 		subject = "Nieuwe aanmelding ontvangen"
 		recipient = data.AdminEmail
 	} else {
-		templateName = "aanmelding_user"
+		templateName = "aanmelding_email"
 		subject = "Bedankt voor je aanmelding"
 		recipient = data.Aanmelding.Email
 	}
@@ -195,10 +195,10 @@ func NewTestEmailService(smtpClient SMTPClient) (*EmailService, error) {
 	}
 
 	templates := make(map[string]*template.Template)
-	templates["contact_admin"] = tmpl
-	templates["contact_user"] = tmpl
-	templates["aanmelding_admin"] = tmpl
-	templates["aanmelding_user"] = tmpl
+	templates["contact_admin_email"] = tmpl
+	templates["contact_email"] = tmpl
+	templates["aanmelding_admin_email"] = tmpl
+	templates["aanmelding_email"] = tmpl
 
 	// Maak een metrics tracker voor testen
 	metrics := NewEmailMetrics(24 * time.Hour)
