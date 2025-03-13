@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nieuwe Aanmelding - De Koninklijke Loop</title>
+    <title>Nieuwe Inschrijving - De Koninklijke Loop</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         
@@ -33,38 +33,28 @@
             background-color: #ff9328;
             color: #ffffff;
             padding: 24px;
+            text-align: center;
         }
         
         .logo {
-            height: 40px;
+            height: 60px;
             margin-bottom: 16px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
         }
         
         .content {
             padding: 24px;
         }
         
-        .field {
-            margin-bottom: 16px;
-        }
-        
-        .field-label {
-            font-weight: 600;
-            color: #4b5563;
-            font-size: 14px;
-            margin-bottom: 4px;
-        }
-        
-        .field-value {
-            color: #1f2937;
-            font-size: 16px;
-        }
-        
         .message-box {
-            background-color: #f9fafb;
+            background-color: #fff7ed;
+            border: 1px solid #ffedd5;
             border-radius: 8px;
             padding: 16px;
-            margin-top: 16px;
+            margin: 16px 0;
+            color: #9a3412;
         }
         
         .footer {
@@ -73,81 +63,37 @@
             color: #6b7280;
             font-size: 14px;
         }
-        
-        .button {
-            display: inline-block;
-            background-color: #ff9328;
-            color: #ffffff;
-            padding: 12px 24px;
-            border-radius: 6px;
-            text-decoration: none;
-            font-weight: 500;
-            margin-top: 16px;
-        }
-        
-        .button:hover {
-            background-color: #fb8b1f;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="card">
             <div class="header">
-                <img src="https://dekoninklijkeloop.nl/logo.png" alt="De Koninklijke Loop" class="logo">
-                <h1 style="margin: 0; font-size: 24px; font-weight: 700;">Nieuwe Aanmelding</h1>
+                <img src="https://res.cloudinary.com/dkl25backend/image/upload/v1/dkl-logo.png" alt="De Koninklijke Loop" class="logo">
+                <h1 style="margin: 0; font-size: 24px; font-weight: 700;">Nieuwe Inschrijving Ontvangen</h1>
             </div>
             
             <div class="content">
-                <p>Er is een nieuwe aanmelding binnengekomen via het aanmeldformulier:</p>
+                <p>Er is een nieuwe inschrijving binnengekomen voor De Koninklijke Loop.</p>
                 
-                <div class="field">
-                    <div class="field-label">Naam</div>
-                    <div class="field-value">{{.Aanmelding.Naam}}</div>
+                <div class="message-box">
+                    <strong>Inschrijfgegevens:</strong><br>
+                    Naam: {{.Aanmelding.Naam}}<br>
+                    Email: {{.Aanmelding.Email}}<br>
+                    Afstand: {{.Aanmelding.Afstand}}<br>
+                    Geboortedatum: {{.Aanmelding.Geboortedatum}}<br>
+                    {{if ne .Aanmelding.Ondersteuning ""}}<br>
+                    Ondersteuning: {{.Aanmelding.Ondersteuning}}<br>
+                    {{end}}
+                    {{if ne .Aanmelding.Opmerkingen ""}}<br>
+                    Opmerkingen: {{.Aanmelding.Opmerkingen}}<br>
+                    {{end}}
+                    IP: {{.Aanmelding.IP}}
                 </div>
-                
-                <div class="field">
-                    <div class="field-label">E-mailadres</div>
-                    <div class="field-value">{{.Aanmelding.Email}}</div>
-                </div>
-                
-                <div class="field">
-                    <div class="field-label">Telefoonnummer</div>
-                    <div class="field-value">{{.Aanmelding.Telefoon}}</div>
-                </div>
-                
-                <div class="field">
-                    <div class="field-label">Rol</div>
-                    <div class="field-value">{{.Aanmelding.Rol}}</div>
-                </div>
-                
-                <div class="field">
-                    <div class="field-label">Gekozen Afstand</div>
-                    <div class="field-value">{{.Aanmelding.Afstand}}</div>
-                </div>
-                
-                <div class="field">
-                    <div class="field-label">Ondersteuning nodig</div>
-                    <div class="field-value">{{.Aanmelding.Ondersteuning}}</div>
-                </div>
-                
-                {{if .Aanmelding.Bijzonderheden}}
-                <div class="field">
-                    <div class="field-label">Bijzonderheden</div>
-                    <div class="message-box">{{.Aanmelding.Bijzonderheden}}</div>
-                </div>
-                {{end}}
-                
-                <div class="field">
-                    <div class="field-label">Algemene voorwaarden geaccepteerd</div>
-                    <div class="field-value">{{if .Aanmelding.Terms}}Ja{{else}}Nee{{end}}</div>
-                </div>
-                
-                <a href="https://jeffdash.com" class="button">Bekijk in Admin Panel</a>
             </div>
             
             <div class="footer">
-                <p>Dit is een automatisch gegenereerde e-mail. Je kunt hier niet op reageren.</p>
+                <p>Dit is een automatisch gegenereerd bericht van het DKL Email Systeem.</p>
                 <p>&copy; 2025 De Koninklijke Loop. Alle rechten voorbehouden.</p>
             </div>
         </div>

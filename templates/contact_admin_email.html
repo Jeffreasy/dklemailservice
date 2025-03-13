@@ -33,38 +33,28 @@
             background-color: #ff9328;
             color: #ffffff;
             padding: 24px;
+            text-align: center;
         }
         
         .logo {
-            height: 40px;
+            height: 60px;
             margin-bottom: 16px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
         }
         
         .content {
             padding: 24px;
         }
         
-        .field {
-            margin-bottom: 16px;
-        }
-        
-        .field-label {
-            font-weight: 600;
-            color: #4b5563;
-            font-size: 14px;
-            margin-bottom: 4px;
-        }
-        
-        .field-value {
-            color: #1f2937;
-            font-size: 16px;
-        }
-        
         .message-box {
-            background-color: #f9fafb;
+            background-color: #fff7ed;
+            border: 1px solid #ffedd5;
             border-radius: 8px;
             padding: 16px;
-            margin-top: 16px;
+            margin: 16px 0;
+            color: #9a3412;
         }
         
         .footer {
@@ -73,64 +63,36 @@
             color: #6b7280;
             font-size: 14px;
         }
-        
-        .button {
-            display: inline-block;
-            background-color: #ff9328;
-            color: #ffffff;
-            padding: 12px 24px;
-            border-radius: 6px;
-            text-decoration: none;
-            font-weight: 500;
-            margin-top: 16px;
-        }
-        
-        .button:hover {
-            background-color: #fb8b1f;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="card">
             <div class="header">
-                <img src="https://dekoninklijkeloop.nl/logo.png" alt="De Koninklijke Loop" class="logo">
-                <h1 style="margin: 0; font-size: 24px; font-weight: 700;">Nieuw Contactformulier</h1>
+                <img src="https://res.cloudinary.com/dkl25backend/image/upload/v1/dkl-logo.png" alt="De Koninklijke Loop" class="logo">
+                <h1 style="margin: 0; font-size: 24px; font-weight: 700;">Nieuw Contactformulier Ontvangen</h1>
             </div>
             
             <div class="content">
-                <p>Er is een nieuw bericht ontvangen via het contactformulier:</p>
+                <p>Er is een nieuw bericht binnengekomen via het contactformulier.</p>
                 
-                <div class="field">
-                    <div class="field-label">Naam</div>
-                    <div class="field-value">{{.Contact.Naam}}</div>
+                <div class="message-box">
+                    <strong>Contactgegevens:</strong><br>
+                    Naam: {{.Contact.Naam}}<br>
+                    Email: {{.Contact.Email}}<br>
+                    {{if ne .Contact.Telefoon ""}}<br>
+                    Telefoon: {{.Contact.Telefoon}}<br>
+                    {{end}}
+                    <br>
+                    <strong>Bericht:</strong><br>
+                    {{.Contact.Bericht}}<br>
+                    <br>
+                    IP: {{.Contact.IP}}
                 </div>
-                
-                <div class="field">
-                    <div class="field-label">E-mailadres</div>
-                    <div class="field-value">{{.Contact.Email}}</div>
-                </div>
-                
-                <div class="field">
-                    <div class="field-label">Bericht</div>
-                    <div class="message-box">{{.Contact.Bericht}}</div>
-                </div>
-                
-                <div class="field">
-                    <div class="field-label">Ontvangen op</div>
-                    <div class="field-value">{{.Contact.CreatedAt.Format "02-01-2006 15:04"}}</div>
-                </div>
-                
-                <div class="field">
-                    <div class="field-label">Privacy akkoord</div>
-                    <div class="field-value">{{if .Contact.PrivacyAkkoord}}Ja{{else}}Nee{{end}}</div>
-                </div>
-                
-                <a href="https://jeffdash.com" class="button">Bekijk in Admin Panel</a>
             </div>
             
             <div class="footer">
-                <p>Dit is een automatisch gegenereerde e-mail. Je kunt hier niet op reageren.</p>
+                <p>Dit is een automatisch gegenereerd bericht van het DKL Email Systeem.</p>
                 <p>&copy; 2025 De Koninklijke Loop. Alle rechten voorbehouden.</p>
             </div>
         </div>
