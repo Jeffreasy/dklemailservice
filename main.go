@@ -145,9 +145,16 @@ func main() {
 
 	// Specific route for favicon.ico
 	app.Get("/favicon.ico", func(c *fiber.Ctx) error {
-		faviconPath := filepath.Join(".", "public", "favicon.ico")
+		// Get the current working directory
+		workDir, err := os.Getwd()
+		if err != nil {
+			logger.Error("Kon werkdirectory niet bepalen", "error", err)
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+
+		faviconPath := filepath.Join(workDir, "public", "favicon.ico")
 		if _, err := os.Stat(faviconPath); os.IsNotExist(err) {
-			logger.Error("Favicon niet gevonden", "path", faviconPath)
+			logger.Error("Favicon niet gevonden", "path", faviconPath, "error", err)
 			return c.SendStatus(fiber.StatusNotFound)
 		}
 		c.Set("Content-Type", "image/x-icon")
