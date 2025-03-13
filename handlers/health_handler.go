@@ -2,17 +2,17 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"html/template"
-	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"time"
 
+	"dklautomationgo/logger"
 	"dklautomationgo/services"
 
+	"github.com/gofiber/fiber/v2"
 	"gopkg.in/gomail.v2"
 )
 
@@ -91,7 +91,7 @@ func SetRateLimiter(rl services.RateLimiterInterface) {
 }
 
 // HealthHandler biedt een uitgebreide health check endpoint
-func HealthHandler(w http.ResponseWriter, r *http.Request) {
+func HealthHandler(c *fiber.Ctx) error {
 	// Verzamel memory stats
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
@@ -122,22 +122,18 @@ func HealthHandler(w http.ResponseWriter, r *http.Request) {
 		Checks: checks,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
 	// Set HTTP status based on service status
 	switch status {
 	case StatusHealthy:
-		w.WriteHeader(http.StatusOK)
+		c.Status(fiber.StatusOK)
 	case StatusDegraded:
-		w.WriteHeader(http.StatusOK) // Still 200 but with degraded status
+		c.Status(fiber.StatusOK) // Still 200 but with degraded status
 	case StatusUnhealthy:
-		w.WriteHeader(http.StatusServiceUnavailable)
+		c.Status(fiber.StatusServiceUnavailable)
 	}
 
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		http.Error(w, "Error encoding response", http.StatusInternalServerError)
-		return
-	}
+	logger.Debug("Health check aangevraagd", "remote_ip", c.IP())
+	return c.JSON(response)
 }
 
 // checkComponents voert health checks uit op verschillende service componenten

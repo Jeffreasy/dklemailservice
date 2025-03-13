@@ -142,8 +142,19 @@ func main() {
 	// Root route
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
-			"message": "DKL Email Service API",
-			"version": handlers.Version,
+			"service":     "DKL Email Service API",
+			"version":     handlers.Version,
+			"status":      "running",
+			"environment": os.Getenv("ENVIRONMENT"),
+			"timestamp":   time.Now(),
+			"endpoints": []fiber.Map{
+				{"path": "/api/health", "method": "GET", "description": "Service health status"},
+				{"path": "/api/contact-email", "method": "POST", "description": "Send contact form email"},
+				{"path": "/api/aanmelding-email", "method": "POST", "description": "Send registration form email"},
+				{"path": "/api/metrics/email", "method": "GET", "description": "Email metrics (requires API key)"},
+				{"path": "/api/metrics/rate-limits", "method": "GET", "description": "Rate limit metrics (requires API key)"},
+				{"path": "/metrics", "method": "GET", "description": "Prometheus metrics"},
+			},
 		})
 	})
 
@@ -151,16 +162,7 @@ func main() {
 	api := app.Group("/api")
 
 	// Health check endpoint
-	api.Get("/health", func(c *fiber.Ctx) error {
-		response := handlers.HealthResponse{
-			Status:    "ok",
-			Version:   handlers.Version,
-			Timestamp: time.Now(),
-			Uptime:    time.Since(handlers.StartTime).String(),
-		}
-		logger.Debug("Health check aangevraagd", "remote_ip", c.IP())
-		return c.JSON(response)
-	})
+	api.Get("/health", handlers.HealthHandler)
 
 	// Email routes
 	api.Post("/contact-email", emailHandler.HandleContactEmail)
@@ -193,30 +195,24 @@ func main() {
 	<-stop
 	logger.Info("Server wordt afgesloten...")
 
-	// Zorg dat de email batcher wordt afgesloten
-	go func() {
-		<-stop
-		logger.Info("Server wordt afgesloten...")
+	// Graceful shutdown
+	if emailBatcher != nil {
+		emailBatcher.Shutdown()
+	}
 
-		// Sluit email batcher af
-		if emailBatcher != nil {
-			emailBatcher.Shutdown()
-		}
+	// Sluit rate limiter af
+	rateLimiter.Shutdown()
 
-		// Sluit rate limiter af
-		rateLimiter.Shutdown()
+	// Log laatste metrics
+	emailMetrics.LogMetrics()
 
-		// Log laatste metrics
-		emailMetrics.LogMetrics()
+	// Sluit alle log writers
+	logger.CloseWriters()
 
-		// Sluit alle log writers
-		logger.CloseWriters()
+	// Graceful shutdown met Fiber
+	if err := app.Shutdown(); err != nil {
+		logger.Fatal("Server shutdown fout", "error", err)
+	}
 
-		// Graceful shutdown met Fiber
-		if err := app.Shutdown(); err != nil {
-			logger.Fatal("Server shutdown fout", "error", err)
-		}
-
-		logger.Info("Server succesvol afgesloten")
-	}()
+	logger.Info("Server succesvol afgesloten")
 }
