@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -144,9 +145,14 @@ func main() {
 
 	// Specific route for favicon.ico
 	app.Get("/favicon.ico", func(c *fiber.Ctx) error {
+		faviconPath := filepath.Join(".", "public", "favicon.ico")
+		if _, err := os.Stat(faviconPath); os.IsNotExist(err) {
+			logger.Error("Favicon niet gevonden", "path", faviconPath)
+			return c.SendStatus(fiber.StatusNotFound)
+		}
 		c.Set("Content-Type", "image/x-icon")
 		c.Set("Cache-Control", "public, max-age=31536000") // Cache voor 1 jaar
-		return c.SendFile("./public/favicon.ico", false)
+		return c.SendFile(faviconPath, false)
 	})
 
 	// Root route
