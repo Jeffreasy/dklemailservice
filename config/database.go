@@ -81,8 +81,10 @@ func InitDatabase(config *DatabaseConfig) (*gorm.DB, error) {
 // Helper functie om environment variables te lezen met fallback
 func getEnv(key, fallback string) string {
 	if value, exists := os.LookupEnv(key); exists {
+		dkllogger.Debug("Environment variable gelezen", "key", key, "value", value)
 		return value
 	}
+	dkllogger.Warn("Environment variable niet gevonden, fallback gebruikt", "key", key, "fallback", fallback)
 	return fallback
 }
 

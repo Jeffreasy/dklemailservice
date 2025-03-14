@@ -40,6 +40,14 @@ func ValidateEnv() error {
 		// Email adressen
 		"ADMIN_EMAIL",
 		"REGISTRATION_EMAIL",
+
+		// Database configuratie
+		"DB_HOST",
+		"DB_PORT",
+		"DB_USER",
+		"DB_PASSWORD",
+		"DB_NAME",
+		"DB_SSL_MODE",
 	}
 
 	for _, env := range required {
@@ -87,6 +95,15 @@ func main() {
 
 	// Initialiseer database
 	dbConfig := config.LoadDatabaseConfig()
+
+	// Log database configuratie voor debugging
+	logger.Info("Database configuratie geladen",
+		"host", dbConfig.Host,
+		"port", dbConfig.Port,
+		"user", dbConfig.User,
+		"dbname", dbConfig.DBName,
+		"sslmode", dbConfig.SSLMode)
+
 	db, err := config.InitDatabase(dbConfig)
 	if err != nil {
 		logger.Fatal("Database initialisatie fout", "error", err)
