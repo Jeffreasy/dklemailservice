@@ -53,6 +53,14 @@ COPY --from=builder-dev /app/main-dev ./main-dev
 # Copy templates directory
 COPY --from=builder-prod /app/templates ./templates
 
+# Create a .env file with default values for database
+RUN echo "DB_HOST=\${DB_HOST:-localhost}" > .env && \
+    echo "DB_PORT=\${DB_PORT:-5432}" >> .env && \
+    echo "DB_USER=\${DB_USER:-postgres}" >> .env && \
+    echo "DB_PASSWORD=\${DB_PASSWORD:-}" >> .env && \
+    echo "DB_NAME=\${DB_NAME:-dklemailservice}" >> .env && \
+    echo "DB_SSL_MODE=\${DB_SSL_MODE:-disable}" >> .env
+
 # Expose port
 EXPOSE 8080
 

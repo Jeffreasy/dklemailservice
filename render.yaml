@@ -63,8 +63,10 @@ services:
       - key: DB_SSL_MODE
         value: require
     healthCheckPath: /api/health
-    buildCommand: docker-compose build
-    startCommand: docker-compose up
+    buildCommand: |
+      chmod +x start.sh
+      docker build -t dklautomatie-backend .
+    startCommand: ./start.sh
     
   - type: pserv
     name: dklautomatie-db
