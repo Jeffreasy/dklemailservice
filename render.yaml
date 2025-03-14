@@ -21,6 +21,65 @@ services:
       - key: APP_ENV
         value: prod
         sync: false
+      # Database configuratie
+      - key: DB_HOST
+        fromService:
+          name: dklautomatie-db
+          type: pserv
+          property: host
+      - key: DB_PORT
+        fromService:
+          name: dklautomatie-db
+          type: pserv
+          property: port
+      - key: DB_USER
+        fromService:
+          name: dklautomatie-db
+          type: pserv
+          property: user
+      - key: DB_PASSWORD
+        fromService:
+          name: dklautomatie-db
+          type: pserv
+          property: password
+      - key: DB_NAME
+        fromService:
+          name: dklautomatie-db
+          type: pserv
+          property: database
+      - key: DB_SSL_MODE
+        value: require
     healthCheckPath: /api/health
     buildCommand: docker build -t dklautomatie-backend .
-    startCommand: docker run -p 8080:8080 dklautomatie-backend 
+    startCommand: >
+      docker run -p 8080:8080 
+      -e ADMIN_EMAIL="$ADMIN_EMAIL" 
+      -e SMTP_HOST="$SMTP_HOST" 
+      -e SMTP_PORT="$SMTP_PORT" 
+      -e SMTP_USER="$SMTP_USER" 
+      -e SMTP_PASSWORD="$SMTP_PASSWORD" 
+      -e SMTP_FROM="$SMTP_FROM" 
+      -e ALLOWED_ORIGINS="$ALLOWED_ORIGINS" 
+      -e APP_ENV="$APP_ENV" 
+      -e DB_HOST="$DB_HOST" 
+      -e DB_PORT="$DB_PORT" 
+      -e DB_USER="$DB_USER" 
+      -e DB_PASSWORD="$DB_PASSWORD" 
+      -e DB_NAME="$DB_NAME" 
+      -e DB_SSL_MODE="$DB_SSL_MODE" 
+      dklautomatie-backend
+    
+  - type: pserv
+    name: dklautomatie-db
+    engine: postgres
+    version: 14
+    ipAllowList: []
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: POSTGRES_USER
+        generateValue: true
+      - key: POSTGRES_PASSWORD
+        generateValue: true
+      - key: POSTGRES_DB
+        value: dklemailservice 
