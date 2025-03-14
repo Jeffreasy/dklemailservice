@@ -35,26 +35,6 @@ services:
         sync: false
       - key: REGISTRATION_EMAIL
         sync: false
-      # Database configuratie - direct doorgeven
-      - key: DB_USER
-        fromService:
-          name: dklautomatie-db
-          type: pserv
-          property: user
-      - key: DB_PASSWORD
-        fromService:
-          name: dklautomatie-db
-          type: pserv
-          property: password
-      - key: DB_NAME
-        fromService:
-          name: dklautomatie-db
-          type: pserv
-          property: database
-      - key: DB_SSL_MODE
-        value: require
-      - key: DB_PORT
-        value: "5432"
       # Debug logging
       - key: LOG_LEVEL
         value: debug

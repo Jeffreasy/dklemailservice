@@ -30,46 +30,24 @@ func LoadDatabaseConfig() *DatabaseConfig {
 		// In productie, gebruik de Render PostgreSQL database
 		dkllogger.Info("Productieomgeving gedetecteerd, gebruik Render PostgreSQL configuratie")
 
-		// Probeer verschillende mogelijke hostnamen voor Render PostgreSQL
-		// Volgens Render documentatie kan de interne URL verschillende vormen hebben
+		// Gebruik de exacte verbindingsgegevens voor de Render PostgreSQL database
+		// Interne hostname: dpg-cva4c01c1ekc738q6q0g-a
+		// Externe hostname: dpg-cva4c01c1ekc738q6q0g-a.oregon-postgres.render.com
 		possibleHosts := []string{
-			"postgres",                            // Standaard hostname in Render
-			"dklautomatie-db",                     // Service naam
-			"postgresql-dklautomatie-db",          // Conventie: postgresql-<service_name>
-			"internal-postgresql-dklautomatie-db", // Conventie: internal-postgresql-<service_name>
-			"dklautomatie-db.internal",            // Conventie: <service_name>.internal
-			"postgresql.render.com",               // Externe hostname
+			"dpg-cva4c01c1ekc738q6q0g-a",                            // Interne hostname
+			"dpg-cva4c01c1ekc738q6q0g-a.oregon-postgres.render.com", // Externe hostname
 		}
 
-		dkllogger.Info("Mogelijke PostgreSQL hostnamen", "hosts", possibleHosts)
+		dkllogger.Info("Exacte PostgreSQL hostnamen", "hosts", possibleHosts)
 
-		// Lees de overige configuratie uit de omgeving
-		port := os.Getenv("DB_PORT")
-		if port == "" {
-			port = "5432"
-		}
+		// Gebruik de exacte verbindingsgegevens
+		port := "5432"
+		user := "dekoninklijkeloopdatabase_user"
+		password := "I4QP3JwyCcEbn8tGl6k3ErEvjUZ9V5rB"
+		dbName := "dekoninklijkeloopdatabase"
+		sslMode := "require" // Render vereist SSL voor externe verbindingen
 
-		// Gebruik de waarden uit de Render dashboard
-		user := os.Getenv("DB_USER")
-		if user == "" {
-			// Fallback naar een standaard gebruikersnaam voor Render
-			user = "postgres"
-		}
-
-		password := os.Getenv("DB_PASSWORD")
-
-		dbName := os.Getenv("DB_NAME")
-		if dbName == "" {
-			dbName = "dklemailservice"
-		}
-
-		sslMode := os.Getenv("DB_SSL_MODE")
-		if sslMode == "" {
-			// Render vereist SSL voor externe verbindingen
-			sslMode = "require"
-		}
-
-		// Gebruik de eerste hostname in de lijst als standaard
+		// Gebruik de interne hostname als standaard
 		host := possibleHosts[0]
 
 		dkllogger.Info("Render PostgreSQL configuratie geladen",
@@ -158,16 +136,12 @@ func InitDatabase(config *DatabaseConfig) (*gorm.DB, error) {
 		},
 	)
 
-	// Als we in productie draaien, probeer alle mogelijke hostnamen
+	// Als we in productie draaien, probeer de exacte hostnamen
 	if os.Getenv("APP_ENV") == "prod" {
-		// Lijst van mogelijke hostnamen voor Render PostgreSQL
+		// Lijst van exacte hostnamen voor Render PostgreSQL
 		possibleHosts := []string{
-			"postgres",                            // Standaard hostname in Render
-			"dklautomatie-db",                     // Service naam
-			"postgresql-dklautomatie-db",          // Conventie: postgresql-<service_name>
-			"internal-postgresql-dklautomatie-db", // Conventie: internal-postgresql-<service_name>
-			"dklautomatie-db.internal",            // Conventie: <service_name>.internal
-			"postgresql.render.com",               // Externe hostname
+			"dpg-cva4c01c1ekc738q6q0g-a",                            // Interne hostname
+			"dpg-cva4c01c1ekc738q6q0g-a.oregon-postgres.render.com", // Externe hostname
 		}
 
 		// Probeer elke hostname
