@@ -21,6 +21,19 @@ services:
       - key: APP_ENV
         value: prod
         sync: false
+      # Registratie SMTP configuratie
+      - key: REGISTRATION_SMTP_HOST
+        sync: false
+      - key: REGISTRATION_SMTP_PORT
+        sync: false
+      - key: REGISTRATION_SMTP_USER
+        sync: false
+      - key: REGISTRATION_SMTP_PASSWORD
+        sync: false
+      - key: REGISTRATION_SMTP_FROM
+        sync: false
+      - key: REGISTRATION_EMAIL
+        sync: false
       # Database configuratie
       - key: DB_HOST
         fromService:
@@ -52,21 +65,27 @@ services:
     healthCheckPath: /api/health
     buildCommand: docker build -t dklautomatie-backend .
     startCommand: >
-      docker run -p 8080:8080 
-      -e ADMIN_EMAIL="$ADMIN_EMAIL" 
-      -e SMTP_HOST="$SMTP_HOST" 
-      -e SMTP_PORT="$SMTP_PORT" 
-      -e SMTP_USER="$SMTP_USER" 
-      -e SMTP_PASSWORD="$SMTP_PASSWORD" 
-      -e SMTP_FROM="$SMTP_FROM" 
-      -e ALLOWED_ORIGINS="$ALLOWED_ORIGINS" 
-      -e APP_ENV="$APP_ENV" 
-      -e DB_HOST="$DB_HOST" 
-      -e DB_PORT="$DB_PORT" 
-      -e DB_USER="$DB_USER" 
-      -e DB_PASSWORD="$DB_PASSWORD" 
-      -e DB_NAME="$DB_NAME" 
-      -e DB_SSL_MODE="$DB_SSL_MODE" 
+      docker run --rm --name dklautomatie-container -p 8080:8080 
+      -e ADMIN_EMAIL=$ADMIN_EMAIL 
+      -e SMTP_HOST=$SMTP_HOST 
+      -e SMTP_PORT=$SMTP_PORT 
+      -e SMTP_USER=$SMTP_USER 
+      -e SMTP_PASSWORD=$SMTP_PASSWORD 
+      -e SMTP_FROM=$SMTP_FROM 
+      -e ALLOWED_ORIGINS=$ALLOWED_ORIGINS 
+      -e APP_ENV=$APP_ENV 
+      -e REGISTRATION_SMTP_HOST=$REGISTRATION_SMTP_HOST 
+      -e REGISTRATION_SMTP_PORT=$REGISTRATION_SMTP_PORT 
+      -e REGISTRATION_SMTP_USER=$REGISTRATION_SMTP_USER 
+      -e REGISTRATION_SMTP_PASSWORD=$REGISTRATION_SMTP_PASSWORD 
+      -e REGISTRATION_SMTP_FROM=$REGISTRATION_SMTP_FROM 
+      -e REGISTRATION_EMAIL=$REGISTRATION_EMAIL 
+      -e DB_HOST=$DB_HOST 
+      -e DB_PORT=$DB_PORT 
+      -e DB_USER=$DB_USER 
+      -e DB_PASSWORD=$DB_PASSWORD 
+      -e DB_NAME=$DB_NAME 
+      -e DB_SSL_MODE=$DB_SSL_MODE 
       dklautomatie-backend
     
   - type: pserv
