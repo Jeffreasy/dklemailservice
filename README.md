@@ -12,7 +12,7 @@ Een robuuste en schaalbare email service voor De Koninklijke Loop, geschreven in
   - Ondersteuning voor HTML templates met dynamische content
   - Fallback naar plaintext voor betere deliverability
 
-- **Authenticatie & Autorisatie** (Nieuw)
+- **Authenticatie & Autorisatie** (Geïmplementeerd)
   - JWT-gebaseerde authenticatie voor beveiligde endpoints
   - Gebruikersbeheer met rollen (admin, gebruiker)
   - Wachtwoord hashing met bcrypt
@@ -30,13 +30,14 @@ Een robuuste en schaalbare email service voor De Koninklijke Loop, geschreven in
   - Secure SMTP configuratie met TLS support
   - XSS preventie in email templates
 
-- **Monitoring & Observability**
+- **Monitoring & Observability** (Geïmplementeerd)
   - Prometheus metrics voor real-time monitoring
   - ELK logging integratie voor centrale log aggregatie
   - Gedetailleerde email metrics per template en type
   - Health check endpoints met uitgebreide status informatie
   - Performance metrics voor email verzending
   - Rate limit statistieken
+  - API key authenticatie voor metrics endpoints
   - Error tracking en reporting
 
 - **Performance**
@@ -198,13 +199,13 @@ go test ./tests/... -v
 
 ### API Endpoints
 
-#### Health & Monitoring
+#### Health & Monitoring (Geïmplementeerd)
 - `GET /api/health` - Health check met uitgebreide service status
-- `GET /api/metrics/email` - Gedetailleerde email statistieken
-- `GET /api/metrics/rate-limits` - Rate limit status en statistieken
-- `GET /metrics` - Prometheus metrics endpoint
+- `GET /api/metrics/email` - Gedetailleerde email statistieken (vereist API key)
+- `GET /api/metrics/rate-limits` - Rate limit status en statistieken (vereist API key)
+- `GET /metrics` - Prometheus metrics endpoint (vereist API key)
 
-#### Email Verzending
+#### Email Verzending (Geïmplementeerd)
 - `POST /api/contact-email` - Verstuur contact formulier
   ```json
   {
@@ -228,7 +229,7 @@ go test ./tests/... -v
   }
   ```
 
-#### Authenticatie (Nieuw)
+#### Authenticatie (Geïmplementeerd)
 - `POST /api/auth/login` - Gebruiker inloggen
   ```json
   {
@@ -246,7 +247,7 @@ go test ./tests/... -v
   }
   ```
 
-#### Contact Beheer (Nieuw)
+#### Contact Beheer (Toekomstige Implementatie)
 - `GET /api/contact` - Lijst van contactformulieren ophalen
 - `GET /api/contact/:id` - Details van een specifiek contactformulier ophalen
 - `PUT /api/contact/:id` - Contactformulier bijwerken (status, notities)
@@ -254,7 +255,7 @@ go test ./tests/... -v
 - `POST /api/contact/:id/antwoord` - Antwoord toevoegen aan contactformulier
 - `GET /api/contact/status/:status` - Contactformulieren filteren op status
 
-#### Aanmelding Beheer (Nieuw)
+#### Aanmelding Beheer (Toekomstige Implementatie)
 - `GET /api/aanmelding` - Lijst van aanmeldingen ophalen
 - `GET /api/aanmelding/:id` - Details van een specifieke aanmelding ophalen
 - `PUT /api/aanmelding/:id` - Aanmelding bijwerken (status, notities)
@@ -524,7 +525,7 @@ De service volgt een modulaire architectuur met de volgende componenten:
 
 De applicatie is uitgebreid met een robuuste PostgreSQL database integratie voor het persistent opslaan van gegevens. Deze integratie maakt gebruik van GORM als ORM (Object-Relational Mapping) framework en implementeert het Repository Pattern voor een schone scheiding van verantwoordelijkheden.
 
-### Database Modellen
+### Database Modellen (Geïmplementeerd)
 
 De volgende modellen zijn geïmplementeerd:
 
@@ -537,7 +538,7 @@ De volgende modellen zijn geïmplementeerd:
 - **Gebruiker**: Beheert gebruikersaccounts voor administratieve toegang tot het systeem.
 - **Migratie**: Houdt database migraties bij om schema-wijzigingen gecontroleerd uit te voeren.
 
-### Repository Pattern
+### Repository Pattern (Geïmplementeerd)
 
 De applicatie implementeert het Repository Pattern voor data-toegang:
 
@@ -644,3 +645,13 @@ Uitgebreide documentatie is beschikbaar in de `/docs` directory:
 - `TEMPLATES.md` - Template documentatie
 - `TESTING.md` - Test procedures
 - `AUTH.md` - Authenticatie documentatie (Nieuw)
+
+## 🔄 Recente Updates
+
+### Maart 2025
+- Toegevoegd: API key authenticatie voor metrics endpoints
+- Verbeterd: Metrics endpoints voor email en rate limiting statistieken
+- Toegevoegd: Prometheus metrics endpoint
+- Verbeterd: Test scripts voor API endpoints
+- Toegevoegd: Automatische API tests met PowerShell script
+- Verbeterd: Documentatie voor metrics en authenticatie
