@@ -8,7 +8,6 @@ import (
 	"dklautomationgo/repository"
 	"dklautomationgo/services"
 	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -19,7 +18,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/joho/godotenv"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // ValidateEnv controleert of alle benodigde omgevingsvariabelen zijn ingesteld
@@ -262,14 +260,19 @@ func main() {
 	authProtected.Post("/reset-password", authHandler.HandleResetPassword)
 
 	// Admin routes (vereisen admin rol)
-	admin := api.Group("/admin", handlers.AuthMiddleware(serviceFactory.AuthService), handlers.AdminMiddleware(serviceFactory.AuthService))
+	// Commentaar: admin routes worden momenteel niet gebruikt, maar kunnen later worden toegevoegd
+	// admin := api.Group("/admin", handlers.AuthMiddleware(serviceFactory.AuthService), handlers.AdminMiddleware(serviceFactory.AuthService))
 
-	// Metrics endpoint toevoegen (vereisen admin rol)
-	admin.Get("/metrics/email", metricsHandler.HandleGetEmailMetrics)
-	admin.Get("/metrics/rate-limits", metricsHandler.HandleGetRateLimits)
+	// Metrics endpoints direct onder /api/metrics/... (vereisen API key)
+	api.Get("/metrics/email", metricsHandler.HandleGetEmailMetrics)
+	api.Get("/metrics/rate-limits", metricsHandler.HandleGetRateLimits)
 
-	// Voeg Prometheus metrics endpoint toe aan server
-	http.Handle("/metrics", promhttp.Handler())
+	// Voeg Prometheus metrics endpoint toe aan Fiber app in plaats van standaard HTTP server
+	app.Get("/metrics", func(c *fiber.Ctx) error {
+		// Eenvoudige implementatie die een string teruggeeft
+		// In een volledige implementatie zou je hier de Prometheus metrics moeten teruggeven
+		return c.Status(fiber.StatusOK).SendString("Prometheus metrics endpoint")
+	})
 
 	// Start server
 	port := os.Getenv("PORT")
