@@ -30,17 +30,18 @@ func LoadDatabaseConfig() *DatabaseConfig {
 		// In productie, gebruik de Render PostgreSQL database
 		dkllogger.Info("Productieomgeving gedetecteerd, gebruik Render PostgreSQL configuratie")
 
-		// Haal de database service naam op uit de omgeving
-		dbServiceName := os.Getenv("RENDER_DB_SERVICE_NAME")
-		if dbServiceName == "" {
-			dbServiceName = "dklautomatie-db"
-			dkllogger.Info("RENDER_DB_SERVICE_NAME niet gevonden, gebruik standaard naam", "default", dbServiceName)
+		// Probeer verschillende mogelijke hostnamen voor Render PostgreSQL
+		// Volgens Render documentatie kan de interne URL verschillende vormen hebben
+		possibleHosts := []string{
+			"postgres",                            // Standaard hostname in Render
+			"dklautomatie-db",                     // Service naam
+			"postgresql-dklautomatie-db",          // Conventie: postgresql-<service_name>
+			"internal-postgresql-dklautomatie-db", // Conventie: internal-postgresql-<service_name>
+			"dklautomatie-db.internal",            // Conventie: <service_name>.internal
+			"postgresql.render.com",               // Externe hostname
 		}
 
-		// Bouw de hostname op basis van de Render conventies
-		// Render gebruikt de vorm: postgresql-<service_name>
-		host := fmt.Sprintf("postgresql-%s", dbServiceName)
-		dkllogger.Info("Render PostgreSQL hostname opgebouwd", "host", host)
+		dkllogger.Info("Mogelijke PostgreSQL hostnamen", "hosts", possibleHosts)
 
 		// Lees de overige configuratie uit de omgeving
 		port := os.Getenv("DB_PORT")
@@ -48,8 +49,15 @@ func LoadDatabaseConfig() *DatabaseConfig {
 			port = "5432"
 		}
 
+		// Gebruik de waarden uit de Render dashboard
 		user := os.Getenv("DB_USER")
+		if user == "" {
+			// Fallback naar een standaard gebruikersnaam voor Render
+			user = "postgres"
+		}
+
 		password := os.Getenv("DB_PASSWORD")
+
 		dbName := os.Getenv("DB_NAME")
 		if dbName == "" {
 			dbName = "dklemailservice"
@@ -57,8 +65,12 @@ func LoadDatabaseConfig() *DatabaseConfig {
 
 		sslMode := os.Getenv("DB_SSL_MODE")
 		if sslMode == "" {
+			// Render vereist SSL voor externe verbindingen
 			sslMode = "require"
 		}
+
+		// Gebruik de eerste hostname in de lijst als standaard
+		host := possibleHosts[0]
 
 		dkllogger.Info("Render PostgreSQL configuratie geladen",
 			"host", host,
@@ -135,8 +147,6 @@ func (c *DatabaseConfig) ConnectionString() string {
 
 // InitDatabase initialiseert de database verbinding
 func InitDatabase(config *DatabaseConfig) (*gorm.DB, error) {
-	dsn := config.ConnectionString()
-
 	// Configureer GORM logger
 	gormLog := gormlogger.New(
 		&dbLogger{},
@@ -148,32 +158,63 @@ func InitDatabase(config *DatabaseConfig) (*gorm.DB, error) {
 		},
 	)
 
-	// Probeer eerst de normale verbinding
+	// Als we in productie draaien, probeer alle mogelijke hostnamen
+	if os.Getenv("APP_ENV") == "prod" {
+		// Lijst van mogelijke hostnamen voor Render PostgreSQL
+		possibleHosts := []string{
+			"postgres",                            // Standaard hostname in Render
+			"dklautomatie-db",                     // Service naam
+			"postgresql-dklautomatie-db",          // Conventie: postgresql-<service_name>
+			"internal-postgresql-dklautomatie-db", // Conventie: internal-postgresql-<service_name>
+			"dklautomatie-db.internal",            // Conventie: <service_name>.internal
+			"postgresql.render.com",               // Externe hostname
+		}
+
+		// Probeer elke hostname
+		var lastErr error
+		for _, host := range possibleHosts {
+			// Maak een kopie van de configuratie met de nieuwe hostname
+			testConfig := *config
+			testConfig.Host = host
+			dsn := testConfig.ConnectionString()
+
+			dkllogger.Info("Probeer database verbinding", "host", host, "dsn", dsn)
+
+			db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+				Logger: gormLog,
+			})
+
+			if err == nil {
+				dkllogger.Info("Database verbinding succesvol", "host", host)
+
+				// Configureer connection pool
+				sqlDB, err := db.DB()
+				if err != nil {
+					return nil, err
+				}
+
+				sqlDB.SetMaxIdleConns(10)
+				sqlDB.SetMaxOpenConns(100)
+				sqlDB.SetConnMaxLifetime(time.Hour)
+
+				return db, nil
+			}
+
+			dkllogger.Warn("Database verbinding mislukt", "host", host, "error", err)
+			lastErr = err
+		}
+
+		// Als alle verbindingen mislukken, geef de laatste fout terug
+		return nil, fmt.Errorf("alle database verbindingen mislukt, laatste fout: %w", lastErr)
+	}
+
+	// Voor niet-productie omgevingen, gebruik de normale verbinding
+	dsn := config.ConnectionString()
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: gormLog,
 	})
 
-	// Als dat niet lukt en we zijn in productie, probeer een alternatieve verbinding
-	if err != nil && os.Getenv("APP_ENV") == "prod" {
-		dkllogger.Warn("Normale database verbinding mislukt, probeer alternatieve verbinding", "error", err)
-
-		// Probeer een alternatieve verbinding met de interne Render hostname
-		altConfig := *config
-		altConfig.Host = "internal-postgresql-" + os.Getenv("RENDER_DB_SERVICE_NAME")
-		altDsn := altConfig.ConnectionString()
-
-		dkllogger.Info("Probeer alternatieve database verbinding", "host", altConfig.Host)
-		db, err = gorm.Open(postgres.Open(altDsn), &gorm.Config{
-			Logger: gormLog,
-		})
-
-		if err != nil {
-			dkllogger.Error("Alternatieve database verbinding mislukt", "error", err)
-			return nil, err
-		}
-
-		dkllogger.Info("Alternatieve database verbinding succesvol")
-	} else if err != nil {
+	if err != nil {
 		return nil, err
 	}
 

@@ -35,19 +35,7 @@ services:
         sync: false
       - key: REGISTRATION_EMAIL
         sync: false
-      # Database configuratie
-      - key: RENDER_DB_SERVICE_NAME
-        value: dklautomatie-db
-      - key: DB_HOST
-        fromService:
-          name: dklautomatie-db
-          type: pserv
-          property: host
-      - key: DB_PORT
-        fromService:
-          name: dklautomatie-db
-          type: pserv
-          property: port
+      # Database configuratie - direct doorgeven
       - key: DB_USER
         fromService:
           name: dklautomatie-db
@@ -65,6 +53,11 @@ services:
           property: database
       - key: DB_SSL_MODE
         value: require
+      - key: DB_PORT
+        value: "5432"
+      # Debug logging
+      - key: LOG_LEVEL
+        value: debug
     healthCheckPath: /api/health
     
   - type: pserv
