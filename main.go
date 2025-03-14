@@ -1,8 +1,11 @@
 package main
 
 import (
+	"dklautomationgo/config"
+	"dklautomationgo/database"
 	"dklautomationgo/handlers"
 	"dklautomationgo/logger"
+	"dklautomationgo/repository"
 	"dklautomationgo/services"
 	"fmt"
 	"net/http"
@@ -82,36 +85,40 @@ func main() {
 		logger.Fatal("Configuratiefout", "error", err)
 	}
 
-	// Initialiseer Prometheus metrics
-	prometheusMetrics := services.GetPrometheusMetrics()
+	// Initialiseer database
+	dbConfig := config.LoadDatabaseConfig()
+	db, err := config.InitDatabase(dbConfig)
+	if err != nil {
+		logger.Fatal("Database initialisatie fout", "error", err)
+	}
 
-	// SMTP client setup
-	smtpClient := services.NewRealSMTPClient(
-		os.Getenv("SMTP_HOST"),
-		os.Getenv("SMTP_PORT"),
-		os.Getenv("SMTP_USER"),
-		os.Getenv("SMTP_PASSWORD"),
-		os.Getenv("SMTP_FROM"),
-		os.Getenv("REGISTRATION_SMTP_HOST"),
-		os.Getenv("REGISTRATION_SMTP_PORT"),
-		os.Getenv("REGISTRATION_SMTP_USER"),
-		os.Getenv("REGISTRATION_SMTP_PASSWORD"),
-		os.Getenv("REGISTRATION_SMTP_FROM"),
-	)
+	// Initialiseer repository factory
+	repoFactory := repository.NewRepositoryFactory(db)
 
-	// Initialize services
-	emailMetrics := services.NewEmailMetrics(24 * time.Hour) // Reset elke 24 uur
-	rateLimiter := services.NewRateLimiter(prometheusMetrics)
-	rateLimiter.AddLimit("contact_email", 100, time.Hour, false)    // 100 contact emails per uur globaal
-	rateLimiter.AddLimit("contact_email", 5, time.Hour, true)       // 5 contact emails per uur per IP
-	rateLimiter.AddLimit("aanmelding_email", 200, time.Hour, false) // 200 aanmelding emails per uur globaal
-	rateLimiter.AddLimit("aanmelding_email", 10, time.Hour, true)   // 10 aanmelding emails per uur per IP
-	emailService := services.NewEmailService(smtpClient, emailMetrics, rateLimiter, prometheusMetrics)
-	emailBatcher := services.NewEmailBatcher(emailService, 50, 15*time.Minute)
-	metricsHandler := handlers.NewMetricsHandler(emailMetrics, rateLimiter)
+	// Voer database migraties uit
+	migrationManager := database.NewMigrationManager(db, repoFactory.Migratie)
+	if err := migrationManager.MigrateDatabase(); err != nil {
+		logger.Fatal("Database migratie fout", "error", err)
+	}
 
-	// Initialize handlers
-	emailHandler := handlers.NewEmailHandler(emailService)
+	// Seed database met initiële data
+	if err := migrationManager.SeedDatabase(); err != nil {
+		logger.Fatal("Database seeding fout", "error", err)
+	}
+
+	// Initialiseer service factory
+	serviceFactory := services.NewServiceFactory(repoFactory)
+
+	// Initialiseer handlers
+	emailHandler := handlers.NewEmailHandler(serviceFactory.EmailService)
+
+	// Type assertion voor RateLimiter
+	rateLimiter, ok := serviceFactory.RateLimiter.(*services.RateLimiter)
+	if !ok {
+		logger.Fatal("Kon RateLimiter niet casten naar juiste type")
+	}
+
+	metricsHandler := handlers.NewMetricsHandler(serviceFactory.EmailMetrics, rateLimiter)
 
 	// Create Fiber app
 	app := fiber.New(fiber.Config{
@@ -219,15 +226,17 @@ func main() {
 	logger.Info("Server wordt afgesloten...")
 
 	// Graceful shutdown
-	if emailBatcher != nil {
-		emailBatcher.Shutdown()
+	if serviceFactory.EmailBatcher != nil {
+		serviceFactory.EmailBatcher.Shutdown()
 	}
 
 	// Sluit rate limiter af
-	rateLimiter.Shutdown()
+	if rateLimiter != nil {
+		rateLimiter.Shutdown()
+	}
 
 	// Log laatste metrics
-	emailMetrics.LogMetrics()
+	serviceFactory.EmailMetrics.LogMetrics()
 
 	// Sluit alle log writers
 	logger.CloseWriters()

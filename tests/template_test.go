@@ -1,3 +1,4 @@
+// Package tests bevat tests voor de applicatie
 package tests
 
 import (
@@ -7,7 +8,24 @@ import (
 	"time"
 )
 
+// TestEmailTemplateRendering test het renderen van email templates
 func TestEmailTemplateRendering(t *testing.T) {
+	// Zoek de templates directory met onze helper
+	templatesDir, err := GetTemplatesDir()
+	if err != nil {
+		t.Skip("Templates directory niet gevonden, test wordt overgeslagen")
+	}
+
+	// Initialiseer een mock SMTP client
+	smtp := newMockSMTP()
+
+	// Maak een aangepaste EmailService met de juiste templates
+	metrics := services.NewEmailMetrics(24 * time.Hour)
+	rateLimiter := services.NewRateLimiter(nil)
+	rateLimiter.AddLimit("email_generic", 1000, time.Minute, false)
+
+	service := services.NewEmailServiceWithTemplatesDir(smtp, metrics, rateLimiter, nil, templatesDir)
+
 	tests := []struct {
 		name     string
 		template string
@@ -56,12 +74,6 @@ func TestEmailTemplateRendering(t *testing.T) {
 		},
 	}
 
-	smtp := newMockSMTP()
-	service, err := services.NewTestEmailService(smtp)
-	if err != nil {
-		t.Fatalf("Failed to create email service: %v", err)
-	}
-
 	for _, tt := range tests {
 		tt := tt // Maak een kopie van de loopvariabele
 		t.Run(tt.name, func(t *testing.T) {
@@ -70,7 +82,7 @@ func TestEmailTemplateRendering(t *testing.T) {
 			tmpl := service.GetTemplate(tt.template)
 			if tmpl == nil {
 				if !tt.wantErr {
-					t.Errorf("Template %s not found", tt.template)
+					t.Errorf("Template %s not found, maar was wel verwacht", tt.template)
 				}
 				return
 			}

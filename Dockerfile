@@ -1,5 +1,5 @@
-# Build stage
-FROM golang:1.21-alpine AS builder
+# Build stage for production (CGO disabled for smaller, static binaries)
+FROM golang:1.21-alpine AS builder-prod
 
 WORKDIR /app
 
@@ -15,25 +15,50 @@ RUN go mod download
 # Copy the source code
 COPY . .
 
-# Build the application with optimizations
-RUN CGO_ENABLED=0 GOOS=linux go build -o main -ldflags="-w -s" .
+# Build the application with optimizations and CGO disabled for production
+RUN CGO_ENABLED=0 GOOS=linux go build -o main-prod -ldflags="-w -s" .
+
+# Build stage for development/testing (CGO enabled for SQLite support)
+FROM golang:1.21-alpine AS builder-dev
+
+WORKDIR /app
+
+# Install necessary build tools and SQLite dependencies
+RUN apk add --no-cache git gcc musl-dev sqlite-dev
+
+# Copy go mod and sum files
+COPY go.mod go.sum ./
+
+# Download all dependencies
+RUN go mod download
+
+# Copy the source code
+COPY . .
+
+# Build the application with CGO enabled for testing
+RUN CGO_ENABLED=1 GOOS=linux go build -o main-dev .
 
 # Final stage
 FROM alpine:latest
 
 WORKDIR /app
 
-# Install ca-certificates for HTTPS
-RUN apk --no-cache add ca-certificates
+# Install ca-certificates for HTTPS and SQLite for development
+RUN apk --no-cache add ca-certificates sqlite
 
-# Copy the binary from builder
-COPY --from=builder /app/main .
+# Copy the binaries from builders
+COPY --from=builder-prod /app/main-prod ./main
+COPY --from=builder-dev /app/main-dev ./main-dev
 
 # Copy templates directory
-COPY --from=builder /app/templates ./templates
+COPY --from=builder-prod /app/templates ./templates
 
 # Expose port
 EXPOSE 8080
 
-# Command to run the executable
-CMD ["./main"] 
+# Set environment variable to indicate which binary to use
+# Use ENV APP_ENV=dev to use the development binary with CGO enabled
+ENV APP_ENV=prod
+
+# Command to run the executable based on environment
+CMD if [ "$APP_ENV" = "dev" ]; then ./main-dev; else ./main; fi 

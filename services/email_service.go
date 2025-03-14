@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
@@ -19,13 +20,14 @@ type SMTPClient interface {
 	SendEmail(to, subject, body string) error
 }
 
-// EmailService beheert email templates en afhandeling van email verzending
+// EmailService is verantwoordelijk voor het versturen van emails
 type EmailService struct {
+	smtpClient        SMTPClient
 	templates         map[string]*template.Template
 	rateLimiter       RateLimiterInterface
-	smtpClient        SMTPClient
 	metrics           *EmailMetrics
 	prometheusMetrics PrometheusMetricsInterface
+	mu                sync.RWMutex
 }
 
 // EmailMessage representeert een te verzenden email
@@ -39,6 +41,11 @@ type EmailMessage struct {
 // Laadt templates uit de configureerbare template directory
 // en configureert rate limiting op basis van omgevingsvariabelen
 func NewEmailService(smtpClient SMTPClient, metrics *EmailMetrics, rateLimiter RateLimiterInterface, prometheusMetrics PrometheusMetricsInterface) *EmailService {
+	return NewEmailServiceWithTemplatesDir(smtpClient, metrics, rateLimiter, prometheusMetrics, "templates")
+}
+
+// NewEmailServiceWithTemplatesDir maakt een nieuwe EmailService met de opgegeven SMTP client en templates directory
+func NewEmailServiceWithTemplatesDir(smtpClient SMTPClient, metrics *EmailMetrics, rateLimiter RateLimiterInterface, prometheusMetrics PrometheusMetricsInterface, templatesDir string) *EmailService {
 	// Laad alle templates bij initialisatie
 	templates := make(map[string]*template.Template)
 	templateFiles := []string{
@@ -49,7 +56,7 @@ func NewEmailService(smtpClient SMTPClient, metrics *EmailMetrics, rateLimiter R
 	}
 
 	for _, name := range templateFiles {
-		templatePath := filepath.Join("templates", name+".html")
+		templatePath := filepath.Join(templatesDir, name+".html")
 		tmpl, err := template.ParseFiles(templatePath)
 		if err != nil {
 			logger.Error("Failed to load template", "template", name, "error", err)
@@ -166,13 +173,31 @@ func (s *EmailService) sendEmail(to, subject, body string) error {
 	return nil
 }
 
+// GetTemplate geeft een template terug op basis van de naam
 func (s *EmailService) GetTemplate(name string) *template.Template {
-	return s.templates[name]
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	tmpl, exists := s.templates[name]
+	if !exists {
+		return nil
+	}
+	return tmpl
 }
 
+// ValidateTemplate valideert of een template correct kan worden uitgevoerd met de gegeven data
 func ValidateTemplate(tmpl *template.Template, data interface{}) error {
+	if tmpl == nil {
+		return fmt.Errorf("template is nil")
+	}
+
+	// Render de template naar een buffer om te controleren of het werkt
 	var buf bytes.Buffer
-	return tmpl.Execute(&buf, data)
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return fmt.Errorf("template execution error: %w", err)
+	}
+
+	return nil
 }
 
 func (s *EmailService) SendEmail(to, subject, body string) error {

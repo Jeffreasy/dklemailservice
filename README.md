@@ -45,6 +45,10 @@ Een robuuste en schaalbare email service voor De Koninklijke Loop, geschreven in
 - SMTP server voor email verzending
   - Ondersteuning voor TLS
   - Voldoende verzendlimieten voor verwacht volume
+- PostgreSQL 12 of hoger voor persistente opslag
+  - Gebruiker met CREATE/ALTER/INSERT/UPDATE/DELETE rechten
+  - Voldoende opslagruimte voor verwacht datavolume
+- (Optioneel) SQLite voor lokale ontwikkeling en tests (vereist CGO)
 - (Optioneel) ELK stack voor logging
   - Elasticsearch 7.x of hoger
   - Logstash voor log processing
@@ -96,6 +100,14 @@ REGISTRATION_SMTP_TIMEOUT=10s
 ADMIN_EMAIL=admin@example.com
 REGISTRATION_EMAIL=registration@example.com
 
+# Database configuratie
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=your_password
+DB_NAME=dklemailservice
+DB_SSL_MODE=disable
+
 # Rate Limiting
 GLOBAL_RATE_LIMIT=1000
 IP_RATE_LIMIT=50
@@ -137,6 +149,38 @@ go build -ldflags="-s -w" -o dklemailservice
 ./dklemailservice
 ```
 
+### Tests Uitvoeren
+
+Voor het uitvoeren van tests is CGO vereist vanwege SQLite afhankelijkheid in de tests. Gebruik de meegeleverde scripts:
+
+#### Linux/macOS:
+```bash
+# Voer alle tests uit
+./scripts/run_tests.sh
+
+# Voer tests uit met coverage rapport
+./scripts/run_tests.sh --coverage
+```
+
+#### Windows:
+```batch
+# Voer alle tests uit
+scripts\run_tests.bat
+
+# Voer tests uit met coverage rapport
+scripts\run_tests.bat --coverage
+```
+
+Handmatig CGO inschakelen:
+```bash
+# Zet CGO aan voor SQLite ondersteuning
+export CGO_ENABLED=1  # Linux/macOS
+set CGO_ENABLED=1     # Windows
+
+# Voer tests uit
+go test ./tests/... -v
+```
+
 ### API Endpoints
 
 #### Health & Monitoring
@@ -168,6 +212,22 @@ go build -ldflags="-s -w" -o dklemailservice
     "terms": true
   }
   ```
+
+#### Contact Beheer (Nieuw)
+- `GET /api/contact` - Lijst van contactformulieren ophalen
+- `GET /api/contact/:id` - Details van een specifiek contactformulier ophalen
+- `PUT /api/contact/:id` - Contactformulier bijwerken (status, notities)
+- `DELETE /api/contact/:id` - Contactformulier verwijderen
+- `POST /api/contact/:id/antwoord` - Antwoord toevoegen aan contactformulier
+- `GET /api/contact/status/:status` - Contactformulieren filteren op status
+
+#### Aanmelding Beheer (Nieuw)
+- `GET /api/aanmelding` - Lijst van aanmeldingen ophalen
+- `GET /api/aanmelding/:id` - Details van een specifieke aanmelding ophalen
+- `PUT /api/aanmelding/:id` - Aanmelding bijwerken (status, notities)
+- `DELETE /api/aanmelding/:id` - Aanmelding verwijderen
+- `POST /api/aanmelding/:id/antwoord` - Antwoord toevoegen aan aanmelding
+- `GET /api/aanmelding/rol/:rol` - Aanmeldingen filteren op rol
 
 ### Docker
 
@@ -427,12 +487,86 @@ De service volgt een modulaire architectuur met de volgende componenten:
 - Observer pattern voor metrics
 - Builder pattern voor email constructie
 
+## 🗄️ Database Architectuur
+
+De applicatie is uitgebreid met een robuuste PostgreSQL database integratie voor het persistent opslaan van gegevens. Deze integratie maakt gebruik van GORM als ORM (Object-Relational Mapping) framework en implementeert het Repository Pattern voor een schone scheiding van verantwoordelijkheden.
+
+### Database Modellen
+
+De volgende modellen zijn geïmplementeerd:
+
+- **ContactFormulier**: Slaat contactformulier gegevens op met velden voor naam, email, bericht, status en behandeling.
+- **ContactAntwoord**: Houdt antwoorden op contactformulieren bij, gekoppeld via een één-op-veel relatie.
+- **Aanmelding**: Registreert aanmeldingen voor het evenement met persoonlijke gegevens en voorkeuren.
+- **AanmeldingAntwoord**: Bewaart antwoorden op aanmeldingen, gekoppeld via een één-op-veel relatie.
+- **EmailTemplate**: Slaat email templates op voor hergebruik en consistentie in communicatie.
+- **VerzondEmail**: Houdt een log bij van alle verzonden emails voor tracking en auditing.
+- **Gebruiker**: Beheert gebruikersaccounts voor administratieve toegang tot het systeem.
+- **Migratie**: Houdt database migraties bij om schema-wijzigingen gecontroleerd uit te voeren.
+
+### Repository Pattern
+
+De applicatie implementeert het Repository Pattern voor data-toegang:
+
+- **Basisrepository**: `PostgresRepository` biedt gemeenschappelijke functionaliteit zoals foutafhandeling en timeouts.
+- **Gespecialiseerde repositories**: Voor elk model is er een specifieke repository die CRUD-operaties implementeert.
+- **Repository Factory**: Centraliseert de creatie van repositories en zorgt voor eenvoudige dependency injection.
+
+### Database Configuratie
+
+De database verbinding wordt geconfigureerd via environment variables:
+
+```env
+# Database configuratie
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=your_password
+DB_NAME=dklemailservice
+DB_SSL_MODE=disable
+```
+
+### Migraties
+
+De applicatie ondersteunt automatische database migraties bij het opstarten:
+
+1. Schema migraties: Creëert en update tabellen op basis van de gedefinieerde modellen.
+2. Data seeding: Vult de database met initiële gegevens zoals standaard email templates.
+
+### Mock Database voor Tests
+
+Voor tests is een mock database implementatie beschikbaar die geen externe database vereist:
+
+- In-memory opslag voor alle modellen
+- Volledige implementatie van repository interfaces
+- Automatische fallback naar mock database als SQLite niet beschikbaar is (CGO uitgeschakeld)
+
+## 🐳 Docker Multi-stage Builds
+
+De Dockerfile is verbeterd met multi-stage builds die twee versies van de applicatie produceren:
+
+1. **Productie binary** (CGO uitgeschakeld):
+   - Kleinere, statisch gelinkte binary
+   - Betere performance en veiligheid
+   - Geen ondersteuning voor SQLite (gebruikt PostgreSQL in productie)
+
+2. **Ontwikkeling/test binary** (CGO ingeschakeld):
+   - Ondersteunt SQLite voor lokale ontwikkeling en tests
+   - Bevat debugging informatie
+   - Geschikt voor testen met database-afhankelijke tests
+
+De te gebruiken binary wordt bepaald door de `APP_ENV` environment variable:
+```bash
+# Productie mode (standaard)
+docker run -e APP_ENV=prod dklemailservice
+
+# Ontwikkeling/test mode met SQLite ondersteuning
+docker run -e APP_ENV=dev dklemailservice
+```
+
 ### Concurrency
-- Goroutines voor non-blocking operations
-- Channels voor communicatie
-- Mutex voor thread-safe operations
-- Context voor cancellation
-- Worker pools voor batch processing
+
+De service gebruikt goroutines voor non-blocking operations en channels voor communicatie. Mutex voor thread-safe operations en context voor cancellation worden gebruikt om te voorkomen dat er race conditions optreden. Worker pools voor batch processing zorgen voor efficiënte bulk verzending.
 
 ## 👥 Bijdragen
 
