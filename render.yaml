@@ -1,8 +1,9 @@
 services:
   - type: web
     name: dklautomatie-backend
-    runtime: docker
-    dockerfilePath: ./Dockerfile
+    env: go
+    buildCommand: go build -o server
+    startCommand: ./server
     envVars:
       - key: ADMIN_EMAIL
         sync: false
@@ -63,10 +64,6 @@ services:
       - key: DB_SSL_MODE
         value: require
     healthCheckPath: /api/health
-    buildCommand: |
-      chmod +x start.sh
-      docker build -t dklautomatie-backend .
-    startCommand: ./start.sh
     
   - type: pserv
     name: dklautomatie-db

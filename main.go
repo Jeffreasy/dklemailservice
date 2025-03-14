@@ -73,6 +73,28 @@ func main() {
 	logger.Setup(logLevel)
 	defer logger.Sync()
 
+	// Debug: Print alle omgevingsvariabelen
+	logger.Info("Omgevingsvariabelen debug:")
+	for _, env := range []string{
+		"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "DB_SSL_MODE",
+		"SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM",
+		"REGISTRATION_SMTP_HOST", "REGISTRATION_SMTP_PORT", "REGISTRATION_SMTP_USER",
+		"REGISTRATION_SMTP_PASSWORD", "REGISTRATION_SMTP_FROM",
+		"ADMIN_EMAIL", "REGISTRATION_EMAIL",
+	} {
+		value := os.Getenv(env)
+		if value == "" {
+			logger.Warn("Omgevingsvariabele niet gevonden", "key", env)
+		} else {
+			// Verberg wachtwoorden in logs
+			if strings.Contains(env, "PASSWORD") {
+				logger.Info("Omgevingsvariabele gevonden", "key", env, "value", "********")
+			} else {
+				logger.Info("Omgevingsvariabele gevonden", "key", env, "value", value)
+			}
+		}
+	}
+
 	// Setup ELK integratie als omgevingsvariabele is ingesteld
 	elkEndpoint := os.Getenv("ELK_ENDPOINT")
 	if elkEndpoint != "" {
@@ -103,6 +125,11 @@ func main() {
 		"user", dbConfig.User,
 		"dbname", dbConfig.DBName,
 		"sslmode", dbConfig.SSLMode)
+
+	// Test database verbinding direct
+	connectionString := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		dbConfig.Host, dbConfig.Port, dbConfig.User, dbConfig.Password, dbConfig.DBName, dbConfig.SSLMode)
+	logger.Info("Probeer directe database verbinding", "connection_string", connectionString)
 
 	db, err := config.InitDatabase(dbConfig)
 	if err != nil {

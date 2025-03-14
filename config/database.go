@@ -24,13 +24,51 @@ type DatabaseConfig struct {
 
 // LoadDatabaseConfig laadt database configuratie uit environment variables
 func LoadDatabaseConfig() *DatabaseConfig {
+	// Lees direct de omgevingsvariabelen
+	host := os.Getenv("DB_HOST")
+	port := os.Getenv("DB_PORT")
+	user := os.Getenv("DB_USER")
+	password := os.Getenv("DB_PASSWORD")
+	dbName := os.Getenv("DB_NAME")
+	sslMode := os.Getenv("DB_SSL_MODE")
+
+	// Log de waarden (verberg wachtwoord)
+	dkllogger.Info("Database configuratie direct uit omgevingsvariabelen:",
+		"DB_HOST", host,
+		"DB_PORT", port,
+		"DB_USER", user,
+		"DB_NAME", dbName,
+		"DB_SSL_MODE", sslMode)
+
+	// Gebruik fallback waarden alleen als de omgevingsvariabelen leeg zijn
+	if host == "" {
+		host = "localhost"
+		dkllogger.Warn("DB_HOST omgevingsvariabele niet gevonden, fallback gebruikt", "fallback", host)
+	}
+	if port == "" {
+		port = "5432"
+		dkllogger.Warn("DB_PORT omgevingsvariabele niet gevonden, fallback gebruikt", "fallback", port)
+	}
+	if user == "" {
+		user = "postgres"
+		dkllogger.Warn("DB_USER omgevingsvariabele niet gevonden, fallback gebruikt", "fallback", user)
+	}
+	if dbName == "" {
+		dbName = "dklemailservice"
+		dkllogger.Warn("DB_NAME omgevingsvariabele niet gevonden, fallback gebruikt", "fallback", dbName)
+	}
+	if sslMode == "" {
+		sslMode = "disable"
+		dkllogger.Warn("DB_SSL_MODE omgevingsvariabele niet gevonden, fallback gebruikt", "fallback", sslMode)
+	}
+
 	return &DatabaseConfig{
-		Host:     getEnv("DB_HOST", "localhost"),
-		Port:     getEnv("DB_PORT", "5432"),
-		User:     getEnv("DB_USER", "postgres"),
-		Password: getEnv("DB_PASSWORD", ""),
-		DBName:   getEnv("DB_NAME", "dklemailservice"),
-		SSLMode:  getEnv("DB_SSL_MODE", "disable"),
+		Host:     host,
+		Port:     port,
+		User:     user,
+		Password: password,
+		DBName:   dbName,
+		SSLMode:  sslMode,
 	}
 }
 
