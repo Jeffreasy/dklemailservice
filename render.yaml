@@ -35,6 +35,9 @@ services:
         sync: false
       - key: REGISTRATION_EMAIL
         sync: false
+      # JWT configuratie
+      - key: JWT_SECRET
+        sync: false
       # Debug logging
       - key: LOG_LEVEL
         value: debug

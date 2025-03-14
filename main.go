@@ -48,6 +48,9 @@ func ValidateEnv() error {
 		"DB_PASSWORD",
 		"DB_NAME",
 		"DB_SSL_MODE",
+
+		// JWT configuratie
+		"JWT_SECRET",
 	}
 
 	for _, env := range required {
@@ -81,6 +84,7 @@ func main() {
 		"REGISTRATION_SMTP_HOST", "REGISTRATION_SMTP_PORT", "REGISTRATION_SMTP_USER",
 		"REGISTRATION_SMTP_PASSWORD", "REGISTRATION_SMTP_FROM",
 		"ADMIN_EMAIL", "REGISTRATION_EMAIL",
+		"JWT_SECRET",
 	} {
 		value := os.Getenv(env)
 		if value == "" {
@@ -153,14 +157,15 @@ func main() {
 	// Initialiseer service factory
 	serviceFactory := services.NewServiceFactory(repoFactory)
 
-	// Initialiseer handlers
-	emailHandler := handlers.NewEmailHandler(serviceFactory.EmailService)
-
 	// Type assertion voor RateLimiter
 	rateLimiter, ok := serviceFactory.RateLimiter.(*services.RateLimiter)
 	if !ok {
 		logger.Fatal("Kon RateLimiter niet casten naar juiste type")
 	}
+
+	// Initialiseer handlers
+	emailHandler := handlers.NewEmailHandler(serviceFactory.EmailService)
+	authHandler := handlers.NewAuthHandler(serviceFactory.AuthService, rateLimiter)
 
 	metricsHandler := handlers.NewMetricsHandler(serviceFactory.EmailMetrics, rateLimiter)
 
@@ -187,8 +192,8 @@ func main() {
 
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: strings.Join(allowedOrigins, ","),
-		AllowHeaders: "Origin, Content-Type, Accept",
-		AllowMethods: "GET,POST,OPTIONS",
+		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
+		AllowMethods: "GET,POST,PUT,DELETE,OPTIONS",
 	}))
 
 	// Serve static files from public directory
@@ -227,6 +232,10 @@ func main() {
 				{"path": "/api/aanmelding-email", "method": "POST", "description": "Send registration form email"},
 				{"path": "/api/metrics/email", "method": "GET", "description": "Email metrics (requires API key)"},
 				{"path": "/api/metrics/rate-limits", "method": "GET", "description": "Rate limit metrics (requires API key)"},
+				{"path": "/api/auth/login", "method": "POST", "description": "User login"},
+				{"path": "/api/auth/logout", "method": "POST", "description": "User logout"},
+				{"path": "/api/auth/profile", "method": "GET", "description": "Get user profile (requires auth)"},
+				{"path": "/api/auth/reset-password", "method": "POST", "description": "Reset password (requires auth)"},
 				{"path": "/metrics", "method": "GET", "description": "Prometheus metrics"},
 			},
 		})
@@ -242,9 +251,22 @@ func main() {
 	api.Post("/contact-email", emailHandler.HandleContactEmail)
 	api.Post("/aanmelding-email", emailHandler.HandleAanmeldingEmail)
 
-	// Metrics endpoint toevoegen
-	api.Get("/metrics/email", metricsHandler.HandleGetEmailMetrics)
-	api.Get("/metrics/rate-limits", metricsHandler.HandleGetRateLimits)
+	// Auth routes
+	auth := api.Group("/auth")
+	auth.Post("/login", handlers.RateLimitMiddleware(rateLimiter, "login"), authHandler.HandleLogin)
+	auth.Post("/logout", authHandler.HandleLogout)
+
+	// Beveiligde auth routes (vereisen authenticatie)
+	authProtected := auth.Group("/", handlers.AuthMiddleware(serviceFactory.AuthService))
+	authProtected.Get("/profile", authHandler.HandleGetProfile)
+	authProtected.Post("/reset-password", authHandler.HandleResetPassword)
+
+	// Admin routes (vereisen admin rol)
+	admin := api.Group("/admin", handlers.AuthMiddleware(serviceFactory.AuthService), handlers.AdminMiddleware(serviceFactory.AuthService))
+
+	// Metrics endpoint toevoegen (vereisen admin rol)
+	admin.Get("/metrics/email", metricsHandler.HandleGetEmailMetrics)
+	admin.Get("/metrics/rate-limits", metricsHandler.HandleGetRateLimits)
 
 	// Voeg Prometheus metrics endpoint toe aan server
 	http.Handle("/metrics", promhttp.Handler())

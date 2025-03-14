@@ -281,16 +281,26 @@ func (m *mockRateLimiter) AllowEmail(operation, email string) bool {
 }
 
 //nolint:unused // These mocks are kept for future tests
+func (m *mockRateLimiter) Allow(key string) bool {
+	return !m.shouldLimit
+}
+
+//nolint:unused // These mocks are kept for future tests
 func (m *mockRateLimiter) GetLimits() map[string]services.RateLimit {
-	limits := make(map[string]services.RateLimit)
-	for op, l := range m.limits {
-		limits[op] = services.RateLimit{
-			Count:  l.limit,
-			Period: l.period,
-			PerIP:  l.perEmail,
+	result := make(map[string]services.RateLimit)
+	for op, limit := range m.limits {
+		result[op] = services.RateLimit{
+			Count:  limit.limit,
+			Period: limit.period,
+			PerIP:  limit.perEmail,
 		}
 	}
-	return limits
+	return result
+}
+
+//nolint:unused // These mocks are kept for future tests
+func (m *mockRateLimiter) GetCurrentValues() map[string]int {
+	return m.currentCounts
 }
 
 //nolint:unused // These mocks are kept for future tests

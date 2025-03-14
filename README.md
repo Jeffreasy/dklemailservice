@@ -12,6 +12,15 @@ Een robuuste en schaalbare email service voor De Koninklijke Loop, geschreven in
   - Ondersteuning voor HTML templates met dynamische content
   - Fallback naar plaintext voor betere deliverability
 
+- **Authenticatie & Autorisatie** (Nieuw)
+  - JWT-gebaseerde authenticatie voor beveiligde endpoints
+  - Gebruikersbeheer met rollen (admin, gebruiker)
+  - Wachtwoord hashing met bcrypt
+  - Login rate limiting voor beveiliging
+  - Beveiligde wachtwoord reset functionaliteit
+  - HTTP-only cookies voor token opslag
+  - Middleware voor rol-gebaseerde toegangscontrole
+
 - **Beveiliging & Stabiliteit**
   - Rate limiting per IP en globaal voor spam preventie
   - CORS beveiliging met configureerbare origins
@@ -108,10 +117,16 @@ DB_PASSWORD=your_password
 DB_NAME=dklemailservice
 DB_SSL_MODE=disable
 
+# JWT configuratie
+JWT_SECRET=your_jwt_secret_key
+JWT_TOKEN_EXPIRY=24h
+
 # Rate Limiting
 GLOBAL_RATE_LIMIT=1000
 IP_RATE_LIMIT=50
 RATE_LIMIT_WINDOW=1h
+LOGIN_LIMIT_COUNT=5
+LOGIN_LIMIT_PERIOD=300
 
 # Monitoring & Logging
 LOG_LEVEL=info
@@ -210,6 +225,24 @@ go test ./tests/... -v
     "ondersteuning": "string",
     "bijzonderheden": "string",
     "terms": true
+  }
+  ```
+
+#### Authenticatie (Nieuw)
+- `POST /api/auth/login` - Gebruiker inloggen
+  ```json
+  {
+    "email": "string",
+    "wachtwoord": "string"
+  }
+  ```
+- `POST /api/auth/logout` - Gebruiker uitloggen
+- `GET /api/auth/profile` - Gebruikersprofiel ophalen (vereist authenticatie)
+- `POST /api/auth/reset-password` - Wachtwoord wijzigen (vereist authenticatie)
+  ```json
+  {
+    "huidig_wachtwoord": "string",
+    "nieuw_wachtwoord": "string"
   }
   ```
 
@@ -610,3 +643,4 @@ Uitgebreide documentatie is beschikbaar in de `/docs` directory:
 - `SECURITY.md` - Security best practices
 - `TEMPLATES.md` - Template documentatie
 - `TESTING.md` - Test procedures
+- `AUTH.md` - Authenticatie documentatie (Nieuw)

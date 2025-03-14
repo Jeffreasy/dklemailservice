@@ -1,33 +1,59 @@
-### Health Check
-GET http://localhost:8080/health
+### Gezondheidscheck
+GET http://localhost:8080/api/health
 
-### Test Contact Form Email
+### Login
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@dekoninklijkeloop.nl",
+  "wachtwoord": "admin123"
+}
+
+### Gebruikersprofiel ophalen
+GET http://localhost:8080/api/auth/profile
+Authorization: Bearer {{auth_token}}
+
+### Wachtwoord wijzigen
+POST http://localhost:8080/api/auth/reset-password
+Content-Type: application/json
+Authorization: Bearer {{auth_token}}
+
+{
+  "huidig_wachtwoord": "admin123",
+  "nieuw_wachtwoord": "nieuw_wachtwoord"
+}
+
+### Uitloggen
+POST http://localhost:8080/api/auth/logout
+
+### Email metrics ophalen (admin)
+GET http://localhost:8080/api/admin/metrics/email
+Authorization: Bearer {{auth_token}}
+
+### Rate limit metrics ophalen (admin)
+GET http://localhost:8080/api/admin/metrics/rate-limits
+Authorization: Bearer {{auth_token}}
+
+### Contact email versturen
 POST http://localhost:8080/api/contact-email
 Content-Type: application/json
 
 {
-    "id": "3b7fadbd-85a1-4d54-988f-6ad378bde0df",
-    "naam": "Test Persoon",
-    "email": "test@example.com",
-    "bericht": "Dit is een test bericht om de email service te controleren.",
-    "privacy_akkoord": true,
-    "status": "nieuw"
+  "naam": "Test Gebruiker",
+  "email": "test@example.com",
+  "bericht": "Dit is een testbericht",
+  "privacy_akkoord": true
 }
 
-### Test Aanmelding Email
+### Aanmelding email versturen
 POST http://localhost:8080/api/aanmelding-email
 Content-Type: application/json
 
 {
-    "id": "26ea058b-2608-49d0-862a-611e98d7dc61",
-    "naam": "Janny van de Wall",
-    "email": "test@example.com",
-    "telefoon": null,
-    "rol": "Deelnemer",
-    "afstand": "10 KM",
-    "ondersteuning": "Nee",
-    "bijzonderheden": "",
-    "terms": true,
-    "email_verzonden": false,
-    "email_verzonden_op": null
+  "naam": "Test Deelnemer",
+  "email": "deelnemer@example.com",
+  "geboortedatum": "1990-01-01",
+  "afstand": "10km",
+  "privacy_akkoord": true
 } 

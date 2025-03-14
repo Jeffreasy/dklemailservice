@@ -16,6 +16,7 @@ type ServiceFactory struct {
 	RateLimiter  RateLimiterInterface
 	EmailMetrics *EmailMetrics
 	EmailBatcher *EmailBatcher
+	AuthService  AuthService
 }
 
 // NewServiceFactory maakt een nieuwe service factory
@@ -40,12 +41,16 @@ func NewServiceFactory(repoFactory *repository.RepositoryFactory) *ServiceFactor
 	// Initialiseer email batcher
 	emailBatcher := createEmailBatcher(emailService)
 
+	// Initialiseer auth service
+	authService := NewAuthService(repoFactory.Gebruiker)
+
 	return &ServiceFactory{
 		EmailService: emailService,
 		SMTPClient:   smtpClient,
 		RateLimiter:  rateLimiter,
 		EmailMetrics: emailMetrics,
 		EmailBatcher: emailBatcher,
+		AuthService:  authService,
 	}
 }
 
@@ -62,9 +67,15 @@ func createRateLimiter(prometheusMetrics *PrometheusMetrics) *RateLimiter {
 	aanmeldingLimitPeriod, _ := strconv.Atoi(getEnvWithDefault("AANMELDING_LIMIT_PERIOD", "86400"))
 	aanmeldingLimitPerIP := getEnvWithDefault("AANMELDING_LIMIT_PER_IP", "true") == "true"
 
+	// Login rate limiting
+	loginLimitCount, _ := strconv.Atoi(getEnvWithDefault("LOGIN_LIMIT_COUNT", "5"))
+	loginLimitPeriod, _ := strconv.Atoi(getEnvWithDefault("LOGIN_LIMIT_PERIOD", "300"))
+	loginLimitPerIP := getEnvWithDefault("LOGIN_LIMIT_PER_IP", "true") == "true"
+
 	// Voeg limieten toe
 	rateLimiter.AddLimit("contact", contactLimitCount, time.Duration(contactLimitPeriod)*time.Second, contactLimitPerIP)
 	rateLimiter.AddLimit("aanmelding", aanmeldingLimitCount, time.Duration(aanmeldingLimitPeriod)*time.Second, aanmeldingLimitPerIP)
+	rateLimiter.AddLimit("login", loginLimitCount, time.Duration(loginLimitPeriod)*time.Second, loginLimitPerIP)
 
 	return rateLimiter
 }

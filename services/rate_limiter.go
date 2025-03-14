@@ -11,8 +11,10 @@ import (
 // RateLimiterInterface definieert de interface voor rate limiting
 type RateLimiterInterface interface {
 	AllowEmail(operation, key string) bool
+	Allow(key string) bool
 	GetLimits() map[string]RateLimit
 	GetCurrentCount(operationType string, key string) int
+	GetCurrentValues() map[string]int
 }
 
 // RateLimit definieert beperkingen voor email verzending
@@ -141,6 +143,97 @@ func (r *RateLimiter) AllowEmail(emailType, userID string) bool {
 	return true
 }
 
+// Allow controleert of een operatie is toegestaan op basis van de rate limit
+func (r *RateLimiter) Allow(key string) bool {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	// Splits de key in operationType en userID (indien aanwezig)
+	parts := make([]string, 2)
+	if idx := indexOf(key, ":"); idx != -1 {
+		parts[0] = key[:idx]
+		if idx+1 < len(key) {
+			parts[1] = key[idx+1:]
+		}
+	} else {
+		parts[0] = key
+	}
+
+	operationType := parts[0]
+	userID := parts[1]
+
+	now := time.Now()
+
+	// Controleer globale rate limiting
+	if limit, exists := r.limits[operationType]; exists {
+		// Bereken hoeveel requests in deze periode zijn toegestaan
+		limitKey := operationType
+		if userID != "" && limit.PerIP {
+			limitKey = fmt.Sprintf("%s:%s", operationType, userID)
+		}
+
+		cnt, exists := r.globalCounts[limitKey]
+		if !exists {
+			// Maak een nieuwe counter aan
+			cnt = &counter{
+				count:     0,
+				resetTime: now,
+			}
+			r.globalCounts[limitKey] = cnt
+		}
+
+		// Reset counter als de periode is verstreken
+		elapsed := now.Sub(cnt.resetTime)
+		if elapsed > limit.Period {
+			cnt.count = 0
+			cnt.resetTime = now
+		}
+
+		// Check tegen de limiet
+		if cnt.count >= limit.Count {
+			// Overschreden
+			logger.Warn("Rate limit overschreden",
+				"operation", operationType,
+				"limit", limit.Count,
+				"period", limit.Period)
+
+			// Prometheus metrics registreren
+			limitType := "global"
+			if userID != "" {
+				limitType = "per_user"
+			}
+			if r.prometheusMetrics != nil {
+				r.prometheusMetrics.RecordRateLimitExceeded(operationType, limitType)
+			}
+
+			// Voor tests: voeg een korte vertraging toe als TEST_RATE_LIMITING=true
+			if os.Getenv("TEST_RATE_LIMITING") == "true" {
+				time.Sleep(100 * time.Millisecond)
+			}
+
+			return false
+		}
+
+		// Verhoog de counter
+		cnt.count++
+
+		return true
+	}
+
+	// Als er geen limiet is ingesteld, sta toe
+	return true
+}
+
+// indexOf vindt de index van een karakter in een string
+func indexOf(s string, char string) int {
+	for i, c := range s {
+		if string(c) == char {
+			return i
+		}
+	}
+	return -1
+}
+
 // GetCurrentCount geeft het huidige aantal voor een operatietype
 func (rl *RateLimiter) GetCurrentCount(operationType string, ipAddress string) int {
 	rl.mutex.Lock()
@@ -235,4 +328,23 @@ func (rl *RateLimiter) GetLimits() map[string]RateLimit {
 	}
 
 	return limits
+}
+
+// GetCurrentValues haalt de huidige waarden op
+func (rl *RateLimiter) GetCurrentValues() map[string]int {
+	rl.mutex.Lock()
+	defer rl.mutex.Unlock()
+
+	result := make(map[string]int)
+	now := time.Now()
+
+	// Verzamel alle actieve tellers
+	for key, counter := range rl.globalCounts {
+		// Controleer of de teller nog geldig is
+		if !now.After(counter.resetTime) {
+			result[key] = counter.count
+		}
+	}
+
+	return result
 }
