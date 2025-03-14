@@ -2,24 +2,26 @@ package migrations
 
 import (
 	"dklautomationgo/logger"
+	"embed"
 	"fmt"
-	"os"
-	"path/filepath"
+	"io/fs"
 	"sort"
 	"strings"
 
 	"gorm.io/gorm"
 )
 
+//go:embed *.sql
+var sqlMigrations embed.FS
+
 // RunSQLMigrations voert alle SQL migratie scripts uit
 func RunSQLMigrations(db *gorm.DB) error {
 	logger.Info("SQL migraties worden uitgevoerd")
 
-	// Lees alle SQL bestanden in de migrations directory
-	migrationsDir := filepath.Join("database", "migrations")
-	files, err := os.ReadDir(migrationsDir)
+	// Lees alle SQL bestanden uit de embedded FS
+	files, err := fs.ReadDir(sqlMigrations, ".")
 	if err != nil {
-		return fmt.Errorf("fout bij lezen migrations directory: %w", err)
+		return fmt.Errorf("fout bij lezen embedded migrations: %w", err)
 	}
 
 	// Filter SQL bestanden en sorteer ze op naam
@@ -35,9 +37,8 @@ func RunSQLMigrations(db *gorm.DB) error {
 	for _, file := range sqlFiles {
 		logger.Info("Migratie wordt uitgevoerd", "file", file)
 
-		// Lees de inhoud van het bestand
-		filePath := filepath.Join(migrationsDir, file)
-		content, err := os.ReadFile(filePath)
+		// Lees de inhoud van het bestand uit de embedded FS
+		content, err := sqlMigrations.ReadFile(file)
 		if err != nil {
 			return fmt.Errorf("fout bij lezen migratie bestand %s: %w", file, err)
 		}
