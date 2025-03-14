@@ -36,6 +36,8 @@ services:
       - key: REGISTRATION_EMAIL
         sync: false
       # Database configuratie
+      - key: RENDER_DB_SERVICE_NAME
+        value: dklautomatie-db
       - key: DB_HOST
         fromService:
           name: dklautomatie-db
