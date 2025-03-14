@@ -1,0 +1,32 @@
+version: '3'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dklautomatie-container
+    ports:
+      - "8080:8080"
+    environment:
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_FROM=${SMTP_FROM}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+      - APP_ENV=${APP_ENV}
+      - REGISTRATION_SMTP_HOST=${REGISTRATION_SMTP_HOST}
+      - REGISTRATION_SMTP_PORT=${REGISTRATION_SMTP_PORT}
+      - REGISTRATION_SMTP_USER=${REGISTRATION_SMTP_USER}
+      - REGISTRATION_SMTP_PASSWORD=${REGISTRATION_SMTP_PASSWORD}
+      - REGISTRATION_SMTP_FROM=${REGISTRATION_SMTP_FROM}
+      - REGISTRATION_EMAIL=${REGISTRATION_EMAIL}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_SSL_MODE=${DB_SSL_MODE}
+    restart: always 
