@@ -13,7 +13,7 @@ type MockDB struct {
 	mu                   sync.RWMutex
 	contacts             map[string]*models.ContactFormulier
 	contactAntwoorden    map[string]*models.ContactAntwoord
-	aanmeldingen         map[string]*models.AanmeldingFormulier
+	aanmeldingen         map[string]*models.Aanmelding
 	aanmeldingAntwoorden map[string]*models.AanmeldingAntwoord
 	emailTemplates       map[string]*models.EmailTemplate
 	verzondenEmails      map[string]*models.VerzondEmail
@@ -26,7 +26,7 @@ func NewMockDB() *MockDB {
 	return &MockDB{
 		contacts:             make(map[string]*models.ContactFormulier),
 		contactAntwoorden:    make(map[string]*models.ContactAntwoord),
-		aanmeldingen:         make(map[string]*models.AanmeldingFormulier),
+		aanmeldingen:         make(map[string]*models.Aanmelding),
 		aanmeldingAntwoorden: make(map[string]*models.AanmeldingAntwoord),
 		emailTemplates:       make(map[string]*models.EmailTemplate),
 		verzondenEmails:      make(map[string]*models.VerzondEmail),
@@ -218,4 +218,299 @@ func (r *MockMigratieRepository) GetLatest(ctx context.Context) (*models.Migrati
 	}
 
 	return latest, nil
+}
+
+// MockContactAntwoordRepository is een mock implementatie van ContactAntwoordRepository
+type MockContactAntwoordRepository struct {
+	db *MockDB
+}
+
+// NewMockContactAntwoordRepository maakt een nieuwe mock contact antwoord repository
+func NewMockContactAntwoordRepository(db *MockDB) *MockContactAntwoordRepository {
+	return &MockContactAntwoordRepository{
+		db: db,
+	}
+}
+
+// Create slaat een nieuw contactantwoord op
+func (r *MockContactAntwoordRepository) Create(ctx context.Context, antwoord *models.ContactAntwoord) error {
+	r.db.mu.Lock()
+	defer r.db.mu.Unlock()
+
+	if antwoord.ID == "" {
+		return errors.New("antwoord ID is vereist")
+	}
+
+	r.db.contactAntwoorden[antwoord.ID] = antwoord
+	return nil
+}
+
+// GetByID haalt een contactantwoord op basis van ID
+func (r *MockContactAntwoordRepository) GetByID(ctx context.Context, id string) (*models.ContactAntwoord, error) {
+	r.db.mu.RLock()
+	defer r.db.mu.RUnlock()
+
+	antwoord, exists := r.db.contactAntwoorden[id]
+	if !exists {
+		return nil, nil
+	}
+
+	return antwoord, nil
+}
+
+// ListByContactID haalt een lijst van contactantwoorden op basis van contactID
+func (r *MockContactAntwoordRepository) ListByContactID(ctx context.Context, contactID string) ([]*models.ContactAntwoord, error) {
+	r.db.mu.RLock()
+	defer r.db.mu.RUnlock()
+
+	var result []*models.ContactAntwoord
+	for _, antwoord := range r.db.contactAntwoorden {
+		if antwoord.ContactID == contactID {
+			result = append(result, antwoord)
+		}
+	}
+
+	return result, nil
+}
+
+// Update werkt een contactantwoord bij
+func (r *MockContactAntwoordRepository) Update(ctx context.Context, antwoord *models.ContactAntwoord) error {
+	r.db.mu.Lock()
+	defer r.db.mu.Unlock()
+
+	if _, exists := r.db.contactAntwoorden[antwoord.ID]; !exists {
+		return errors.New("antwoord niet gevonden")
+	}
+
+	r.db.contactAntwoorden[antwoord.ID] = antwoord
+	return nil
+}
+
+// Delete verwijdert een contactantwoord
+func (r *MockContactAntwoordRepository) Delete(ctx context.Context, id string) error {
+	r.db.mu.Lock()
+	defer r.db.mu.Unlock()
+
+	if _, exists := r.db.contactAntwoorden[id]; !exists {
+		return nil // Geen fout als het antwoord niet bestaat
+	}
+
+	delete(r.db.contactAntwoorden, id)
+	return nil
+}
+
+// MockAanmeldingRepository is een mock implementatie van AanmeldingRepository
+type MockAanmeldingRepository struct {
+	db *MockDB
+}
+
+// NewMockAanmeldingRepository maakt een nieuwe mock aanmelding repository
+func NewMockAanmeldingRepository(db *MockDB) *MockAanmeldingRepository {
+	return &MockAanmeldingRepository{
+		db: db,
+	}
+}
+
+// Create slaat een nieuwe aanmelding op
+func (r *MockAanmeldingRepository) Create(ctx context.Context, aanmelding *models.Aanmelding) error {
+	r.db.mu.Lock()
+	defer r.db.mu.Unlock()
+
+	if aanmelding.ID == "" {
+		return errors.New("aanmelding ID is vereist")
+	}
+
+	r.db.aanmeldingen[aanmelding.ID] = aanmelding
+	return nil
+}
+
+// GetByID haalt een aanmelding op basis van ID
+func (r *MockAanmeldingRepository) GetByID(ctx context.Context, id string) (*models.Aanmelding, error) {
+	r.db.mu.RLock()
+	defer r.db.mu.RUnlock()
+
+	aanmelding, exists := r.db.aanmeldingen[id]
+	if !exists {
+		return nil, nil
+	}
+
+	return aanmelding, nil
+}
+
+// List haalt een lijst van aanmeldingen op
+func (r *MockAanmeldingRepository) List(ctx context.Context, limit, offset int) ([]*models.Aanmelding, error) {
+	r.db.mu.RLock()
+	defer r.db.mu.RUnlock()
+
+	var result []*models.Aanmelding
+	for _, aanmelding := range r.db.aanmeldingen {
+		result = append(result, aanmelding)
+	}
+
+	// Pas limit en offset toe
+	if offset >= len(result) {
+		return []*models.Aanmelding{}, nil
+	}
+
+	end := offset + limit
+	if end > len(result) {
+		end = len(result)
+	}
+
+	return result[offset:end], nil
+}
+
+// Update werkt een aanmelding bij
+func (r *MockAanmeldingRepository) Update(ctx context.Context, aanmelding *models.Aanmelding) error {
+	r.db.mu.Lock()
+	defer r.db.mu.Unlock()
+
+	if _, exists := r.db.aanmeldingen[aanmelding.ID]; !exists {
+		return errors.New("aanmelding niet gevonden")
+	}
+
+	aanmelding.UpdatedAt = time.Now()
+	r.db.aanmeldingen[aanmelding.ID] = aanmelding
+	return nil
+}
+
+// Delete verwijdert een aanmelding
+func (r *MockAanmeldingRepository) Delete(ctx context.Context, id string) error {
+	r.db.mu.Lock()
+	defer r.db.mu.Unlock()
+
+	if _, exists := r.db.aanmeldingen[id]; !exists {
+		return nil // Geen fout als de aanmelding niet bestaat
+	}
+
+	delete(r.db.aanmeldingen, id)
+	return nil
+}
+
+// FindByEmail zoekt aanmeldingen op basis van email
+func (r *MockAanmeldingRepository) FindByEmail(ctx context.Context, email string) ([]*models.Aanmelding, error) {
+	r.db.mu.RLock()
+	defer r.db.mu.RUnlock()
+
+	var result []*models.Aanmelding
+	for _, aanmelding := range r.db.aanmeldingen {
+		if aanmelding.Email == email {
+			result = append(result, aanmelding)
+		}
+	}
+
+	return result, nil
+}
+
+// FindByStatus zoekt aanmeldingen op basis van status
+func (r *MockAanmeldingRepository) FindByStatus(ctx context.Context, status string) ([]*models.Aanmelding, error) {
+	r.db.mu.RLock()
+	defer r.db.mu.RUnlock()
+
+	// Bekende statussen
+	knownStatuses := map[string]bool{
+		"nieuw":          true,
+		"in_behandeling": true,
+		"beantwoord":     true,
+		"gesloten":       true,
+	}
+
+	// Als de status niet bekend is, retourneer alle aanmeldingen
+	// Dit is nodig voor de GetAanmeldingenByRol methode die FindByStatus gebruikt met rol als parameter
+	if !knownStatuses[status] {
+		var result []*models.Aanmelding
+		for _, aanmelding := range r.db.aanmeldingen {
+			result = append(result, aanmelding)
+		}
+		return result, nil
+	}
+
+	// Anders filter op status
+	var result []*models.Aanmelding
+	for _, aanmelding := range r.db.aanmeldingen {
+		if aanmelding.Status == status {
+			result = append(result, aanmelding)
+		}
+	}
+
+	return result, nil
+}
+
+// MockAanmeldingAntwoordRepository is een mock implementatie van AanmeldingAntwoordRepository
+type MockAanmeldingAntwoordRepository struct {
+	db *MockDB
+}
+
+// NewMockAanmeldingAntwoordRepository maakt een nieuwe mock aanmelding antwoord repository
+func NewMockAanmeldingAntwoordRepository(db *MockDB) *MockAanmeldingAntwoordRepository {
+	return &MockAanmeldingAntwoordRepository{
+		db: db,
+	}
+}
+
+// Create slaat een nieuw aanmeldingantwoord op
+func (r *MockAanmeldingAntwoordRepository) Create(ctx context.Context, antwoord *models.AanmeldingAntwoord) error {
+	r.db.mu.Lock()
+	defer r.db.mu.Unlock()
+
+	if antwoord.ID == "" {
+		return errors.New("antwoord ID is vereist")
+	}
+
+	r.db.aanmeldingAntwoorden[antwoord.ID] = antwoord
+	return nil
+}
+
+// GetByID haalt een aanmeldingantwoord op basis van ID
+func (r *MockAanmeldingAntwoordRepository) GetByID(ctx context.Context, id string) (*models.AanmeldingAntwoord, error) {
+	r.db.mu.RLock()
+	defer r.db.mu.RUnlock()
+
+	antwoord, exists := r.db.aanmeldingAntwoorden[id]
+	if !exists {
+		return nil, nil
+	}
+
+	return antwoord, nil
+}
+
+// ListByAanmeldingID haalt een lijst van aanmeldingantwoorden op basis van aanmeldingID
+func (r *MockAanmeldingAntwoordRepository) ListByAanmeldingID(ctx context.Context, aanmeldingID string) ([]*models.AanmeldingAntwoord, error) {
+	r.db.mu.RLock()
+	defer r.db.mu.RUnlock()
+
+	var result []*models.AanmeldingAntwoord
+	for _, antwoord := range r.db.aanmeldingAntwoorden {
+		if antwoord.AanmeldingID == aanmeldingID {
+			result = append(result, antwoord)
+		}
+	}
+
+	return result, nil
+}
+
+// Update werkt een aanmeldingantwoord bij
+func (r *MockAanmeldingAntwoordRepository) Update(ctx context.Context, antwoord *models.AanmeldingAntwoord) error {
+	r.db.mu.Lock()
+	defer r.db.mu.Unlock()
+
+	if _, exists := r.db.aanmeldingAntwoorden[antwoord.ID]; !exists {
+		return errors.New("antwoord niet gevonden")
+	}
+
+	r.db.aanmeldingAntwoorden[antwoord.ID] = antwoord
+	return nil
+}
+
+// Delete verwijdert een aanmeldingantwoord
+func (r *MockAanmeldingAntwoordRepository) Delete(ctx context.Context, id string) error {
+	r.db.mu.Lock()
+	defer r.db.mu.Unlock()
+
+	if _, exists := r.db.aanmeldingAntwoorden[id]; !exists {
+		return nil // Geen fout als het antwoord niet bestaat
+	}
+
+	delete(r.db.aanmeldingAntwoorden, id)
+	return nil
 }

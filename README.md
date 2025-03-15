@@ -21,6 +21,15 @@ Een robuuste en schaalbare email service voor De Koninklijke Loop, geschreven in
   - HTTP-only cookies voor token opslag
   - Middleware voor rol-gebaseerde toegangscontrole
 
+- **Contact & Aanmelding Beheer** (Geïmplementeerd)
+  - Beheer van contactformulieren (lijst, details, bijwerken, verwijderen)
+  - Beheer van aanmeldingen (lijst, details, bijwerken, verwijderen)
+  - Antwoorden toevoegen aan contactformulieren en aanmeldingen
+  - Filteren op status (contactformulieren) en rol (aanmeldingen)
+  - Automatische email notificaties bij antwoorden
+  - Status tracking van contactformulieren en aanmeldingen
+  - Notities toevoegen voor interne communicatie
+
 - **Beveiliging & Stabiliteit**
   - Rate limiting per IP en globaal voor spam preventie
   - CORS beveiliging met configureerbare origins
@@ -247,7 +256,7 @@ go test ./tests/... -v
   }
   ```
 
-#### Contact Beheer (Toekomstige Implementatie)
+#### Contact Beheer (Geïmplementeerd)
 - `GET /api/contact` - Lijst van contactformulieren ophalen
 - `GET /api/contact/:id` - Details van een specifiek contactformulier ophalen
 - `PUT /api/contact/:id` - Contactformulier bijwerken (status, notities)
@@ -255,7 +264,7 @@ go test ./tests/... -v
 - `POST /api/contact/:id/antwoord` - Antwoord toevoegen aan contactformulier
 - `GET /api/contact/status/:status` - Contactformulieren filteren op status
 
-#### Aanmelding Beheer (Toekomstige Implementatie)
+#### Aanmelding Beheer (Geïmplementeerd)
 - `GET /api/aanmelding` - Lijst van aanmeldingen ophalen
 - `GET /api/aanmelding/:id` - Details van een specifieke aanmelding ophalen
 - `PUT /api/aanmelding/:id` - Aanmelding bijwerken (status, notities)
@@ -486,6 +495,9 @@ De service volgt een modulaire architectuur met de volgende componenten:
   - `email_handler.go` - Email verzending endpoints
   - `health_handler.go` - Health check endpoint
   - `metrics_handler.go` - Metrics endpoints
+  - `contact_handler.go` - Contact formulier beheer endpoints
+  - `aanmelding_handler.go` - Aanmelding beheer endpoints
+  - `auth_handler.go` - Authenticatie endpoints
 
 - `services/` - Business logic
   - `email_service.go` - Email verzending logica
@@ -520,6 +532,30 @@ De service volgt een modulaire architectuur met de volgende componenten:
 - Strategy pattern voor email verzending
 - Observer pattern voor metrics
 - Builder pattern voor email constructie
+
+### Handler Implementaties
+
+#### Contact Handler
+De `ContactHandler` biedt een volledige implementatie voor het beheren van contactformulieren:
+- **ListContactFormulieren**: Haalt een gepagineerde lijst van contactformulieren op
+- **GetContactFormulier**: Haalt details van een specifiek contactformulier op, inclusief antwoorden
+- **UpdateContactFormulier**: Werkt een contactformulier bij (status, notities)
+- **DeleteContactFormulier**: Verwijdert een contactformulier
+- **AddContactAntwoord**: Voegt een antwoord toe aan een contactformulier en stuurt een email naar de indiener
+- **GetContactFormulierenByStatus**: Filtert contactformulieren op status (nieuw, in_behandeling, beantwoord, gesloten)
+
+Alle endpoints zijn beveiligd met JWT authenticatie en vereisen admin rechten.
+
+#### Aanmelding Handler
+De `AanmeldingHandler` biedt een volledige implementatie voor het beheren van aanmeldingen:
+- **ListAanmeldingen**: Haalt een gepagineerde lijst van aanmeldingen op
+- **GetAanmelding**: Haalt details van een specifieke aanmelding op, inclusief antwoorden
+- **UpdateAanmelding**: Werkt een aanmelding bij (status, notities)
+- **DeleteAanmelding**: Verwijdert een aanmelding
+- **AddAanmeldingAntwoord**: Voegt een antwoord toe aan een aanmelding en stuurt een email naar de indiener
+- **GetAanmeldingenByRol**: Filtert aanmeldingen op rol (vrijwilliger, deelnemer, etc.)
+
+Alle endpoints zijn beveiligd met JWT authenticatie en vereisen admin rechten.
 
 ## 🗄️ Database Architectuur
 
@@ -637,7 +673,7 @@ Deze software is eigendom van De Koninklijke Loop en mag niet worden gebruikt, g
 ## 📚 Documentatie
 
 Uitgebreide documentatie is beschikbaar in de `/docs` directory:
-- `API.md` - API documentatie
+- `API.md` - API documentatie (Bijgewerkt met Contact en Aanmelding Beheer endpoints)
 - `DEPLOYMENT.md` - Deployment instructies
 - `DEVELOPMENT.md` - Development guidelines
 - `MONITORING.md` - Monitoring setup
@@ -645,6 +681,7 @@ Uitgebreide documentatie is beschikbaar in de `/docs` directory:
 - `TEMPLATES.md` - Template documentatie
 - `TESTING.md` - Test procedures
 - `AUTH.md` - Authenticatie documentatie (Nieuw)
+- `CONTACT_AANMELDING.md` - Contact en Aanmelding Beheer documentatie (Nieuw)
 
 ## 🔄 Recente Updates
 
@@ -655,3 +692,6 @@ Uitgebreide documentatie is beschikbaar in de `/docs` directory:
 - Verbeterd: Test scripts voor API endpoints
 - Toegevoegd: Automatische API tests met PowerShell script
 - Verbeterd: Documentatie voor metrics en authenticatie
+- Toegevoegd: Volledige implementatie van Contact Beheer endpoints
+- Toegevoegd: Volledige implementatie van Aanmelding Beheer endpoints
+- Verbeterd: Repository Pattern implementatie voor data toegang

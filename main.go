@@ -164,8 +164,22 @@ func main() {
 	// Initialiseer handlers
 	emailHandler := handlers.NewEmailHandler(serviceFactory.EmailService)
 	authHandler := handlers.NewAuthHandler(serviceFactory.AuthService, rateLimiter)
-
 	metricsHandler := handlers.NewMetricsHandler(serviceFactory.EmailMetrics, rateLimiter)
+
+	// Initialiseer nieuwe handlers voor contact en aanmelding beheer
+	contactHandler := handlers.NewContactHandler(
+		repoFactory.Contact,
+		repoFactory.ContactAntwoord,
+		serviceFactory.EmailService,
+		serviceFactory.AuthService,
+	)
+
+	aanmeldingHandler := handlers.NewAanmeldingHandler(
+		repoFactory.Aanmelding,
+		repoFactory.AanmeldingAntwoord,
+		serviceFactory.EmailService,
+		serviceFactory.AuthService,
+	)
 
 	// Create Fiber app
 	app := fiber.New(fiber.Config{
@@ -234,6 +248,18 @@ func main() {
 				{"path": "/api/auth/logout", "method": "POST", "description": "User logout"},
 				{"path": "/api/auth/profile", "method": "GET", "description": "Get user profile (requires auth)"},
 				{"path": "/api/auth/reset-password", "method": "POST", "description": "Reset password (requires auth)"},
+				{"path": "/api/contact", "method": "GET", "description": "List contact forms (requires admin auth)"},
+				{"path": "/api/contact/:id", "method": "GET", "description": "Get contact form details (requires admin auth)"},
+				{"path": "/api/contact/:id", "method": "PUT", "description": "Update contact form (requires admin auth)"},
+				{"path": "/api/contact/:id", "method": "DELETE", "description": "Delete contact form (requires admin auth)"},
+				{"path": "/api/contact/:id/antwoord", "method": "POST", "description": "Add reply to contact form (requires admin auth)"},
+				{"path": "/api/contact/status/:status", "method": "GET", "description": "Filter contact forms by status (requires admin auth)"},
+				{"path": "/api/aanmelding", "method": "GET", "description": "List registrations (requires admin auth)"},
+				{"path": "/api/aanmelding/:id", "method": "GET", "description": "Get registration details (requires admin auth)"},
+				{"path": "/api/aanmelding/:id", "method": "PUT", "description": "Update registration (requires admin auth)"},
+				{"path": "/api/aanmelding/:id", "method": "DELETE", "description": "Delete registration (requires admin auth)"},
+				{"path": "/api/aanmelding/:id/antwoord", "method": "POST", "description": "Add reply to registration (requires admin auth)"},
+				{"path": "/api/aanmelding/rol/:rol", "method": "GET", "description": "Filter registrations by role (requires admin auth)"},
 				{"path": "/metrics", "method": "GET", "description": "Prometheus metrics"},
 			},
 		})
@@ -266,6 +292,10 @@ func main() {
 	// Metrics endpoints direct onder /api/metrics/... (vereisen API key)
 	api.Get("/metrics/email", metricsHandler.HandleGetEmailMetrics)
 	api.Get("/metrics/rate-limits", metricsHandler.HandleGetRateLimits)
+
+	// Registreer routes voor contact en aanmelding beheer
+	contactHandler.RegisterRoutes(app)
+	aanmeldingHandler.RegisterRoutes(app)
 
 	// Voeg Prometheus metrics endpoint toe aan Fiber app in plaats van standaard HTTP server
 	app.Get("/metrics", func(c *fiber.Ctx) error {
