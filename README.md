@@ -695,3 +695,118 @@ Uitgebreide documentatie is beschikbaar in de `/docs` directory:
 - Toegevoegd: Volledige implementatie van Contact Beheer endpoints
 - Toegevoegd: Volledige implementatie van Aanmelding Beheer endpoints
 - Verbeterd: Repository Pattern implementatie voor data toegang
+
+# DKL Email Service - API Test Tools
+
+Dit project bevat scripts voor het testen van de DKL Email Service API, specifiek gericht op de Contact en Aanmelding Beheer endpoints.
+
+## Inhoud
+
+- `insert_test_data.ps1`: Script voor het genereren van SQL om testgegevens in de database in te voegen
+- `run_api_test.ps1`: Script voor het testen van de API endpoints
+
+## Vereisten
+
+- PowerShell 5.1 of hoger
+- Toegang tot de DKL Email Service API
+- PostgreSQL client tools (optioneel, voor het uitvoeren van de SQL queries)
+
+## Configuratie
+
+De scripts gebruiken standaard de volgende configuratie:
+
+### Database configuratie
+
+```
+Host: dpg-cva4c01c1ekc738q6q0g-a
+Port: 5432
+Database: dekoninklijkeloopdatabase
+Username: dekoninklijkeloopdatabase_user
+Password: I4QP3JwyCcEbn8tGl6k3ErEvjUZ9V5rB
+SSL Mode: require
+```
+
+### API configuratie
+
+```
+Base URL: https://dkl-email-service.onrender.com
+```
+
+Je kunt deze configuratie aanpassen door omgevingsvariabelen in te stellen:
+
+```powershell
+# Database configuratie
+$env:DB_HOST = "jouw-database-host"
+$env:DB_PORT = "jouw-database-port"
+$env:DB_NAME = "jouw-database-naam"
+$env:DB_USER = "jouw-database-gebruiker"
+$env:DB_PASSWORD = "jouw-database-wachtwoord"
+$env:DB_SSL_MODE = "jouw-ssl-mode"
+
+# API configuratie
+$env:API_BASE_URL = "jouw-api-base-url"
+```
+
+## Gebruik
+
+### Stap 1: Testgegevens invoegen
+
+Voer het volgende commando uit om het script voor het genereren van testgegevens te starten:
+
+```powershell
+.\insert_test_data.ps1
+```
+
+Dit script genereert een SQL bestand (`insert_test_data.sql`) met queries om testgegevens in te voegen. Je kunt deze SQL uitvoeren met een PostgreSQL client zoals psql of pgAdmin.
+
+Met psql:
+
+```bash
+psql -h <host> -p <port> -d <database> -U <username> -f insert_test_data.sql
+```
+
+### Stap 2: API tests uitvoeren
+
+Nadat je de testgegevens hebt ingevoegd, kun je de API tests uitvoeren met:
+
+```powershell
+.\run_api_test.ps1
+```
+
+Dit script test de volgende endpoints:
+
+#### Contact Beheer Endpoints
+
+1. `GET /api/contact/beheer` - Ophalen van alle contactformulieren
+2. `GET /api/contact/beheer/{id}` - Ophalen van een specifiek contactformulier
+3. `PATCH /api/contact/beheer/{id}` - Bijwerken van een contactformulier status
+4. `POST /api/contact/beheer/{id}/antwoord` - Beantwoorden van een contactformulier
+
+#### Aanmelding Beheer Endpoints
+
+1. `GET /api/aanmelding/beheer` - Ophalen van alle aanmeldingen
+2. `GET /api/aanmelding/beheer/{id}` - Ophalen van een specifieke aanmelding
+3. `PATCH /api/aanmelding/beheer/{id}` - Bijwerken van een aanmelding status
+4. `POST /api/aanmelding/beheer/{id}/antwoord` - Beantwoorden van een aanmelding
+
+## Probleemoplossing
+
+### API niet bereikbaar
+
+Als de API niet bereikbaar is, controleer dan:
+
+1. Of de API-server draait
+2. Of de Base URL correct is
+3. Of er netwerkproblemen zijn
+
+### Database problemen
+
+Als je problemen hebt met het invoegen van testgegevens:
+
+1. Controleer of de database-inloggegevens correct zijn
+2. Controleer of je toegang hebt tot de database
+3. Controleer of de tabellen bestaan in de database
+
+## Licentie
+
+Dit project is eigendom van De Koninklijke Loop en mag alleen worden gebruikt met toestemming.
