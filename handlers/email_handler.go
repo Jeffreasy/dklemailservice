@@ -3,6 +3,7 @@ package handlers
 import (
 	"dklautomationgo/logger"
 	"dklautomationgo/models"
+	"encoding/json"
 	"os"
 	"strings"
 	"time"
@@ -39,11 +40,32 @@ func (h *EmailHandler) HandleContactEmail(c *fiber.Ctx) error {
 		})
 	}
 
+	// Detecteer test modus
+	var testMode bool
+	if testModeValue := c.Get("X-Test-Mode"); testModeValue == "true" {
+		testMode = true
+		logger.Info("Test modus gedetecteerd via header", "remote_ip", c.IP())
+	}
+
+	if c.Locals("test_mode") != nil {
+		testMode = true
+		logger.Info("Test modus gedetecteerd via locals", "remote_ip", c.IP())
+	}
+
+	var requestMap map[string]interface{}
+	if err := json.Unmarshal(c.Body(), &requestMap); err == nil {
+		if val, ok := requestMap["test_mode"]; ok && val.(bool) {
+			testMode = true
+			logger.Info("Test modus gedetecteerd via body parameter", "remote_ip", c.IP())
+		}
+	}
+
 	// Log the incoming request
 	logger.Info("Contact formulier ontvangen",
 		"naam", request.Naam,
 		"email", request.Email,
-		"remote_ip", c.IP())
+		"remote_ip", c.IP(),
+		"test_mode", testMode)
 
 	// Validate the request
 	if request.Naam == "" || request.Email == "" || request.Bericht == "" {
@@ -88,22 +110,27 @@ func (h *EmailHandler) HandleContactEmail(c *fiber.Ctx) error {
 		ToAdmin:    true,
 	}
 
-	logger.Info("Admin email wordt verzonden",
-		"admin_email", adminEmail,
-		"contact_naam", request.Naam)
-	if err := h.emailService.SendContactEmail(adminEmailData); err != nil {
-		logger.Error("Fout bij verzenden admin email",
-			"error", err,
+	// In testmodus sturen we geen echte emails
+	if testMode {
+		logger.Info("Test modus: Geen admin email verzonden", "admin_email", adminEmail)
+	} else {
+		logger.Info("Admin email wordt verzonden",
+			"admin_email", adminEmail,
+			"contact_naam", request.Naam)
+		if err := h.emailService.SendContactEmail(adminEmailData); err != nil {
+			logger.Error("Fout bij verzenden admin email",
+				"error", err,
+				"admin_email", adminEmail,
+				"elapsed", time.Since(start))
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"success": false,
+				"error":   "Fout bij het verzenden van de email: " + err.Error(),
+			})
+		}
+		logger.Info("Admin email verzonden",
 			"admin_email", adminEmail,
 			"elapsed", time.Since(start))
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"success": false,
-			"error":   "Fout bij het verzenden van de email: " + err.Error(),
-		})
 	}
-	logger.Info("Admin email verzonden",
-		"admin_email", adminEmail,
-		"elapsed", time.Since(start))
 
 	// Send confirmation email to user
 	userEmailData := &models.ContactEmailData{
@@ -112,32 +139,49 @@ func (h *EmailHandler) HandleContactEmail(c *fiber.Ctx) error {
 		ToAdmin:    false,
 	}
 
-	logger.Info("Bevestigingsemail wordt verzonden",
-		"user_email", request.Email,
-		"naam", request.Naam)
-	if err := h.emailService.SendContactEmail(userEmailData); err != nil {
-		logger.Error("Fout bij verzenden bevestigingsemail",
-			"error", err,
+	// In testmodus sturen we geen echte emails
+	if testMode {
+		logger.Info("Test modus: Geen gebruiker email verzonden", "user_email", request.Email)
+	} else {
+		logger.Info("Bevestigingsemail wordt verzonden",
+			"user_email", request.Email,
+			"naam", request.Naam)
+		if err := h.emailService.SendContactEmail(userEmailData); err != nil {
+			logger.Error("Fout bij verzenden bevestigingsemail",
+				"error", err,
+				"user_email", request.Email,
+				"elapsed", time.Since(start))
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"success": false,
+				"error":   "Fout bij het verzenden van de bevestigingsemail: " + err.Error(),
+			})
+		}
+		logger.Info("Bevestigingsemail verzonden",
 			"user_email", request.Email,
 			"elapsed", time.Since(start))
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"success": false,
-			"error":   "Fout bij het verzenden van de bevestigingsemail: " + err.Error(),
-		})
 	}
-	logger.Info("Bevestigingsemail verzonden",
-		"user_email", request.Email,
-		"elapsed", time.Since(start))
 
 	// Return success
-	logger.Info("Contact formulier succesvol verwerkt",
-		"naam", request.Naam,
-		"email", request.Email,
-		"total_elapsed", time.Since(start))
-	return c.JSON(fiber.Map{
-		"success": true,
-		"message": "Je bericht is verzonden! Je ontvangt ook een bevestiging per email.",
-	})
+	if testMode {
+		logger.Info("Contact formulier succesvol verwerkt in test modus",
+			"naam", request.Naam,
+			"email", request.Email,
+			"total_elapsed", time.Since(start))
+		return c.JSON(fiber.Map{
+			"success":   true,
+			"message":   "[TEST MODE] Je bericht is verwerkt (geen echte email verzonden).",
+			"test_mode": true,
+		})
+	} else {
+		logger.Info("Contact formulier succesvol verwerkt",
+			"naam", request.Naam,
+			"email", request.Email,
+			"total_elapsed", time.Since(start))
+		return c.JSON(fiber.Map{
+			"success": true,
+			"message": "Je bericht is verzonden! Je ontvangt ook een bevestiging per email.",
+		})
+	}
 }
 
 func (h *EmailHandler) HandleAanmeldingEmail(c *fiber.Ctx) error {
@@ -154,11 +198,32 @@ func (h *EmailHandler) HandleAanmeldingEmail(c *fiber.Ctx) error {
 		})
 	}
 
+	// Detecteer test modus
+	var testMode bool
+	if testModeValue := c.Get("X-Test-Mode"); testModeValue == "true" {
+		testMode = true
+		logger.Info("Test modus gedetecteerd via header", "remote_ip", c.IP())
+	}
+
+	if c.Locals("test_mode") != nil {
+		testMode = true
+		logger.Info("Test modus gedetecteerd via locals", "remote_ip", c.IP())
+	}
+
+	var requestMap map[string]interface{}
+	if err := json.Unmarshal(c.Body(), &requestMap); err == nil {
+		if val, ok := requestMap["test_mode"]; ok && val.(bool) {
+			testMode = true
+			logger.Info("Test modus gedetecteerd via body parameter", "remote_ip", c.IP())
+		}
+	}
+
 	// Log the incoming request
 	logger.Info("Aanmelding formulier ontvangen",
 		"naam", aanmelding.Naam,
 		"email", aanmelding.Email,
-		"remote_ip", c.IP())
+		"remote_ip", c.IP(),
+		"test_mode", testMode)
 
 	// Validate required fields
 	if aanmelding.Naam == "" {
@@ -219,22 +284,27 @@ func (h *EmailHandler) HandleAanmeldingEmail(c *fiber.Ctx) error {
 		AdminEmail: adminEmail,
 	}
 
-	logger.Info("Admin email wordt verzonden",
-		"admin_email", adminEmail,
-		"aanmelding_naam", aanmelding.Naam)
-	if err := h.emailService.SendAanmeldingEmail(adminEmailData); err != nil {
-		logger.Error("Fout bij verzenden admin email",
-			"error", err,
+	// In testmodus sturen we geen echte emails
+	if testMode {
+		logger.Info("Test modus: Geen admin email verzonden", "admin_email", adminEmail)
+	} else {
+		logger.Info("Admin email wordt verzonden",
+			"admin_email", adminEmail,
+			"aanmelding_naam", aanmelding.Naam)
+		if err := h.emailService.SendAanmeldingEmail(adminEmailData); err != nil {
+			logger.Error("Fout bij verzenden admin email",
+				"error", err,
+				"admin_email", adminEmail,
+				"elapsed", time.Since(start))
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"success": false,
+				"error":   "Fout bij het verzenden van de email: " + err.Error(),
+			})
+		}
+		logger.Info("Admin email verzonden",
 			"admin_email", adminEmail,
 			"elapsed", time.Since(start))
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"success": false,
-			"error":   "Fout bij het verzenden van de email: " + err.Error(),
-		})
 	}
-	logger.Info("Admin email verzonden",
-		"admin_email", adminEmail,
-		"elapsed", time.Since(start))
 
 	// Stuur bevestigingsemail naar gebruiker
 	userEmailData := &models.AanmeldingEmailData{
@@ -242,32 +312,49 @@ func (h *EmailHandler) HandleAanmeldingEmail(c *fiber.Ctx) error {
 		Aanmelding: &aanmelding,
 	}
 
-	logger.Info("Bevestigingsemail wordt verzonden",
-		"user_email", aanmelding.Email,
-		"naam", aanmelding.Naam)
-	if err := h.emailService.SendAanmeldingEmail(userEmailData); err != nil {
-		logger.Error("Fout bij verzenden bevestigingsemail",
-			"error", err,
+	// In testmodus sturen we geen echte emails
+	if testMode {
+		logger.Info("Test modus: Geen gebruiker email verzonden", "user_email", aanmelding.Email)
+	} else {
+		logger.Info("Bevestigingsemail wordt verzonden",
+			"user_email", aanmelding.Email,
+			"naam", aanmelding.Naam)
+		if err := h.emailService.SendAanmeldingEmail(userEmailData); err != nil {
+			logger.Error("Fout bij verzenden bevestigingsemail",
+				"error", err,
+				"user_email", aanmelding.Email,
+				"elapsed", time.Since(start))
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"success": false,
+				"error":   "Fout bij het verzenden van de bevestigingsemail: " + err.Error(),
+			})
+		}
+		logger.Info("Bevestigingsemail verzonden",
 			"user_email", aanmelding.Email,
 			"elapsed", time.Since(start))
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"success": false,
-			"error":   "Fout bij het verzenden van de bevestigingsemail: " + err.Error(),
-		})
 	}
-	logger.Info("Bevestigingsemail verzonden",
-		"user_email", aanmelding.Email,
-		"elapsed", time.Since(start))
 
 	// Return success
-	logger.Info("Aanmelding formulier succesvol verwerkt",
-		"naam", aanmelding.Naam,
-		"email", aanmelding.Email,
-		"total_elapsed", time.Since(start))
-	return c.JSON(fiber.Map{
-		"success": true,
-		"message": "Je aanmelding is verzonden! Je ontvangt ook een bevestiging per email.",
-	})
+	if testMode {
+		logger.Info("Aanmelding formulier succesvol verwerkt in test modus",
+			"naam", aanmelding.Naam,
+			"email", aanmelding.Email,
+			"total_elapsed", time.Since(start))
+		return c.JSON(fiber.Map{
+			"success":   true,
+			"message":   "[TEST MODE] Je aanmelding is verwerkt (geen echte email verzonden).",
+			"test_mode": true,
+		})
+	} else {
+		logger.Info("Aanmelding formulier succesvol verwerkt",
+			"naam", aanmelding.Naam,
+			"email", aanmelding.Email,
+			"total_elapsed", time.Since(start))
+		return c.JSON(fiber.Map{
+			"success": true,
+			"message": "Je aanmelding is verzonden! Je ontvangt ook een bevestiging per email.",
+		})
+	}
 }
 
 // LogUserActivity logt gebruikersactiviteit (helper voor tests)

@@ -110,3 +110,23 @@ func RateLimitMiddleware(rateLimiter services.RateLimiterService, keyPrefix stri
 		return c.Next()
 	}
 }
+
+// TestModeMiddleware controleert of de request in testmodus moet worden uitgevoerd
+func TestModeMiddleware() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		// Controleer op test mode header
+		if testMode := c.Get("X-Test-Mode"); testMode == "true" {
+			c.Locals("test_mode", true)
+			logger.Debug("Test modus geactiveerd via header", "path", c.Path(), "ip", c.IP())
+		}
+
+		// Controleer op test_mode query parameter
+		if testMode := c.Query("test_mode"); testMode == "true" {
+			c.Locals("test_mode", true)
+			logger.Debug("Test modus geactiveerd via query parameter", "path", c.Path(), "ip", c.IP())
+		}
+
+		// Ga verder met de request
+		return c.Next()
+	}
+}

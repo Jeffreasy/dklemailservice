@@ -208,6 +208,9 @@ func main() {
 		AllowMethods: "GET,POST,PUT,DELETE,OPTIONS",
 	}))
 
+	// Voeg TestModeMiddleware toe als globale middleware
+	app.Use(handlers.TestModeMiddleware())
+
 	// Serve static files from public directory
 	app.Static("/", "./public")
 
