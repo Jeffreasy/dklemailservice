@@ -378,3 +378,40 @@ func (h *MailHandler) ListEmailsByAccountType(c *fiber.Ctx) error {
 	// Stuur resultaat terug
 	return c.JSON(emails)
 }
+
+// GetEmails haalt alle inkomende emails op
+func (h *MailHandler) GetEmails(c *fiber.Ctx) error {
+	// Admin check
+	user, err := h.authService.GetUserFromToken(c.Context(), string(c.Request().Header.Peek("Authorization")))
+	if err != nil {
+		logger.Error("Fout bij ophalen gebruiker", "error", err)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Niet geautoriseerd",
+		})
+	}
+
+	// Controleer of gebruiker admin is (direct op rol)
+	if user.Rol != "admin" {
+		logger.Warn("Toegang geweigerd: gebruiker is geen admin", "user_id", user.ID, "role", user.Rol)
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "Alleen beheerders hebben toegang tot deze functie",
+		})
+	}
+
+	// Debug logging voor database issues
+	logger.Info("GetEmails API aangeroepen door admin", "user_id", user.ID, "user_email", user.Email)
+
+	// Haal emails op uit de repository
+	emails, err := h.incomingEmailRepo.List(c.Context(), 100, 0)
+	if err != nil {
+		logger.Error("Fout bij ophalen inkomende e-mails", "error", err)
+		logger.Error("Fout bij ophalen emails", "error", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon emails niet ophalen",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"emails": emails,
+	})
+}
