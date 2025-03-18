@@ -57,6 +57,7 @@ Een robuuste en schaalbare email service voor De Koninklijke Loop, geschreven in
   - Connection pooling voor SMTP verbindingen
   - Optimale resource utilizatie
   - Automatische cleanup van oude data
+  - Automatische email ophaling met configureerbaar interval (Geïmplementeerd)
 
 ## 📋 Vereisten
 
@@ -157,6 +158,10 @@ EMAIL_BATCH_SIZE=50
 EMAIL_BATCH_INTERVAL=15m
 TEMPLATE_RELOAD_INTERVAL=1h
 MAX_CONCURRENT_SENDS=10
+
+# Automatische Email Ophaling
+EMAIL_FETCH_INTERVAL=15
+DISABLE_AUTO_EMAIL_FETCH=false
 ```
 
 ## 🏃‍♂️ Gebruik
@@ -271,6 +276,15 @@ go test ./tests/... -v
 - `DELETE /api/aanmelding/:id` - Aanmelding verwijderen
 - `POST /api/aanmelding/:id/antwoord` - Antwoord toevoegen aan aanmelding
 - `GET /api/aanmelding/rol/:rol` - Aanmeldingen filteren op rol
+
+#### Mail Beheer (Geïmplementeerd)
+- `GET /api/mail` - Lijst van inkomende emails ophalen
+- `GET /api/mail/:id` - Details van een specifieke email ophalen
+- `PUT /api/mail/:id/processed` - Email markeren als verwerkt
+- `DELETE /api/mail/:id` - Email verwijderen
+- `POST /api/mail/fetch` - Handmatig nieuwe emails ophalen
+- `GET /api/mail/unprocessed` - Lijst van onverwerkte emails ophalen
+- `GET /api/mail/account/:type` - Emails filteren op account type (info, inschrijving)
 
 ### Docker
 
@@ -486,6 +500,33 @@ rateLimiter.AddLimit("aanmelding_email", 200, time.Hour, false) // Globaal
 rateLimiter.AddLimit("aanmelding_email", 10, time.Hour, true)   // Per IP
 ```
 
+## 📬 Automatische Email Ophaling
+
+De service biedt automatische ophaling van inkomende emails via de `EmailAutoFetcher` component:
+
+### Functionaliteit
+- Periodiek ophalen van emails uit geconfigureerde mailboxen
+- Automatisch starten bij applicatie-opstart (configureerbaar)
+- Voorkomen van duplicaten door UID-controle
+- Graceful shutdown bij applicatie-afsluiting
+- Thread-safe operatie met concurrency controle
+
+### Configuratie
+De automatische email ophaling kan worden geconfigureerd via de volgende omgevingsvariabelen:
+
+```env
+# Automatische email ophaling configuratie
+EMAIL_FETCH_INTERVAL=15     # Interval in minuten tussen ophaal-operaties (standaard: 15)
+DISABLE_AUTO_EMAIL_FETCH=false # Zet op "true" om automatisch ophalen uit te schakelen
+```
+
+### Email Accounts
+De service is geconfigureerd om emails op te halen van:
+- info@dekoninklijkeloop.nl
+- inschrijving@dekoninklijkeloop.nl
+
+Inkomende emails worden automatisch gesorteerd en opgeslagen in de database, en zijn beschikbaar via de beveiligde `/api/mail` endpoints.
+
 ## 🛠 Architectuur
 
 De service volgt een modulaire architectuur met de volgende componenten:
@@ -506,6 +547,8 @@ De service volgt een modulaire architectuur met de volgende componenten:
   - `email_batcher.go` - Batch processing
   - `email_metrics.go` - Metrics tracking
   - `prometheus_metrics.go` - Prometheus integratie
+  - `email_auto_fetcher.go` - Automatische email ophaling
+  - `mail_fetcher.go` - IMAP communicatie voor inkomende emails
 
 - `models/` - Data structuren
   - `email.go` - Email gerelateerde structs
@@ -685,6 +728,7 @@ Uitgebreide documentatie is beschikbaar in de `/docs` directory:
 
 ## 🔄 Recente Updates
 
+
 ### Maart 2025
 - Toegevoegd: API key authenticatie voor metrics endpoints
 - Verbeterd: Metrics endpoints voor email en rate limiting statistieken
@@ -695,6 +739,11 @@ Uitgebreide documentatie is beschikbaar in de `/docs` directory:
 - Toegevoegd: Volledige implementatie van Contact Beheer endpoints
 - Toegevoegd: Volledige implementatie van Aanmelding Beheer endpoints
 - Verbeterd: Repository Pattern implementatie voor data toegang
+- Toegevoegd: EmailAutoFetcher voor automatisch ophalen van inkomende emails
+- Verbeterd: Integratie van automatische email ophaling in ServiceFactory
+- Toegevoegd: Configuratie opties voor email ophaal interval en aan/uit zetten
+- Verbeterd: Graceful shutdown met correcte afsluiting van achtergrondprocessen
+- Toegevoegd: Test ondersteuning voor mail endpoints in test_api_light.ps1
 
 # DKL Email Service - API Test Tools
 
