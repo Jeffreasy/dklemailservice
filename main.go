@@ -166,6 +166,13 @@ func main() {
 	authHandler := handlers.NewAuthHandler(serviceFactory.AuthService, rateLimiter)
 	metricsHandler := handlers.NewMetricsHandler(serviceFactory.EmailMetrics, rateLimiter)
 
+	// Initialiseer NotificationHandler
+	notificationHandler := handlers.NewNotificationHandler(
+		repoFactory.Notification,
+		serviceFactory.NotificationService,
+		serviceFactory.AuthService,
+	)
+
 	// Initialiseer nieuwe handlers voor contact en aanmelding beheer
 	contactHandler := handlers.NewContactHandler(
 		repoFactory.Contact,
@@ -319,6 +326,9 @@ func main() {
 	// Registreer routes voor contact en aanmelding beheer
 	contactHandler.RegisterRoutes(app)
 	aanmeldingHandler.RegisterRoutes(app)
+
+	// Registreer routes voor notificaties
+	notificationHandler.RegisterRoutes(app)
 
 	// Registreer de mailHandler in de main functie na repo en authService
 	mailHandler.RegisterRoutes(app)
