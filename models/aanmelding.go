@@ -25,6 +25,9 @@ type Aanmelding struct {
 	BehandeldOp   *time.Time `json:"behandeld_op"`
 	Notities      *string    `json:"notities" gorm:"type:text"`
 
+	// Test mode veld
+	TestMode bool `json:"test_mode" gorm:"type:boolean;not null;default:false"`
+
 	// Relatie met antwoorden
 	Antwoorden []AanmeldingAntwoord `json:"antwoorden,omitempty" gorm:"foreignKey:AanmeldingID"`
 }
@@ -44,4 +47,5 @@ type AanmeldingFormulier struct {
 	Ondersteuning  string `json:"ondersteuning"`
 	Bijzonderheden string `json:"bijzonderheden"`
 	Terms          bool   `json:"terms"`
+	TestMode       bool   `json:"test_mode"`
 }

@@ -6,7 +6,9 @@ import (
 	"dklautomationgo/models"
 	"fmt"
 	"html/template"
+	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -27,14 +29,16 @@ type EmailService struct {
 	rateLimiter       RateLimiterInterface
 	metrics           *EmailMetrics
 	prometheusMetrics PrometheusMetricsInterface
+	excludedEmails    []string
 	mu                sync.RWMutex
 }
 
 // EmailMessage representeert een te verzenden email
 type EmailMessage struct {
-	To      string
-	Subject string
-	Body    string
+	To       string
+	Subject  string
+	Body     string
+	TestMode bool
 }
 
 // NewEmailService maakt een nieuwe EmailService met de opgegeven SMTP client
@@ -66,34 +70,79 @@ func NewEmailServiceWithTemplatesDir(smtpClient SMTPClient, metrics *EmailMetric
 		logger.Info("Template loaded successfully", "template", name)
 	}
 
+	// Laad uitgesloten email adressen
+	excludedEmails := []string{}
+	if excludedEmailsStr := os.Getenv("EXCLUDE_TEST_EMAILS"); excludedEmailsStr != "" {
+		excludedEmails = strings.Split(excludedEmailsStr, ",")
+		for i, email := range excludedEmails {
+			excludedEmails[i] = strings.TrimSpace(strings.ToLower(email))
+		}
+		logger.Info("Uitgesloten test email adressen geladen", "count", len(excludedEmails))
+	}
+
 	return &EmailService{
 		templates:         templates,
 		smtpClient:        smtpClient,
 		metrics:           metrics,
 		rateLimiter:       rateLimiter,
 		prometheusMetrics: prometheusMetrics,
+		excludedEmails:    excludedEmails,
 	}
 }
 
+// isExcludedEmail controleert of een email adres is uitgesloten van test emails
+func (s *EmailService) isExcludedEmail(email string) bool {
+	email = strings.TrimSpace(strings.ToLower(email))
+	for _, excluded := range s.excludedEmails {
+		if email == excluded {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *EmailService) SendContactEmail(data *models.ContactEmailData) error {
+	// Check if this is a test email to an excluded address
+	if data.Contact.TestMode && !data.ToAdmin {
+		if s.isExcludedEmail(data.Contact.Email) {
+			logger.Info("Test email overgeslagen voor uitgesloten adres",
+				"email", data.Contact.Email,
+				"type", "contact")
+			return nil
+		}
+	}
+
 	// Log appropriately
 	if data.ToAdmin {
 		logger.Debug("Contact admin email wordt voorbereid",
 			"naam", data.Contact.Naam,
-			"email", data.Contact.Email)
+			"email", data.Contact.Email,
+			"test_mode", data.Contact.TestMode)
 		return s.sendEmailWithTemplate("contact_admin_email", data.AdminEmail, "Nieuw contactformulier", data)
 	}
 
 	logger.Debug("Contact bevestigingsemail wordt voorbereid",
 		"naam", data.Contact.Naam,
-		"email", data.Contact.Email)
+		"email", data.Contact.Email,
+		"test_mode", data.Contact.TestMode)
 	return s.sendEmailWithTemplate("contact_email", data.Contact.Email, "Bedankt voor je bericht", data)
 }
 
 func (s *EmailService) SendAanmeldingEmail(data *models.AanmeldingEmailData) error {
+	// Check if this is a test email to an excluded address
+	if data.Aanmelding.TestMode && !data.ToAdmin {
+		if s.isExcludedEmail(data.Aanmelding.Email) {
+			logger.Info("Test email overgeslagen voor uitgesloten adres",
+				"email", data.Aanmelding.Email,
+				"type", "aanmelding")
+			return nil
+		}
+	}
+
 	var templateName string
 	var subject string
 	var recipient string
+	start := time.Now()
 
 	if data.ToAdmin {
 		templateName = "aanmelding_admin_email"
@@ -105,26 +154,35 @@ func (s *EmailService) SendAanmeldingEmail(data *models.AanmeldingEmailData) err
 		recipient = data.Aanmelding.Email
 	}
 
-	template := s.templates[templateName]
+	template := s.GetTemplate(templateName)
 	if template == nil {
 		return fmt.Errorf("template not found: %s", templateName)
 	}
 
+	// Genereer email body
 	var body bytes.Buffer
 	if err := template.Execute(&body, data); err != nil {
 		return fmt.Errorf("failed to execute template: %v", err)
 	}
 
-	msg := &EmailMessage{
-		To:      recipient,
-		Subject: subject,
-		Body:    body.String(),
-	}
-
+	// Controleer rate limits voordat we een poging wagen
 	if !s.rateLimiter.AllowEmail("email_generic", "") {
+		if s.metrics != nil {
+			s.metrics.RecordEmailFailed("aanmelding_email")
+		}
+		s.prometheusMetrics.RecordEmailFailed("aanmelding_email", "rate_limited")
 		return fmt.Errorf("rate limit exceeded")
 	}
 
+	// Bereid bericht voor
+	msg := &EmailMessage{
+		To:       recipient,
+		Subject:  subject,
+		Body:     body.String(),
+		TestMode: data.Aanmelding.TestMode,
+	}
+
+	// Verzend met de juiste client op basis van type
 	var err error
 	if data.ToAdmin {
 		err = s.smtpClient.Send(msg) // Gebruik standaard SMTP voor admin emails
@@ -132,18 +190,24 @@ func (s *EmailService) SendAanmeldingEmail(data *models.AanmeldingEmailData) err
 		err = s.smtpClient.SendRegistration(msg) // Gebruik registratie SMTP voor gebruiker emails
 	}
 
+	elapsedTime := time.Since(start)
+
+	// Metrics bijwerken op basis van resultaat
 	if err != nil {
 		if s.metrics != nil {
 			s.metrics.RecordEmailFailed("aanmelding_email")
 		}
 		s.prometheusMetrics.RecordEmailFailed("aanmelding_email", "smtp_error")
+		s.prometheusMetrics.ObserveEmailLatency("aanmelding_email", elapsedTime.Seconds())
 		return err
 	}
 
+	// Succesvolle verzending
 	if s.metrics != nil {
 		s.metrics.RecordEmailSent("aanmelding_email")
 	}
 	s.prometheusMetrics.RecordEmailSent("aanmelding_email", "success")
+	s.prometheusMetrics.ObserveEmailLatency("aanmelding_email", elapsedTime.Seconds())
 	return nil
 }
 

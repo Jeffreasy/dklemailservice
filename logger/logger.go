@@ -244,12 +244,50 @@ func buildLogEntry(level, msg string, keysAndValues ...interface{}) map[string]i
 		if i+1 < len(keysAndValues) {
 			key, ok := keysAndValues[i].(string)
 			if ok {
-				entry[key] = keysAndValues[i+1]
+				// Maskeer gevoelige informatie
+				value := keysAndValues[i+1]
+				if isSensitiveKey(key) && value != nil {
+					if strValue, ok := value.(string); ok && strValue != "" {
+						entry[key] = maskSensitiveValue(strValue)
+					} else {
+						entry[key] = value
+					}
+				} else {
+					entry[key] = value
+				}
 			}
 		}
 	}
 
 	return entry
+}
+
+// isSensitiveKey controleert of een sleutel gevoelige informatie bevat
+func isSensitiveKey(key string) bool {
+	// Lijst met sleutelwoorden die gevoelige data kunnen bevatten
+	sensitiveKeywords := []string{
+		"password", "passwd", "secret", "token", "key", "auth",
+		"credential", "cred", "connection_string", "dsn", "pwd",
+	}
+
+	lowerKey := strings.ToLower(key)
+	for _, keyword := range sensitiveKeywords {
+		if strings.Contains(lowerKey, keyword) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// maskSensitiveValue vervangt gevoelige waarden door asterisks
+func maskSensitiveValue(value string) string {
+	if len(value) <= 4 {
+		return "****"
+	}
+
+	// Toon alleen de eerste en laatste twee tekens
+	return value[:2] + "******" + value[len(value)-2:]
 }
 
 // Toevoegen aan Setup of als aparte functie

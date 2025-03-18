@@ -8,7 +8,7 @@ param(
     [string]$ApiUrl,
     [switch]$IncludeSecuredEndpoints,
     [string]$Username,
-    [string]$Password,
+    [System.Security.SecureString]$Password,
     [string]$ApiKey,
     [switch]$SaveResults,
     [switch]$DetailedHealth,
@@ -55,6 +55,7 @@ $testData = @{
         email = "test@example.com"
         bericht = "Dit is een geautomatiseerd testbericht"
         privacy_akkoord = $true
+        test_mode = $true
     }
     AanmeldingEmail = @{
         naam = "Test Deelnemer"
@@ -65,6 +66,7 @@ $testData = @{
         ondersteuning = "geen"
         bijzonderheden = "Dit is een testbericht vanuit het API test script."
         terms = $true
+        test_mode = $true
     }
     Auth = @{
         email = if ($Username) { $Username } else { "admin@dekoninklijkeloop.nl" }
@@ -674,8 +676,22 @@ function Start-ApiTest {
         Write-Host "Notificatie endpoints testen: ingeschakeld" -ForegroundColor $infoColor
     }
     
-    # Test beschikbare endpoints via root endpoint
-    $rootResult = Test-RootEndpoint
+    # Test root endpoint
+    Write-Host "`nTesten van root endpoint..." -ForegroundColor $infoColor
+    try {
+        $response = Invoke-RestMethod -Uri "$baseUrl/" -Method Get
+        if ($response.status -eq "ok") {
+            Write-Host "Root endpoint: ✅ Bereikbaar" -ForegroundColor $successColor
+            Write-Host "  Status: $($response.status)" -ForegroundColor $infoColor
+            Write-Host "  Versie: $($response.version)" -ForegroundColor $infoColor
+            Write-Host "  Omgeving: $($response.environment)" -ForegroundColor $infoColor
+        } else {
+            Write-Host "Root endpoint: ❌ Onverwachte status" -ForegroundColor $errorColor
+        }
+    } catch {
+        Write-Host "Root endpoint: ❌ Niet bereikbaar" -ForegroundColor $errorColor
+        Write-Host "  Error: $($_.Exception.Message)" -ForegroundColor $errorColor
+    }
     
     # Test health endpoint
     $healthResult = Test-HealthEndpoint

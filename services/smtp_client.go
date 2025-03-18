@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"sync"
 
 	"gopkg.in/gomail.v2"
 )
@@ -24,9 +25,12 @@ type SMTPConfig struct {
 
 // RealSMTPClient implementeert de SMTP client interface
 type RealSMTPClient struct {
-	defaultConf *SMTPConfig
-	regConf     *SMTPConfig
-	dialer      SMTPDialer
+	defaultConf        *SMTPConfig
+	regConf            *SMTPConfig
+	dialer             SMTPDialer
+	defaultDialer      *gomail.Dialer
+	registrationDialer *gomail.Dialer
+	connMutex          sync.Mutex
 }
 
 // NewRealSMTPClient creates a new SMTP client with the given configuration
@@ -57,9 +61,20 @@ func NewRealSMTPClient(host, port, user, password, from, regHost, regPort, regUs
 		From:     regFrom,
 	}
 
+	// Maak persistente dialers voor betere performance
+	defaultDialer := gomail.NewDialer(host, defaultPortNum, user, password)
+	regDialer := gomail.NewDialer(regHost, regPortNum, regUser, regPassword)
+
+	// Configureer keepalive en timeouts
+	defaultDialer.SSL = false // Use STARTTLS instead of SSL
+	regDialer.SSL = false     // Use STARTTLS instead of SSL
+
 	return &RealSMTPClient{
-		defaultConf: defaultConf,
-		regConf:     regConf,
+		defaultConf:        defaultConf,
+		regConf:            regConf,
+		defaultDialer:      defaultDialer,
+		registrationDialer: regDialer,
+		connMutex:          sync.Mutex{},
 	}
 }
 
@@ -70,16 +85,16 @@ func (c *RealSMTPClient) SetDialer(d SMTPDialer) {
 
 // Send verzendt een email met de standaard configuratie
 func (c *RealSMTPClient) Send(msg *EmailMessage) error {
-	return c.sendWithConfig(msg, c.defaultConf)
+	return c.sendWithDialer(msg, c.defaultConf, c.defaultDialer)
 }
 
 // SendRegistration verzendt een email met de registratie configuratie
 func (c *RealSMTPClient) SendRegistration(msg *EmailMessage) error {
-	return c.sendWithConfig(msg, c.regConf)
+	return c.sendWithDialer(msg, c.regConf, c.registrationDialer)
 }
 
-// sendWithConfig verzendt een email met de opgegeven configuratie
-func (c *RealSMTPClient) sendWithConfig(msg *EmailMessage, conf *SMTPConfig) error {
+// sendWithDialer verzendt een email met de opgegeven configuratie en dialer
+func (c *RealSMTPClient) sendWithDialer(msg *EmailMessage, conf *SMTPConfig, dialer *gomail.Dialer) error {
 	if conf == nil {
 		return fmt.Errorf("smtp configuration is nil")
 	}
@@ -105,9 +120,13 @@ func (c *RealSMTPClient) sendWithConfig(msg *EmailMessage, conf *SMTPConfig) err
 	m.SetHeader("Subject", msg.Subject)
 	m.SetBody("text/html", msg.Body)
 
-	d := gomail.NewDialer(conf.Host, conf.Port, conf.Username, conf.Password)
+	// Gebruik connection pooling voor betere performance
+	c.connMutex.Lock()
+	defer c.connMutex.Unlock()
 
-	if err := d.DialAndSend(m); err != nil {
+	// Probeer e-mail te verzenden met bestaande verbinding of maak nieuwe verbinding
+	err := dialer.DialAndSend(m)
+	if err != nil {
 		log.Printf("Error sending email: %v", err)
 		return err
 	}

@@ -150,10 +150,16 @@ func InitDatabase(config *DatabaseConfig) (*gorm.DB, error) {
 			// Maak een kopie van de configuratie met de nieuwe hostname
 			testConfig := *config
 			testConfig.Host = host
+
+			// Log veilige versie van de connection string (zonder wachtwoord)
+			safeConnectionString := fmt.Sprintf(
+				"host=%s port=%s user=%s dbname=%s sslmode=%s",
+				testConfig.Host, testConfig.Port, testConfig.User, testConfig.DBName, testConfig.SSLMode,
+			)
+			dkllogger.Info("Probeer database verbinding", "host", host, "connection_string", safeConnectionString)
+
+			// Maak echte verbinding met wachtwoord
 			dsn := testConfig.ConnectionString()
-
-			dkllogger.Info("Probeer database verbinding", "host", host, "dsn", dsn)
-
 			db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 				Logger: gormLog,
 			})
@@ -183,6 +189,14 @@ func InitDatabase(config *DatabaseConfig) (*gorm.DB, error) {
 	}
 
 	// Voor niet-productie omgevingen, gebruik de normale verbinding
+	// Log veilige versie van de connection string (zonder wachtwoord)
+	safeConnectionString := fmt.Sprintf(
+		"host=%s port=%s user=%s dbname=%s sslmode=%s",
+		config.Host, config.Port, config.User, config.DBName, config.SSLMode,
+	)
+	dkllogger.Info("Probeer database verbinding", "connection_string", safeConnectionString)
+
+	// Maak echte verbinding met wachtwoord
 	dsn := config.ConnectionString()
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: gormLog,
@@ -203,16 +217,6 @@ func InitDatabase(config *DatabaseConfig) (*gorm.DB, error) {
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
 	return db, nil
-}
-
-// Helper functie om environment variables te lezen met fallback
-func getEnv(key, fallback string) string {
-	if value, exists := os.LookupEnv(key); exists {
-		dkllogger.Debug("Environment variable gelezen", "key", key, "value", value)
-		return value
-	}
-	dkllogger.Warn("Environment variable niet gevonden, fallback gebruikt", "key", key, "fallback", fallback)
-	return fallback
 }
 
 // dbLogger implementeert de GORM logger interface en gebruikt onze eigen logger

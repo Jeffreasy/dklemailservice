@@ -23,6 +23,9 @@ type ContactFormulier struct {
 	AntwoordDatum *time.Time `json:"antwoord_datum"`
 	AntwoordDoor  string     `json:"antwoord_door"`
 
+	// Test mode veld
+	TestMode bool `json:"test_mode" gorm:"type:boolean;not null;default:false"`
+
 	// Relatie met antwoorden
 	Antwoorden []ContactAntwoord `json:"antwoorden,omitempty" gorm:"foreignKey:ContactID"`
 }
