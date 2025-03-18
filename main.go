@@ -224,15 +224,17 @@ func main() {
 	// Configure CORS
 	allowedOrigins := strings.Split(os.Getenv("ALLOWED_ORIGINS"), ",")
 	if len(allowedOrigins) == 0 || (len(allowedOrigins) == 1 && allowedOrigins[0] == "") {
-		allowedOrigins = []string{"https://www.dekoninklijkeloop.nl", "https://dekoninklijkeloop.nl", "http://localhost:3000"}
+		allowedOrigins = []string{"https://www.dekoninklijkeloop.nl", "https://dekoninklijkeloop.nl", "http://localhost:3000", "http://localhost:5173"}
 	}
 
 	logger.Info("CORS geconfigureerd", "origins", allowedOrigins)
 
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: strings.Join(allowedOrigins, ","),
-		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
-		AllowMethods: "GET,POST,PUT,DELETE,OPTIONS",
+		AllowOrigins:     strings.Join(allowedOrigins, ","),
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
+		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
+		AllowCredentials: true,
+		ExposeHeaders:    "Content-Length, Content-Type",
 	}))
 
 	// Voeg TestModeMiddleware toe als globale middleware
