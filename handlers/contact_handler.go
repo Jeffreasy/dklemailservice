@@ -392,6 +392,9 @@ func (h *ContactHandler) AddContactAntwoord(c *fiber.Ctx) error {
 		})
 	}
 
+	// Stuur notificatie over het nieuwe antwoord
+	h.handleContactNotification(ctx, contact)
+
 	// Update contactformulier status naar beantwoord
 	contact.Status = "beantwoord"
 	contact.Beantwoord = true

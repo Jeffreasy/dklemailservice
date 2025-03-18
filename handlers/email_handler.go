@@ -345,6 +345,9 @@ func (h *EmailHandler) HandleAanmeldingEmail(c *fiber.Ctx) error {
 			"elapsed", time.Since(start))
 	}
 
+	// Stuur een notificatie voor een nieuwe aanmelding
+	h.sendAanmeldingNotification(&aanmelding, testMode)
+
 	// Return success
 	if testMode {
 		logger.Info("Aanmelding formulier succesvol verwerkt in test modus",
@@ -411,5 +414,51 @@ func (h *EmailHandler) sendContactNotification(contact *models.ContactFormulier,
 			"error", err,
 			"contact_naam", contact.Naam,
 			"contact_email", contact.Email)
+	}
+}
+
+// Stuur een notificatie voor een nieuwe aanmelding
+func (h *EmailHandler) sendAanmeldingNotification(aanmelding *models.AanmeldingFormulier, isTestMode bool) {
+	// Skip als de notification service niet beschikbaar is of als we in test mode zijn
+	if h.notificationService == nil || isTestMode {
+		return
+	}
+
+	priority := models.NotificationPriorityMedium
+	title := "Nieuwe Aanmelding"
+	message := ""
+
+	if aanmelding.Naam != "" && aanmelding.Email != "" {
+		message = "<b>" + aanmelding.Naam + "</b> heeft zich aangemeld.\n\n" +
+			"<b>Email:</b> " + aanmelding.Email + "\n\n" +
+			"<b>Rol:</b> " + aanmelding.Rol + "\n" +
+			"<b>Afstand:</b> " + aanmelding.Afstand + "\n"
+
+		if aanmelding.Telefoon != "" {
+			message += "<b>Telefoon:</b> " + aanmelding.Telefoon + "\n\n"
+		}
+
+		if aanmelding.Bijzonderheden != "" {
+			message += "<b>Bijzonderheden:</b>\n" + aanmelding.Bijzonderheden
+		}
+	} else {
+		// Fallback als naam of email ontbreekt
+		message = "Er is een nieuwe aanmelding ontvangen."
+	}
+
+	// Maak een notificatie aan
+	_, err := h.notificationService.CreateNotification(
+		context.Background(),
+		models.NotificationTypeAanmelding,
+		priority,
+		title,
+		message,
+	)
+
+	if err != nil {
+		logger.Error("Fout bij aanmaken aanmelding notificatie",
+			"error", err,
+			"aanmelding_naam", aanmelding.Naam,
+			"aanmelding_email", aanmelding.Email)
 	}
 }
