@@ -5,11 +5,60 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	_ "github.com/lib/pq"
 )
 
+// loadEnv laadt de .env file en zet deze als omgevingsvariabelen
+func loadEnv(filename string) error {
+	// Lees het bestand
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+
+	// Parse de inhoud en zet de variabelen
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		// Sla commentaren en lege regels over
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// Parse key=value
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+
+		// Verwijder aanhalingstekens als die er zijn
+		value = strings.Trim(value, `"'`)
+
+		// Stel de omgevingsvariabele in
+		os.Setenv(key, value)
+		if key != "DB_PASSWORD" {
+			fmt.Printf("Geladen env var: %s\n", key)
+		} else {
+			fmt.Printf("Geladen env var: %s=********\n", key)
+		}
+	}
+
+	return nil
+}
+
 func main() {
+	// Laad de omgevingsvariabelen uit .env
+	if err := loadEnv(".env"); err != nil {
+		fmt.Printf("Kon .env bestand niet laden: %v\n", err)
+		fmt.Println("Probeer handmatig de omgevingsvariabelen in te stellen.")
+		// Ga door, misschien zijn de variabelen al ingesteld
+	}
+
 	// Migratie bestandspad
 	migrationFile := "database/migrations/004_create_incoming_emails_table.sql"
 
@@ -30,6 +79,8 @@ func main() {
 	// Database connectie string
 	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		dbHost, dbPort, dbUser, dbPassword, dbName, dbSSLMode)
+
+	fmt.Println("Verbinden met database:", dbHost, dbPort, dbUser, "********", dbName, dbSSLMode)
 
 	// Verbind met database
 	db, err := sql.Open("postgres", connStr)
