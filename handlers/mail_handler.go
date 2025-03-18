@@ -4,6 +4,8 @@ import (
 	"dklautomationgo/logger"
 	"dklautomationgo/repository"
 	"dklautomationgo/services"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -33,10 +35,76 @@ func NewMailHandler(
 
 // RegisterRoutes registreert de routes voor mail beheer
 func (h *MailHandler) RegisterRoutes(app *fiber.App) {
-	// Groep voor mail beheer routes (vereist admin rechten)
+	// Groep voor mail beheer routes (vereist admin rechten of API key)
 	mailGroup := app.Group("/api/mail")
-	mailGroup.Use(AuthMiddleware(h.authService))
-	mailGroup.Use(AdminMiddleware(h.authService))
+
+	// Custom auth middleware die zowel API key als JWT token accepteert
+	mailGroup.Use(func(c *fiber.Ctx) error {
+		// Haal token op uit Authorization header
+		authHeader := c.Get("Authorization")
+		if authHeader == "" {
+			logger.Warn("Geen Authorization header gevonden")
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "Niet geautoriseerd",
+			})
+		}
+
+		// Check voor API key als Bearer token
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			logger.Warn("Ongeldige Authorization header", "header", authHeader)
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "Ongeldige Authorization header",
+			})
+		}
+
+		token := parts[1]
+
+		// Controleer eerst of het een API key is
+		adminAPIKey := os.Getenv("ADMIN_API_KEY")
+		if token == adminAPIKey {
+			// Geldige API key, ga door
+			logger.Info("Mail API toegang verleend via API key")
+			return c.Next()
+		}
+
+		// Geen geldige API key, probeer JWT token
+		userID, err := h.authService.ValidateToken(token)
+		if err != nil {
+			logger.Error("Fout bij valideren token", "error", err)
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "Ongeldig token",
+			})
+		}
+
+		// JWT token is geldig, sla gebruiker ID op in context
+		c.Locals("userID", userID)
+		c.Locals("token", token)
+
+		// Controleer nog of gebruiker admin is
+		ctx := c.Context()
+		gebruiker, err := h.authService.GetUserFromToken(ctx, token)
+		if err != nil {
+			logger.Warn("Kon gebruiker niet ophalen uit token", "error", err)
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "Niet geautoriseerd",
+			})
+		}
+
+		// Controleer of gebruiker admin is
+		if gebruiker.Rol != "admin" {
+			logger.Warn("Gebruiker is geen admin", "user_id", gebruiker.ID, "role", gebruiker.Rol)
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "Geen toegang",
+			})
+		}
+
+		// Sla gebruiker op in context
+		c.Locals("gebruiker", gebruiker)
+		logger.Info("Mail API toegang verleend via JWT token", "user_id", gebruiker.ID)
+
+		return c.Next()
+	})
 
 	// Mail beheer routes
 	mailGroup.Get("/", h.ListEmails)
