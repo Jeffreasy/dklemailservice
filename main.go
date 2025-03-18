@@ -185,6 +185,21 @@ func main() {
 	mailFetcher := initializeMailFetcher(serviceFactory.EmailMetrics)
 	mailHandler := handlers.NewMailHandler(mailFetcher, repoFactory.IncomingEmail, serviceFactory.AuthService)
 
+	// Maak een EmailAutoFetcher aan voor automatisch ophalen van emails
+	emailAutoFetcher := services.NewEmailAutoFetcher(mailFetcher, repoFactory.IncomingEmail)
+
+	// Sla de emailAutoFetcher op in de serviceFactory
+	serviceFactory.EmailAutoFetcher = emailAutoFetcher
+
+	// Start de automatische email fetcher als deze niet is uitgeschakeld
+	if os.Getenv("DISABLE_AUTO_EMAIL_FETCH") != "true" {
+		logger.Info("Automatisch ophalen van emails starten...")
+		serviceFactory.EmailAutoFetcher.Start()
+		logger.Info("Automatische email fetcher gestart")
+	} else {
+		logger.Info("Automatisch ophalen van emails is uitgeschakeld")
+	}
+
 	// Create Fiber app
 	app := fiber.New(fiber.Config{
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
@@ -337,6 +352,13 @@ func main() {
 	// Graceful shutdown
 	if serviceFactory.EmailBatcher != nil {
 		serviceFactory.EmailBatcher.Shutdown()
+	}
+
+	// Stop de email auto fetcher
+	if serviceFactory.EmailAutoFetcher != nil && serviceFactory.EmailAutoFetcher.IsRunning() {
+		logger.Info("Email auto fetcher stoppen...")
+		serviceFactory.EmailAutoFetcher.Stop()
+		logger.Info("Email auto fetcher gestopt")
 	}
 
 	// Sluit rate limiter af

@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"dklautomationgo/models"
+	"time"
 )
 
 // IEmailService definieert de interface voor email operaties
@@ -68,4 +69,19 @@ type EmailSender interface {
 
 type TemplateRenderer interface {
 	RenderTemplate(name string, data interface{}) (string, error)
+}
+
+// EmailAutoFetcherInterface definieert de interface voor automatisch ophalen van emails
+type EmailAutoFetcherInterface interface {
+	// Start begint het periodiek ophalen van emails
+	Start()
+
+	// Stop stopt het periodiek ophalen van emails
+	Stop()
+
+	// IsRunning controleert of de auto fetcher actief is
+	IsRunning() bool
+
+	// GetLastRunTime geeft de laatste keer dat emails zijn opgehaald
+	GetLastRunTime() time.Time
 }

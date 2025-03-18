@@ -11,12 +11,13 @@ import (
 
 // ServiceFactory bevat alle services
 type ServiceFactory struct {
-	EmailService *EmailService
-	SMTPClient   SMTPClient
-	RateLimiter  RateLimiterInterface
-	EmailMetrics *EmailMetrics
-	EmailBatcher *EmailBatcher
-	AuthService  AuthService
+	EmailService     *EmailService
+	SMTPClient       SMTPClient
+	RateLimiter      RateLimiterInterface
+	EmailMetrics     *EmailMetrics
+	EmailBatcher     *EmailBatcher
+	AuthService      AuthService
+	EmailAutoFetcher EmailAutoFetcherInterface
 }
 
 // NewServiceFactory maakt een nieuwe service factory
@@ -44,13 +45,17 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 	// Initialiseer auth service
 	authService := NewAuthService(repoFactory.Gebruiker)
 
+	// Maak een EmailAutoFetcher aan
+	// Nog niet geinitialiseerd omdat MailFetcher buiten de ServiceFactory wordt aangemaakt in main.go
+
 	return &ServiceFactory{
-		EmailService: emailService,
-		SMTPClient:   smtpClient,
-		RateLimiter:  rateLimiter,
-		EmailMetrics: emailMetrics,
-		EmailBatcher: emailBatcher,
-		AuthService:  authService,
+		EmailService:     emailService,
+		SMTPClient:       smtpClient,
+		RateLimiter:      rateLimiter,
+		EmailMetrics:     emailMetrics,
+		EmailBatcher:     emailBatcher,
+		AuthService:      authService,
+		EmailAutoFetcher: nil, // Dit wordt later in main.go ingesteld
 	}
 }
 
