@@ -415,3 +415,268 @@ func debugTemplateRender(name string, data interface{}) {
 }
 ``` 
    - Inline CSS styles 
+```
+
+## Inkomende Email Verwerking
+
+De EmailAutoFetcher haalt automatisch emails op en slaat deze op in de database. Voor het verwerken en weergeven van deze inkomende emails zijn een aantal templates beschikbaar.
+
+### Email Overzicht Template
+
+Deze template wordt gebruikt voor het weergeven van een overzicht van alle opgehaalde emails in het admin dashboard.
+
+**Template Locatie:** `templates/admin/email_list.gohtml`
+
+**Template Functionaliteiten:**
+- Lijst weergave van alle opgehaalde emails
+- Sortering op datum, afzender, onderwerp
+- Filter functies (verwerkt/onverwerkt, account type)
+- Paginering
+
+**Voorbeeld:**
+
+```html
+{{define "admin/email_list"}}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Email Beheer - De Koninklijke Loop</title>
+    {{template "common/head" .}}
+</head>
+<body>
+    {{template "admin/header" .}}
+    
+    <div class="container mx-auto py-8">
+        <h1 class="text-2xl font-bold mb-4">Inkomende Emails</h1>
+        
+        {{template "admin/email_filters" .}}
+        
+        <table class="w-full mt-4">
+            <thead>
+                <tr>
+                    <th class="px-4 py-2 text-left">Datum</th>
+                    <th class="px-4 py-2 text-left">Van</th>
+                    <th class="px-4 py-2 text-left">Onderwerp</th>
+                    <th class="px-4 py-2 text-left">Account</th>
+                    <th class="px-4 py-2 text-left">Status</th>
+                    <th class="px-4 py-2 text-left">Acties</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Emails}}
+                <tr class="{{if .IsProcessed}}bg-gray-100{{else}}bg-white{{end}}">
+                    <td class="px-4 py-2">{{formatDate .ReceivedAt}}</td>
+                    <td class="px-4 py-2">{{.From}}</td>
+                    <td class="px-4 py-2">{{.Subject}}</td>
+                    <td class="px-4 py-2">{{.AccountType}}</td>
+                    <td class="px-4 py-2">
+                        {{if .IsProcessed}}
+                            <span class="px-2 py-1 bg-green-100 text-green-800 rounded">Verwerkt</span>
+                        {{else}}
+                            <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded">Nieuw</span>
+                        {{end}}
+                    </td>
+                    <td class="px-4 py-2">
+                        <a href="/admin/emails/{{.ID}}" class="text-blue-500">Bekijken</a>
+                    </td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+        
+        {{template "common/pagination" .Pagination}}
+    </div>
+    
+    {{template "common/footer" .}}
+</body>
+</html>
+{{end}}
+```
+
+### Email Detail Template
+
+Deze template toont de details van een specifieke email, inclusief de inhoud.
+
+**Template Locatie:** `templates/admin/email_detail.gohtml`
+
+**Template Functionaliteiten:**
+- Volledige email details weergave
+- Email content weergave (plaintext of HTML)
+- Acties (markeren als verwerkt, verwijderen)
+- Koppeling naar reply functionaliteit
+
+**Voorbeeld:**
+
+```html
+{{define "admin/email_detail"}}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Email Detail - De Koninklijke Loop</title>
+    {{template "common/head" .}}
+</head>
+<body>
+    {{template "admin/header" .}}
+    
+    <div class="container mx-auto py-8">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold">Email Detail</h1>
+            <div>
+                <a href="/admin/emails" class="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded mr-2">Terug naar overzicht</a>
+                {{if not .Email.IsProcessed}}
+                    <button id="mark-processed" data-id="{{.Email.ID}}" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded mr-2">Markeer als verwerkt</button>
+                {{end}}
+                <button id="delete-email" data-id="{{.Email.ID}}" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded">Verwijderen</button>
+            </div>
+        </div>
+        
+        <div class="bg-white shadow-md rounded p-6 mb-6">
+            <div class="mb-4">
+                <p class="text-sm text-gray-600">Van</p>
+                <p class="font-medium">{{.Email.From}}</p>
+            </div>
+            <div class="mb-4">
+                <p class="text-sm text-gray-600">Aan</p>
+                <p class="font-medium">{{.Email.To}}</p>
+            </div>
+            <div class="mb-4">
+                <p class="text-sm text-gray-600">Onderwerp</p>
+                <p class="font-medium">{{.Email.Subject}}</p>
+            </div>
+            <div class="mb-4">
+                <p class="text-sm text-gray-600">Ontvangen op</p>
+                <p class="font-medium">{{formatDateTime .Email.ReceivedAt}}</p>
+            </div>
+            <div class="mb-4">
+                <p class="text-sm text-gray-600">Account</p>
+                <p class="font-medium">{{.Email.AccountType}}</p>
+            </div>
+            <div class="mb-4">
+                <p class="text-sm text-gray-600">Status</p>
+                <p class="font-medium">
+                    {{if .Email.IsProcessed}}
+                        <span class="px-2 py-1 bg-green-100 text-green-800 rounded">Verwerkt op {{formatDateTime .Email.ProcessedAt}}</span>
+                    {{else}}
+                        <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded">Nieuw</span>
+                    {{end}}
+                </p>
+            </div>
+        </div>
+        
+        <div class="bg-white shadow-md rounded p-6">
+            <h2 class="text-xl font-bold mb-4">Inhoud</h2>
+            {{if eq .Email.ContentType "text/html"}}
+                <div class="content-html p-4 bg-gray-50 rounded">
+                    {{.EmailHTML}}
+                </div>
+            {{else}}
+                <pre class="whitespace-pre-wrap p-4 bg-gray-50 rounded">{{.Email.Body}}</pre>
+            {{end}}
+        </div>
+    </div>
+    
+    <script>
+        // JavaScript voor mark as processed en delete functies
+        document.addEventListener('DOMContentLoaded', function() {
+            const markProcessedBtn = document.getElementById('mark-processed');
+            if (markProcessedBtn) {
+                markProcessedBtn.addEventListener('click', function() {
+                    const emailId = this.getAttribute('data-id');
+                    fetch(`/api/mail/${emailId}/processed`, {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': `Bearer ${getAuthToken()}`
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.is_processed) {
+                            window.location.reload();
+                        }
+                    })
+                    .catch(error => console.error('Error:', error));
+                });
+            }
+            
+            const deleteEmailBtn = document.getElementById('delete-email');
+            if (deleteEmailBtn) {
+                deleteEmailBtn.addEventListener('click', function() {
+                    if (confirm('Weet je zeker dat je deze email wilt verwijderen?')) {
+                        const emailId = this.getAttribute('data-id');
+                        fetch(`/api/mail/${emailId}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Authorization': `Bearer ${getAuthToken()}`
+                            }
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                window.location.href = '/admin/emails';
+                            }
+                        })
+                        .catch(error => console.error('Error:', error));
+                    }
+                });
+            }
+            
+            function getAuthToken() {
+                // Functie om JWT token op te halen uit localStorage of cookies
+                return localStorage.getItem('auth_token') || '';
+            }
+        });
+    </script>
+    
+    {{template "common/footer" .}}
+</body>
+</html>
+{{end}}
+```
+
+### Email Sanitization Helpers
+
+Voor het veilig weergeven van inkomende emails worden helper functies gebruikt om de content te sanitiseren en veilig weer te geven.
+
+**Helper Functies:**
+- `sanitizeHTML`: Verwijdert potentieel gevaarlijke HTML elementen
+- `renderEmailContent`: Geeft email content weer als HTML of plaintext
+- `formatEmailAddress`: Formatteert email adressen
+
+**Implementatie:**
+
+```go
+// Functie om HTML content te sanitiseren
+func sanitizeHTML(htmlContent string) string {
+    p := bluemonday.UGCPolicy()
+    return p.Sanitize(htmlContent)
+}
+
+// Template functie om email content veilig weer te geven
+func renderEmailContent(e *models.Email) template.HTML {
+    if e.ContentType == "text/html" {
+        sanitized := sanitizeHTML(e.Body)
+        return template.HTML(sanitized)
+    }
+    // Voor plaintext, converteer newlines naar <br> tags
+    escaped := html.EscapeString(e.Body)
+    withBrs := strings.ReplaceAll(escaped, "\n", "<br>")
+    return template.HTML(withBrs)
+}
+
+// Functie om email adres te formatteren voor privacy
+func formatEmailAddress(address string) string {
+    parts := strings.Split(address, "@")
+    if len(parts) != 2 {
+        return address
+    }
+    username := parts[0]
+    domain := parts[1]
+    
+    // Toon eerste 3 karakters + sterretjes voor de rest
+    if len(username) > 3 {
+        masked := username[:3] + strings.Repeat("*", len(username)-3)
+        return masked + "@" + domain
+    }
+    return address
+}
+``` 

@@ -327,3 +327,98 @@ type Config struct {
     AllowedOrigins []string `env:"ALLOWED_ORIGINS" default:"https://www.dekoninklijkeloop.nl"`
 }
 ```
+
+## Testing
+
+### Algemene tests
+
+Run de Go-tests met:
+
+```bash
+go test ./... -v
+```
+
+Voor unit tests met coverage:
+
+```bash
+go test ./... -cover
+```
+
+### End-to-end tests
+
+In de map `testscripts` staan PowerShell scripts die gebruikt kunnen worden voor het testen van de API endpoints:
+
+```bash
+cd testscripts
+./test_api_light.ps1  # Test API zonder stress test
+./test_api_full.ps1   # Test API inclusief stress test
+```
+
+### API Monitoring
+
+Om de health van alle endpoints te controleren:
+
+```bash
+cd testscripts
+./test_api_light.ps1 -DetailedHealth
+```
+
+### Email Endpoints Testen
+
+Voor het testen van e-mail functionaliteit kun je de volgende scripts gebruiken:
+
+```bash
+# Test alle email endpoints, inclusief beveiligde endpoints
+./test_api_light.ps1 -TestMailEndpoints -IncludeSecuredEndpoints
+
+# Mail logs bekijken en analyseren
+./check_mail_logs.ps1
+```
+
+### EmailAutoFetcher Testen
+
+De EmailAutoFetcher component zorgt voor het automatisch ophalen van e-mails. Voor testdoeleinden kun je:
+
+1. De interval tijd verkorten via environment variabelen:
+
+```bash
+# .env file of command line:
+EMAIL_FETCH_INTERVAL=1  # Haalt elke minuut e-mails op in plaats van standaard 15 minuten
+```
+
+2. Force manual fetch via de API:
+
+```bash
+curl -X POST http://localhost:8080/api/mail/fetch \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+3. Monitor fetch gedrag in logs:
+
+```bash
+# Log output filteren op EmailAutoFetcher
+grep "EmailAutoFetcher" server.log
+```
+
+4. Mocks voor testen:
+
+Voor gecontroleerde tests is er een mock implementatie beschikbaar in `mocks/mail_fetcher_mock.go`. Deze kan 
+geconfigureerd worden om specifieke test scenarios te simuleren.
+
+### Logging
+
+```go
+// Debug logging
+logger.Debug("processing request",
+    "method", r.Method,
+    "path", r.URL.Path,
+    "remote_addr", r.RemoteAddr,
+)
+
+// Trace logging voor gedetailleerde debugging
+logger.Trace("smtp connection details",
+    "host", smtpHost,
+    "port", smtpPort,
+    "tls", tlsEnabled,
+)
+```

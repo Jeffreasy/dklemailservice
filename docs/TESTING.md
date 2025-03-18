@@ -258,4 +258,137 @@ func TestWithLogging(t *testing.T) {
     if testing.Verbose() {
         t.Logf("Test result: %+v", result)
     }
-} 
+}
+
+## API Endpoint Tests
+
+De volgende PowerShell scripts zijn beschikbaar om de API endpoints te testen:
+
+- `test_api_light.ps1`: Test alle API endpoints zonder stress test
+- `test_api_full.ps1`: Test alle API endpoints inclusief stress test
+- `stress_test.ps1`: Voert alleen de stress test uit
+- `check_mail_logs.ps1`: Analyseert email verzend logs
+
+### Parameters voor test scripts
+
+`test_api_light.ps1` en `test_api_full.ps1` accepteren de volgende parameters:
+
+```
+-BaseUrl <string>       : API base URL (default: http://localhost:8080)
+-DetailedHealth         : Geeft gedetailleerde health check informatie
+-TestAdminEndpoints     : Test admin endpoints (vereist admin API key)
+-SkipStressTest         : Slaat de stress test over (alleen bij test_api_full.ps1)
+-TestMetrics            : Test metrics endpoints (vereist admin API key)
+-AdminAPIKey <string>   : Admin API key voor beveiligde endpoints
+-TestMailEndpoints      : Test email functionaliteit endpoints
+-IncludeSecuredEndpoints: Test beveiligde email endpoints (vereist JWT token)
+-JWTToken <string>      : JWT token voor beveiligde endpoints
+```
+
+### Test voorbeelden
+
+```powershell
+# Basis API test
+./test_api_light.ps1
+
+# API test met gedetailleerde health check
+./test_api_light.ps1 -DetailedHealth
+
+# Test inclusief mail endpoints
+./test_api_light.ps1 -TestMailEndpoints
+
+# Test inclusief beveiligde mail endpoints
+./test_api_light.ps1 -TestMailEndpoints -IncludeSecuredEndpoints -JWTToken "your-jwt-token"
+
+# Test van productie API
+./test_api_light.ps1 -BaseUrl "https://api.dekoninklijkeloop.nl"
+```
+
+## EmailAutoFetcher Tests
+
+De EmailAutoFetcher component verwerkt inkomende emails via IMAP en slaat deze op in de database. De volgende test procedures zijn beschikbaar:
+
+### Unit Tests
+
+Unit tests voor de EmailAutoFetcher zijn beschikbaar in:
+- `services/email_auto_fetcher_test.go`
+
+Run specifieke tests met:
+
+```bash
+go test -v ./services -run TestEmailAutoFetcher
+```
+
+### Integratie Tests
+
+Voor integratie tests met echte mail servers:
+
+1. Configureer test credentials in een `.env.test` bestand:
+
+```
+TEST_EMAIL_HOST=imap.example.com
+TEST_EMAIL_PORT=993
+TEST_EMAIL_USER=testuser@example.com
+TEST_EMAIL_PASSWORD=testpassword
+TEST_EMAIL_USE_TLS=true
+```
+
+2. Run integratie tests:
+
+```bash
+go test -v ./integration -run TestEmailFetching
+```
+
+### Handmatige Tests
+
+1. Configureer EmailAutoFetcher voor snel testen:
+
+```
+# In .env file
+EMAIL_FETCH_INTERVAL=1
+EMAIL_INFO_HOST=imap.example.com
+EMAIL_INFO_PORT=993
+EMAIL_INFO_USERNAME=info@dekoninklijkeloop.nl
+EMAIL_INFO_PASSWORD=your-password
+EMAIL_INFO_USE_TLS=true
+```
+
+2. Start de applicatie en monitor logs:
+
+```bash
+go run main.go | grep "EmailAutoFetcher"
+```
+
+3. Stuur een test email naar het geconfigureerde adres en verifieer dat deze wordt opgehaald.
+
+4. Test de handmatige fetch API:
+
+```bash
+# Login en JWT token verkrijgen
+TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"password"}' | jq -r '.token')
+
+# Handmatig emails fetchen
+curl -X POST http://localhost:8080/api/mail/fetch \
+  -H "Authorization: Bearer $TOKEN"
+
+# Bekijk ontvangen emails
+curl -X GET http://localhost:8080/api/mail \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Test cases voor EmailAutoFetcher
+
+| Test Case | Beschrijving | Verwacht Resultaat |
+|-----------|--------------|-------------------|
+| Automatisch ophalen | Start de applicatie met EmailAutoFetcher ingeschakeld | Logs tonen periodieke fetch operaties volgens ingesteld interval |
+| Duplicate detection | Verstuur dezelfde email meerdere keren | Email wordt slechts één keer opgeslagen in database |
+| Error recovery | Simuleer een tijdelijke IMAP verbindingsfout | EmailAutoFetcher herstelt en probeert opnieuw bij volgende interval |
+| Graceful shutdown | Stop applicatie tijdens fetch operatie | Fetch operatie wordt veilig afgebroken |
+| Configuratie wijziging | Wijzig interval via env variabele | EmailAutoFetcher past interval aan |
+| Handmatige fetch | Trigger handmatige fetch via API | Nieuwe emails worden onmiddellijk opgehaald |
+
+## Logging
+
+// ... existing code ... 

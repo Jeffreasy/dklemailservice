@@ -131,6 +131,206 @@ func NewSMTPClient(config SMTPConfig) (*smtp.Client, error) {
 }
 ```
 
+## IMAP Security en Email Auto-Fetcher
+
+### Beveiligde IMAP connecties
+```go
+// IMAP TLS connectie configuratie
+func DialIMAP(host string, port int) (*client.Client, error) {
+    // Verbind met TLS
+    imapAddr := fmt.Sprintf("%s:%d", host, port)
+    c, err := client.DialTLS(imapAddr, &tls.Config{
+        MinVersion: tls.VersionTLS12,
+    })
+    if err != nil {
+        return nil, fmt.Errorf("kan niet verbinden met IMAP server: %w", err)
+    }
+    return c, nil
+}
+```
+
+### Credential Management
+Alle mailbox inloggegevens worden in de eerste instantie geleverd via omgevingsvariabelen (niet hard-coded):
+
+```go
+// EmailAccount configuratie
+type EmailAccountConfig struct {
+    Username    string `env:"EMAIL_USERNAME,required"`
+    Password    string `env:"EMAIL_PASSWORD,required"`
+    Host        string `env:"EMAIL_HOST,required"`
+    Port        int    `env:"EMAIL_PORT" default:"993"`
+    AccountType string `env:"EMAIL_TYPE,required"`
+}
+```
+
+### Toegangscontrole Inkomende Emails
+De toegang tot inkomende emails is beveiligd op meerdere niveaus:
+
+1. **Multi-layer Authenticatie**: Alle mail endpoints vereisen JWT authenticatie
+2. **Rol-gebaseerde Toegang**: Alleen admin gebruikers kunnen mail endpoints benaderen
+3. **Security Middleware**: Endpoints beschermd door meerdere beveiligingslagen
+
+```go
+// Mail routes security
+func (h *MailHandler) RegisterRoutes(app *fiber.App) {
+    // Groep voor mail beheer routes (vereist admin rechten)
+    mailGroup := app.Group("/api/mail")
+    mailGroup.Use(AuthMiddleware(h.authService))     // JWT authenticatie
+    mailGroup.Use(AdminMiddleware(h.authService))    // Admin rol controle
+    
+    // Mail beheer routes
+    mailGroup.Get("/", h.ListEmails)
+    // ...andere routes
+}
+```
+
+### Resource Beperking
+
+EmailAutoFetcher implementeert verschillende beperkingen om resource uitputting te voorkomen:
+
+1. **Timeout Controle**: Email ophaal operaties hebben een strikte timeout (2 minuten)
+2. **Interval Beperking**: Minimale standaard interval van 15 minuten, configureerbaar
+3. **Duplicatie Preventie**: Voorkomt dubbele opslag van identieke emails
+
+```go
+// Resource beperking voor email ophalen
+func (f *EmailAutoFetcher) fetchOnce() {
+    // Context met timeout om hangende operaties te beperken
+    ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+    defer cancel()
+    
+    // Duplicatie controle
+    existing, err := f.emailRepository.FindByUID(ctx, email.UID)
+    if err == nil && existing != nil {
+        // Email bestaat al, sla over
+        return
+    }
+}
+```
+
+### Thread Safety
+
+De implementatie van EmailAutoFetcher is volledig thread-safe:
+
+1. **Mutex Bescherming**: Voorkomt race conditions bij gelijktijdige toegang
+2. **Atomic Operations**: Status updates gebeuren atomair
+3. **Graceful Shutdown**: Veilig afsluiten van achtergrondprocessen
+
+```go
+// Thread-safe operaties
+func (f *EmailAutoFetcher) Start() {
+    f.mutex.Lock()
+    defer f.mutex.Unlock()
+    
+    if f.running {
+        return
+    }
+    
+    f.running = true
+    f.stopChan = make(chan struct{})
+    
+    go f.fetchLoop()
+}
+
+func (f *EmailAutoFetcher) Stop() {
+    f.mutex.Lock()
+    defer f.mutex.Unlock()
+    
+    if !f.running {
+        return
+    }
+    
+    close(f.stopChan)
+    f.running = false
+}
+```
+
+### Logging en Monitoring
+
+De EmailAutoFetcher biedt uitgebreide logging voor beveiligingsdoeleinden:
+
+1. **Operationele Logs**: Start, stop en fetch operaties worden gelogd
+2. **Error Logs**: Gedetailleerde logging van fouten tijdens fetch operaties
+3. **Metrics**: Statistieken over opgehaalde en opgeslagen emails
+
+### Veiligheidsoverwegingen
+
+Aanbevelingen voor veilig gebruik van de EmailAutoFetcher:
+
+1. **Gebruik een dedicated mailaccount** met beperkte rechten voor het ophalen van emails
+2. **Regelmatig wachtwoord rotatie** voor email accounts
+3. **Monitoring instellen** voor onverwachte patronen in email ophalingen
+4. **Rate limiting** configureren om mailserver overbelasting te voorkomen
+5. **Regelmatige audit** van inkomende emails op verdachte patronen
+
+### Email Content Security
+
+Inkomende emails vormen een potentieel beveiligingsrisico omdat ze content kunnen bevatten van onbekende bronnen. De service implementeert de volgende maatregelen:
+
+1. **Content Isolatie**:
+   - Email content wordt nooit direct uitgevoerd of geïnterpreteerd
+   - Alle content wordt behandeld als potentieel onveilig
+   - Content wordt alleen getoond in een beveiligde weergave-omgeving
+
+2. **Content Sanitization**:
+   ```go
+   // HTML content sanitization
+   func sanitizeEmailContent(body string, contentType string) string {
+       // Voor HTML emails
+       if strings.Contains(contentType, "text/html") {
+           // Gebruik strict policy voor HTML reiniging
+           p := bluemonday.StrictPolicy()
+           return p.Sanitize(body)
+       }
+       return body
+   }
+   ```
+
+3. **Malware Preventie**:
+   - Email bijlagen worden niet automatisch opgehaald of opgeslagen
+   - Links in emails worden gemarkeerd als extern en niet automatisch gevolgd
+   - Inline afbeeldingen worden geblokkeerd of door een proxy geserveerd
+
+4. **Rate Anomaly Detectie**:
+   ```go
+   // Abnormale patronen detecteren
+   func detectAnomalies(emails []*models.IncomingEmail) []SecurityAlert {
+       var alerts []SecurityAlert
+       
+       // Controleer op ongewoon hoge volumes
+       if len(emails) > normalThreshold {
+           alerts = append(alerts, SecurityAlert{
+               Type: "volume_spike",
+               Details: fmt.Sprintf("Ongewoon hoog volume: %d emails", len(emails)),
+           })
+       }
+       
+       // Controleer op verdachte patronen in afzenders
+       senderCounts := make(map[string]int)
+       for _, email := range emails {
+           senderCounts[email.From]++
+       }
+       
+       for sender, count := range senderCounts {
+           if count > senderThreshold {
+               alerts = append(alerts, SecurityAlert{
+                   Type: "sender_volume",
+                   Details: fmt.Sprintf("Hoog volume van één afzender: %s (%d)", sender, count),
+               })
+           }
+       }
+       
+       return alerts
+   }
+   ```
+
+5. **Verdachte Content Detectie**:
+   - Monitoring op phishing indicatoren
+   - Detectie van verdachte URL patronen
+   - Controle op typische spam kenmerken
+
+Deze maatregelen beschermen de applicatie tegen veel voorkomende aanvallen via email, zoals phishing, malware en social engineering pogingen. Het is aanbevolen om daarnaast een dedicated email security oplossing te gebruiken voor geavanceerde bescherming.
+
 ## API Security
 
 ### CORS Configuratie
@@ -391,6 +591,10 @@ func GenerateIncidentReport(incident SecurityIncident) *IncidentReport {
 - [ ] Template sanitization actief
 - [ ] Audit logging ingeschakeld
 - [ ] Incident response plan gereed
+- [ ] Email account credentials beveiligd
+- [ ] IMAP TLS verbinding geconfigureerd
+- [ ] Email AutoFetcher resource limieten ingesteld
+- [ ] Mail endpoints beschermd met authenticatie
 
 ### Regular Checks
 - [ ] SSL certificaten geldig
@@ -402,4 +606,8 @@ func GenerateIncidentReport(incident SecurityIncident) *IncidentReport {
 - [ ] Backups recent
 - [ ] Monitoring actief
 - [ ] Alerts functioneel
-- [ ] Incident response getest 
+- [ ] Incident response getest
+- [ ] Email account wachtwoorden regelmatig geroteerd
+- [ ] Email ophaal interval geoptimaliseerd
+- [ ] Inkomende emails gescand op verdachte inhoud
+- [ ] Automatische email ophaling logs gecontroleerd 

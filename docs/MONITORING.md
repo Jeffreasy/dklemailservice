@@ -19,34 +19,63 @@ Deze handleiding beschrijft de monitoring setup voor de DKL Email Service, inclu
 ### Core Metrics
 
 #### Email Metrics
-```prometheus
-# Counter voor verzonden emails
-email_sent_total{type="contact|aanmelding",template="admin|user"}
 
-# Counter voor gefaalde emails
-email_failed_total{type="contact|aanmelding",error="smtp|template|validation"}
+Monitor verzend statistieken en email gerelateerde informatie:
 
-# Histogram voor email verzend latency
-email_latency_seconds{type="contact|aanmelding"}
-histogram_quantile(0.95, sum(rate(email_latency_bucket[5m])) by (le))
+```http
+GET /api/metrics/email
+```
 
-# Gauge voor huidige batch grootte
-email_batch_size{type="contact|aanmelding"}
+**Headers:**
+```
+X-API-Key: your-admin-api-key
+```
 
-# Histogram voor template render tijd
-email_template_render_duration_seconds
+**Response:**
+```json
+{
+    "total_emails": 150,
+    "success_rate": 98.5,
+    "emails_by_type": {
+        "contact": {
+            "sent": 50,
+            "failed": 1
+        },
+        "aanmelding": {
+            "sent": 100,
+            "failed": 2
+        }
+    },
+    "generated_at": "2024-03-20T15:04:05Z"
+}
 ```
 
 #### Rate Limiting Metrics
-```prometheus
-# Counter voor rate limit overschrijdingen
-rate_limit_exceeded_total{type="ip|global"}
 
-# Gauge voor resterende requests
-rate_limit_remaining{type="ip|global"}
+Rate limiting statistieken:
 
-# Gauge voor tijd tot reset
-rate_limit_reset_seconds
+```http
+GET /api/metrics/rate-limits
+```
+
+**Headers:**
+```
+X-API-Key: your-admin-api-key
+```
+
+**Response:**
+```json
+{
+    "rate_limits": {
+        "contact_email": {
+            "global_count": 45
+        },
+        "aanmelding_email": {
+            "global_count": 120
+        }
+    },
+    "generated_at": "2024-03-20T15:04:05Z"
+}
 ```
 
 #### System Metrics
@@ -385,3 +414,145 @@ prometheus --storage.tsdb.path=/path/to/snapshot
 # Restore van snapshot
 POST /_snapshot/backup_repo/snapshot_1/_restore
 ```
+
+### Email Auto Fetcher Monitoring
+
+Voor het monitoren van de automatische email ophaal functionaliteit zijn de volgende mogelijkheden beschikbaar:
+
+#### Status Monitoring
+
+De huidige status van de EmailAutoFetcher is beschikbaar via de health endpoint, die aangeeft of de service actief is:
+
+```http
+GET /api/health
+```
+
+**Response:**
+```json
+{
+    "status": "healthy",
+    "version": "1.2.3",
+    "services": {
+        "database": "connected",
+        "email_service": "operational",
+        "email_auto_fetcher": "running", // of "stopped" als niet actief
+        "rate_limiter": "active"
+    },
+    "last_email_fetch": "2024-04-02T14:25:00Z"
+}
+```
+
+#### Email Fetch Metrics
+
+Gedetailleerde metrics over de email fetch operaties:
+
+```http
+GET /api/metrics/email-fetch
+```
+
+**Headers:**
+```
+X-API-Key: your-admin-api-key
+```
+
+**Response:**
+```json
+{
+    "auto_fetcher_status": "running",
+    "fetch_interval_minutes": 15,
+    "last_run": "2024-04-02T14:25:00Z",
+    "next_scheduled_run": "2024-04-02T14:40:00Z",
+    "total_fetches": 96,
+    "successful_fetches": 95,
+    "failed_fetches": 1,
+    "fetch_stats": {
+        "total_emails_found": 150,
+        "total_emails_saved": 120,
+        "duplicate_emails": 30
+    },
+    "accounts": {
+        "info@dekoninklijkeloop.nl": {
+            "emails_found": 100,
+            "emails_saved": 85,
+            "last_fetch_status": "success"
+        },
+        "inschrijving@dekoninklijkeloop.nl": {
+            "emails_found": 50,
+            "emails_saved": 35,
+            "last_fetch_status": "success"
+        }
+    },
+    "generated_at": "2024-04-02T14:30:00Z"
+}
+```
+
+#### Log Monitoring
+
+De EmailAutoFetcher logt alle activiteiten en fouten. Relevante log entries kunnen gefilterd worden:
+
+```bash
+# Filter logs op EmailAutoFetcher activiteit
+grep "EmailAutoFetcher" server.log
+
+# Filter logs op fetch operaties
+grep "Fetching emails" server.log
+
+# Filter logs op fouten
+grep "Error fetching emails" server.log
+```
+
+Voorbeeld log output:
+```
+2024-04-02T14:25:00Z INFO EmailAutoFetcher: Starting email fetch operation
+2024-04-02T14:25:01Z INFO EmailAutoFetcher: Fetching emails from info@dekoninklijkeloop.nl
+2024-04-02T14:25:02Z INFO EmailAutoFetcher: Found 5 emails, 3 new emails saved
+2024-04-02T14:25:03Z INFO EmailAutoFetcher: Fetching emails from inschrijving@dekoninklijkeloop.nl
+2024-04-02T14:25:04Z INFO EmailAutoFetcher: Found 2 emails, 2 new emails saved
+2024-04-02T14:25:05Z INFO EmailAutoFetcher: Email fetch operation completed successfully
+```
+
+#### Prometheus Metrics
+
+De volgende Prometheus metrics zijn beschikbaar op `/metrics`:
+
+```
+# HELP dkl_email_fetcher_runs_total Totaal aantal email fetch operaties
+# TYPE dkl_email_fetcher_runs_total counter
+dkl_email_fetcher_runs_total 96
+
+# HELP dkl_email_fetcher_errors_total Aantal mislukte email fetch operaties
+# TYPE dkl_email_fetcher_errors_total counter
+dkl_email_fetcher_errors_total 1
+
+# HELP dkl_email_fetcher_duration_seconds Tijd besteed aan email fetch operaties
+# TYPE dkl_email_fetcher_duration_seconds histogram
+dkl_email_fetcher_duration_seconds_bucket{le="0.1"} 3
+dkl_email_fetcher_duration_seconds_bucket{le="0.5"} 56
+dkl_email_fetcher_duration_seconds_bucket{le="1"} 80
+dkl_email_fetcher_duration_seconds_bucket{le="2"} 92
+dkl_email_fetcher_duration_seconds_bucket{le="5"} 96
+dkl_email_fetcher_duration_seconds_bucket{le="+Inf"} 96
+dkl_email_fetcher_duration_seconds_sum 104.2
+dkl_email_fetcher_duration_seconds_count 96
+
+# HELP dkl_emails_fetched_total Totaal aantal opgehaalde emails
+# TYPE dkl_emails_fetched_total counter
+dkl_emails_fetched_total{account="info"} 100
+dkl_emails_fetched_total{account="inschrijving"} 50
+
+# HELP dkl_emails_saved_total Totaal aantal opgeslagen emails
+# TYPE dkl_emails_saved_total counter
+dkl_emails_saved_total{account="info"} 85
+dkl_emails_saved_total{account="inschrijving"} 35
+
+# HELP dkl_emails_duplicates_total Totaal aantal gedetecteerde duplicate emails
+# TYPE dkl_emails_duplicates_total counter
+dkl_emails_duplicates_total{account="info"} 15
+dkl_emails_duplicates_total{account="inschrijving"} 15
+
+# HELP dkl_email_fetcher_last_run_timestamp_seconds Timestamp van laatste email fetch operatie
+# TYPE dkl_email_fetcher_last_run_timestamp_seconds gauge
+dkl_email_fetcher_last_run_timestamp_seconds 1712072700
+```
+
+## Logging en Alerts

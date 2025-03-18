@@ -174,4 +174,73 @@ curl -X POST http://localhost:8080/api/auth/reset-password \
 
 # Uitloggen
 curl -X POST http://localhost:8080/api/auth/logout
+```
+
+## Mail Endpoints Authenticatie
+
+Voor de mail management endpoints, die toegang bieden tot de door de EmailAutoFetcher opgehaalde emails, is authenticatie vereist. Deze endpoints zijn alleen toegankelijk voor gebruikers met admin rechten.
+
+### Mail Endpoints Overzicht
+
+| Endpoint | HTTP Methode | Vereiste Rol | Beschrijving |
+|----------|--------------|--------------|--------------|
+| `/api/mail` | GET | admin | Lijst van opgehaalde emails ophalen |
+| `/api/mail/:id` | GET | admin | Details van specifieke email ophalen |
+| `/api/mail/:id/processed` | PUT | admin | Email als verwerkt markeren |
+| `/api/mail/:id` | DELETE | admin | Email verwijderen |
+| `/api/mail/fetch` | POST | admin | Handmatig emails ophalen |
+| `/api/mail/unprocessed` | GET | admin | Lijst van onverwerkte emails ophalen |
+| `/api/mail/account/:type` | GET | admin | Emails voor specifiek account ophalen |
+
+### JWT Authenticatie
+
+Alle mail endpoints vereisen een geldige JWT token in de Authorization header:
+
+```
+Authorization: Bearer jwt_token_hier
+```
+
+### Voorbeeld API Calls
+
+```bash
+# Login en JWT token ophalen
+TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@dekoninklijkeloop.nl","wachtwoord":"admin123"}' | jq -r '.token')
+
+# Lijst van alle emails ophalen
+curl -X GET http://localhost:8080/api/mail \
+  -H "Authorization: Bearer $TOKEN"
+
+# Handmatig emails ophalen van de mailserver
+curl -X POST http://localhost:8080/api/mail/fetch \
+  -H "Authorization: Bearer $TOKEN"
+
+# Email als verwerkt markeren
+curl -X PUT http://localhost:8080/api/mail/550e8400-e29b-41d4-a716-446655440000/processed \
+  -H "Authorization: Bearer $TOKEN"
+
+# Email verwijderen
+curl -X DELETE http://localhost:8080/api/mail/550e8400-e29b-41d4-a716-446655440000 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Foutafhandeling
+
+Bij ongeldige authenticatie wordt de volgende response geretourneerd:
+
+```json
+{
+  "error": "Ongeautoriseerde toegang",
+  "status": 401
+}
+```
+
+Bij ontbrekende rechten (geen admin rol) wordt de volgende response geretourneerd:
+
+```json
+{
+  "error": "Toegang geweigerd",
+  "status": 403
+}
 ``` 

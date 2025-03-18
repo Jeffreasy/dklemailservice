@@ -258,4 +258,139 @@ docker logs -f dklemailservice
 
 # Laatste 100 logs
 docker logs --tail 100 dklemailservice
-``` 
+```
+
+### Environment Variables
+
+Configureer de volgende omgevingsvariabelen voor een productie deployment:
+
+```bash
+# Server configuratie
+PORT=8080
+ENV=production
+LOG_LEVEL=info
+BASE_URL=https://api.dekoninklijkeloop.nl
+
+# Database configuratie
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=your-secure-password
+DB_NAME=dklemailservice
+DB_SSL_MODE=require
+
+# SMTP configuratie
+SMTP_HOST=smtp.provider.com
+SMTP_PORT=587
+SMTP_USERNAME=noreply@dekoninklijkeloop.nl
+SMTP_PASSWORD=your-smtp-password
+SMTP_USE_TLS=true
+SMTP_FROM=noreply@dekoninklijkeloop.nl
+
+# IMAP configuratie voor EmailAutoFetcher
+EMAIL_FETCH_INTERVAL=15  # in minuten
+DISABLE_AUTO_EMAIL_FETCH=false  # true om auto fetch uit te schakelen
+
+# Info email account
+EMAIL_INFO_HOST=imap.provider.com
+EMAIL_INFO_PORT=993
+EMAIL_INFO_USERNAME=info@dekoninklijkeloop.nl
+EMAIL_INFO_PASSWORD=your-email-password
+EMAIL_INFO_USE_TLS=true
+
+# Inschrijving email account
+EMAIL_INSCHRIJVING_HOST=imap.provider.com
+EMAIL_INSCHRIJVING_PORT=993
+EMAIL_INSCHRIJVING_USERNAME=inschrijving@dekoninklijkeloop.nl
+EMAIL_INSCHRIJVING_PASSWORD=your-email-password
+EMAIL_INSCHRIJVING_USE_TLS=true
+
+# API security
+JWT_SECRET=your-jwt-secret-key
+API_KEY=your-admin-api-key
+CORS_ALLOWED_ORIGINS=https://dekoninklijkeloop.nl,https://www.dekoninklijkeloop.nl
+```
+
+### Email Auto Fetcher Configuratie
+
+De EmailAutoFetcher service is verantwoordelijk voor het automatisch ophalen van inkomende emails. Voor een robuuste productie-inzet volg deze best practices:
+
+#### 1. Interval configuratie
+
+Kies een geschikte interval voor email ophaal operaties:
+
+```bash
+# Standaard: 15 minuten
+EMAIL_FETCH_INTERVAL=15
+
+# Voor drukke mail accounts: elke 5 minuten
+EMAIL_FETCH_INTERVAL=5
+
+# Voor accounts met weinig verkeer: elk uur
+EMAIL_FETCH_INTERVAL=60
+```
+
+#### 2. Mail account configuratie
+
+Configureer de IMAP accounts voor elke mailbox die gemonitord moet worden:
+
+```bash
+# Info mailbox
+EMAIL_INFO_HOST=imap.provider.com
+EMAIL_INFO_PORT=993
+EMAIL_INFO_USERNAME=info@dekoninklijkeloop.nl
+EMAIL_INFO_PASSWORD=your-email-password
+EMAIL_INFO_USE_TLS=true
+
+# Aanmeldingen mailbox
+EMAIL_INSCHRIJVING_HOST=imap.provider.com
+EMAIL_INSCHRIJVING_PORT=993
+EMAIL_INSCHRIJVING_USERNAME=inschrijving@dekoninklijkeloop.nl
+EMAIL_INSCHRIJVING_PASSWORD=your-email-password
+EMAIL_INSCHRIJVING_USE_TLS=true
+```
+
+#### 3. Uitschakelen in multi-instance omgevingen
+
+Als meerdere instances van de applicatie worden uitgevoerd (bijv. in een Kubernetes cluster), configureer dan één designated instance voor email ophalen:
+
+```bash
+# Op designated master instance
+DISABLE_AUTO_EMAIL_FETCH=false
+
+# Op alle andere instances
+DISABLE_AUTO_EMAIL_FETCH=true
+```
+
+#### 4. Monitoring configuratie
+
+Voeg specifieke monitoring toe voor de EmailAutoFetcher:
+
+```bash
+# Log level voor EmailAutoFetcher (optioneel, overschrijft globale LOG_LEVEL)
+EMAIL_FETCHER_LOG_LEVEL=info
+
+# Alert drempelwaarde voor mislukte fetch operaties
+EMAIL_FETCHER_ALERT_THRESHOLD=3
+```
+
+### Cron Job (Alternatief voor Auto Fetcher)
+
+Als een externe trigger gewenst is in plaats van de ingebouwde EmailAutoFetcher, kan een cron job worden gebruikt:
+
+```bash
+# In crontab:
+*/15 * * * * curl -X POST https://api.dekoninklijkeloop.nl/api/mail/fetch -H "Authorization: Bearer $JWT_TOKEN" > /dev/null 2>&1
+```
+
+Verkrijg de JWT token via:
+
+```bash
+JWT_TOKEN=$(curl -s -X POST https://api.dekoninklijkeloop.nl/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"password"}' | jq -r '.token')
+```
+
+### Health Checks
+
+// ... existing code ... 
