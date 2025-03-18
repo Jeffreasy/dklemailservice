@@ -15,6 +15,7 @@ type Repository struct {
 	EmailTemplate      EmailTemplateRepository
 	Migratie           MigratieRepository
 	IncomingEmail      IncomingEmailRepository
+	Notification       NotificationRepository
 }
 
 // NewRepository maakt een nieuwe Repository met concrete implementaties
@@ -31,6 +32,7 @@ func NewRepository(db *gorm.DB) *Repository {
 		EmailTemplate:      NewPostgresEmailTemplateRepository(baseRepo),
 		Migratie:           NewPostgresMigratieRepository(baseRepo),
 		IncomingEmail:      NewPostgresIncomingEmailRepository(db),
+		Notification:       NewPostgresNotificationRepository(baseRepo),
 	}
 
 	return repo

@@ -57,9 +57,10 @@ func TestHandlerLogging(t *testing.T) {
 
 	// Maak een mock email service
 	mockService := newMockEmailService()
+	mockNotificationService := NewMockNotificationService()
 
 	// Maak de email handler
-	handler := handlers.NewEmailHandler(mockService)
+	handler := handlers.NewEmailHandler(mockService, mockNotificationService)
 
 	// Simuleer het afhandelen van een aanvraag (zonder daadwerkelijk HTTP te gebruiken)
 	// We roepen hier alleen bepaalde functies aan die loggen

@@ -202,3 +202,27 @@ type IncomingEmailRepository interface {
 	// FindByAccountType zoekt inkomende e-mails op basis van account type
 	FindByAccountType(ctx context.Context, accountType string) ([]*models.IncomingEmail, error)
 }
+
+// NotificationRepository definieert de interface voor notificaties
+type NotificationRepository interface {
+	// Create slaat een nieuwe notificatie op
+	Create(ctx context.Context, notification *models.Notification) error
+
+	// GetByID haalt een notificatie op basis van ID
+	GetByID(ctx context.Context, id string) (*models.Notification, error)
+
+	// Update werkt een bestaande notificatie bij
+	Update(ctx context.Context, notification *models.Notification) error
+
+	// Delete verwijdert een notificatie
+	Delete(ctx context.Context, id string) error
+
+	// ListUnsent haalt alle niet verzonden notificaties op
+	ListUnsent(ctx context.Context) ([]*models.Notification, error)
+
+	// ListByType haalt alle notificaties op van een bepaald type
+	ListByType(ctx context.Context, notificationType models.NotificationType) ([]*models.Notification, error)
+
+	// ListByPriority haalt alle notificaties op met een bepaalde prioriteit
+	ListByPriority(ctx context.Context, priority models.NotificationPriority) ([]*models.Notification, error)
+}

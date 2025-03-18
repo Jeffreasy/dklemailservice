@@ -15,6 +15,7 @@ param(
     [switch]$SkipEmailTests,
     [switch]$TestMetrics,
     [switch]$TestMailEndpoints,
+    [switch]$TestNotifications,
     [string]$OutputFile = "DKL_API_Test_Report_$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss').txt"
 )
 
@@ -68,6 +69,12 @@ $testData = @{
     Auth = @{
         email = if ($Username) { $Username } else { "admin@dekoninklijkeloop.nl" }
         wachtwoord = if ($Password) { $Password } else { "admin123" }
+    }
+    Notification = @{
+        type = "system"
+        priority = "medium"
+        title = "Test Notificatie"
+        message = "Dit is een testnotificatie vanuit het API test script."
     }
 }
 
@@ -442,6 +449,99 @@ function Test-MailEndpoints {
     }
 }
 
+# Test notificatie endpoints
+function Test-NotificationEndpoints {
+    if (-not $TestNotifications -or -not $IncludeSecuredEndpoints) {
+        if (-not $TestNotifications) {
+            Write-Host "Notificatie endpoints tests overgeslagen (-TestNotifications parameter niet opgegeven)" -ForegroundColor $promptColor
+        } elseif (-not $IncludeSecuredEndpoints) {
+            Write-Host "Notificatie endpoints tests overgeslagen (vereist -IncludeSecuredEndpoints)" -ForegroundColor $promptColor
+        }
+        return $null
+    }
+    
+    Show-Title -Title "Notificatie Endpoints (Auth Vereist)"
+    
+    # Test het ophalen van notificaties
+    $notificationsListResult = Invoke-ApiCall -Name "Notificaties overzicht" -Method "GET" -Endpoint "/api/v1/notifications" -RequiresAuth -RetryCount 2
+    
+    # Test het aanmaken van een notificatie
+    $createNotificationResult = Invoke-ApiCall -Name "Notificatie aanmaken" -Method "POST" -Endpoint "/api/v1/notifications" -Body $testData.Notification -RequiresAuth -RetryCount 2
+    
+    # Test het ophalen van een specifieke notificatie als er een is aangemaakt
+    $notificationItemResult = $null
+    if ($createNotificationResult -and $createNotificationResult.id) {
+        $notificationItemResult = Invoke-ApiCall -Name "Specifieke notificatie ophalen" -Method "GET" -Endpoint "/api/v1/notifications/$($createNotificationResult.id)" -RequiresAuth -RetryCount 2
+    }
+    
+    # Test het verwijderen van een notificatie als er een is aangemaakt
+    $deleteNotificationResult = $null
+    if ($createNotificationResult -and $createNotificationResult.id) {
+        $deleteNotificationResult = Invoke-ApiCall -Name "Notificatie verwijderen" -Method "DELETE" -Endpoint "/api/v1/notifications/$($createNotificationResult.id)" -RequiresAuth -RetryCount 2
+    }
+    
+    return @{
+        NotificationsListResult = $notificationsListResult
+        CreateNotificationResult = $createNotificationResult
+        NotificationItemResult = $notificationItemResult
+        DeleteNotificationResult = $deleteNotificationResult
+    }
+}
+
+# Test contact formulier notificaties
+function Test-ContactNotifications {
+    if (-not $TestNotifications -or -not $IncludeSecuredEndpoints) {
+        return $null
+    }
+    
+    Show-Title -Title "Contactformulier Notificaties Test"
+    
+    # Verzend een contactformulier
+    $contactFormulier = @{
+        naam = "Notificatie Test"
+        email = "notification_test@example.com"
+        bericht = "Dit is een testbericht om te controleren of notificaties correct worden verzonden."
+        privacy_akkoord = $true
+        test_mode = $testMode
+    }
+    
+    $contactResult = Invoke-ApiCall -Name "Contact Formulier (voor notificatie)" -Method "POST" -Endpoint "/api/contact-email" -Body $contactFormulier -RetryCount 2
+    
+    # Wacht even om notificatie verwerking toe te staan
+    Write-Host "Wachten op verwerking van notificaties (3 seconden)..." -ForegroundColor $promptColor
+    Start-Sleep -Seconds 3
+    
+    # Controleer of er notificaties zijn aangemaakt
+    $notificationsResult = Invoke-ApiCall -Name "Notificaties ophalen" -Method "GET" -Endpoint "/api/v1/notifications" -RequiresAuth -RetryCount 2
+    
+    $contactNotification = $null
+    if ($notificationsResult) {
+        # Probeer een contact notificatie te vinden met de juiste naam/email
+        $contactNotification = $notificationsResult | Where-Object { 
+            $_.type -eq "contact" -and $_.message -match "Notificatie Test"
+        }
+    }
+    
+    if ($contactNotification) {
+        Write-Host "✅ Contactformulier notificatie succesvol aangemaakt:" -ForegroundColor $successColor
+        Write-Host "  ID: $($contactNotification.id)" -ForegroundColor $infoColor
+        Write-Host "  Titel: $($contactNotification.title)" -ForegroundColor $infoColor
+        Write-Host "  Type: $($contactNotification.type)" -ForegroundColor $infoColor
+        Write-Host "  Prioriteit: $($contactNotification.priority)" -ForegroundColor $infoColor
+        Write-Host "  Verzonden: $($contactNotification.sent)" -ForegroundColor $infoColor
+    } else {
+        Write-Host "❌ Geen notificatie gevonden voor het verzonden contactformulier" -ForegroundColor $errorColor
+        Write-Host "  Dit kan betekenen dat de notificatie functionaliteit niet correct werkt" -ForegroundColor $warningColor
+        Write-Host "  Controleer de server logs voor meer informatie" -ForegroundColor $infoColor
+    }
+    
+    return @{
+        ContactResult = $contactResult
+        NotificationsResult = $notificationsResult
+        ContactNotification = $contactNotification
+    }
+}
+
 # Toont gedetailleerde analyse van health check
 function Show-HealthAnalysis {
     param ([object]$HealthData)
@@ -570,6 +670,9 @@ function Start-ApiTest {
     if ($TestMailEndpoints) {
         Write-Host "Mail endpoints testen: ingeschakeld" -ForegroundColor $infoColor
     }
+    if ($TestNotifications) {
+        Write-Host "Notificatie endpoints testen: ingeschakeld" -ForegroundColor $infoColor
+    }
     
     # Test beschikbare endpoints via root endpoint
     $rootResult = Test-RootEndpoint
@@ -588,6 +691,12 @@ function Start-ApiTest {
     
     # Test mail endpoints indien ingeschakeld
     $mailResults = Test-MailEndpoints
+    
+    # Test notificatie endpoints indien ingeschakeld
+    $notificationResults = Test-NotificationEndpoints
+    
+    # Test contact formulier notificaties indien ingeschakeld
+    $contactNotificationResults = Test-ContactNotifications
     
     # Toon health check analyse indien ingeschakeld
     if ($DetailedHealth -and $healthResult) {
@@ -660,6 +769,35 @@ function Start-ApiTest {
             }
         } else {
             Write-Host "Mail Endpoints: ❌ Toegang mislukt of endpoints niet beschikbaar" -ForegroundColor $errorColor
+        }
+    }
+    
+    # Notificatie endpoints toegang
+    if ($TestNotifications -and $IncludeSecuredEndpoints) {
+        if ($notificationResults -and ($notificationResults.NotificationsListResult -or $notificationResults.CreateNotificationResult)) {
+            Write-Host "Notificatie Endpoints: ✅ Toegang verkregen" -ForegroundColor $successColor
+            
+            if ($notificationResults.CreateNotificationResult -and $notificationResults.CreateNotificationResult.id) {
+                Write-Host "  Er is een testnotificatie aangemaakt met ID: $($notificationResults.CreateNotificationResult.id)" -ForegroundColor $successColor
+            }
+            
+            if ($notificationResults.NotificationsListResult) {
+                $notificationCount = if ($notificationResults.NotificationsListResult.Count -gt 0) {
+                    $notificationResults.NotificationsListResult.Count
+                } else {
+                    0
+                }
+                Write-Host "  Er zijn $notificationCount notificaties in de database" -ForegroundColor $infoColor
+            }
+            
+            # Resultaten van contact notificatie test
+            if ($contactNotificationResults -and $contactNotificationResults.ContactNotification) {
+                Write-Host "Contact Notificatie Test: ✅ Succesvol" -ForegroundColor $successColor
+            } elseif ($contactNotificationResults) {
+                Write-Host "Contact Notificatie Test: ❌ Mislukt (geen notificatie gevonden)" -ForegroundColor $errorColor
+            }
+        } else {
+            Write-Host "Notificatie Endpoints: ❌ Toegang mislukt of endpoints niet beschikbaar" -ForegroundColor $errorColor
         }
     }
     

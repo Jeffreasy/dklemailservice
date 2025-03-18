@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"context"
 	"dklautomationgo/logger"
 	"dklautomationgo/models"
+	"dklautomationgo/services"
 	"encoding/json"
 	"os"
 	"strings"
@@ -11,18 +13,23 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
+// EmailServiceInterface definieert de interface voor email operaties
 type EmailServiceInterface interface {
 	SendContactEmail(data *models.ContactEmailData) error
 	SendAanmeldingEmail(data *models.AanmeldingEmailData) error
 }
 
+// EmailHandler verzorgt de afhandeling van email verzoeken
 type EmailHandler struct {
-	emailService EmailServiceInterface
+	emailService        EmailServiceInterface
+	notificationService services.NotificationService
 }
 
-func NewEmailHandler(emailService EmailServiceInterface) *EmailHandler {
+// NewEmailHandler maakt een nieuwe EmailHandler
+func NewEmailHandler(emailService EmailServiceInterface, notificationService services.NotificationService) *EmailHandler {
 	return &EmailHandler{
-		emailService: emailService,
+		emailService:        emailService,
+		notificationService: notificationService,
 	}
 }
 
@@ -160,6 +167,10 @@ func (h *EmailHandler) HandleContactEmail(c *fiber.Ctx) error {
 			"user_email", request.Email,
 			"elapsed", time.Since(start))
 	}
+
+	// Stuur een notificatie over het nieuwe contactformulier
+	// We doen dit alleen in productie modus
+	h.sendContactNotification(&request, testMode)
 
 	// Return success
 	if testMode {
@@ -363,4 +374,42 @@ func (h *EmailHandler) LogUserActivity(email, activity, ip string) {
 		"email", email,
 		"activiteit", activity,
 		"ip", ip)
+}
+
+// Stuur een notificatie voor een nieuw contactformulier
+func (h *EmailHandler) sendContactNotification(contact *models.ContactFormulier, isTestMode bool) {
+	// Skip als de notification service niet beschikbaar is of als we in test mode zijn
+	if h.notificationService == nil || isTestMode {
+		return
+	}
+
+	priority := models.NotificationPriorityMedium
+	title := "Nieuw Contactverzoek"
+	message := ""
+
+	if contact.Naam != "" && contact.Email != "" {
+		message = "<b>" + contact.Naam + "</b> heeft contact opgenomen via het contactformulier.\n\n" +
+			"<b>Email:</b> " + contact.Email + "\n\n" +
+			"<b>Bericht:</b>\n" + contact.Bericht
+	} else {
+		// Fallback als naam of email ontbreekt
+		message = "Er is een nieuw contactverzoek ontvangen.\n\n" +
+			"<b>Bericht:</b>\n" + contact.Bericht
+	}
+
+	// Maak een notificatie aan
+	_, err := h.notificationService.CreateNotification(
+		context.Background(),
+		models.NotificationTypeContact,
+		priority,
+		title,
+		message,
+	)
+
+	if err != nil {
+		logger.Error("Fout bij aanmaken contact notificatie",
+			"error", err,
+			"contact_naam", contact.Naam,
+			"contact_email", contact.Email)
+	}
 }

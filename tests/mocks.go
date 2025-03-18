@@ -2,8 +2,10 @@
 package tests
 
 import (
+	"context"
 	"dklautomationgo/models"
 	"dklautomationgo/services"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -381,4 +383,126 @@ func (m *mockPrometheusMetrics) Reset() {
 	m.emailsSent = 0
 	m.emailsFailed = 0
 	m.latencies = make(map[string][]float64)
+}
+
+// MockNotificationService implements the services.NotificationService interface for testing
+type MockNotificationService struct {
+	shouldFail    bool
+	calls         map[string]int
+	notifications []*models.Notification
+}
+
+// NewMockNotificationService creates a new mock notification service
+func NewMockNotificationService() *MockNotificationService {
+	return &MockNotificationService{
+		shouldFail:    false,
+		calls:         make(map[string]int),
+		notifications: make([]*models.Notification, 0),
+	}
+}
+
+// SendNotification mocks sending a notification
+func (m *MockNotificationService) SendNotification(ctx context.Context, notification *models.Notification) error {
+	m.calls["SendNotification"]++
+
+	if m.shouldFail {
+		return errors.New("mock notification send failure")
+	}
+
+	notification.Sent = true
+	return nil
+}
+
+// CreateNotification mocks creating a notification
+func (m *MockNotificationService) CreateNotification(
+	ctx context.Context,
+	notificationType models.NotificationType,
+	priority models.NotificationPriority,
+	title, message string,
+) (*models.Notification, error) {
+	m.calls["CreateNotification"]++
+
+	if m.shouldFail {
+		return nil, errors.New("mock notification creation failure")
+	}
+
+	notification := &models.Notification{
+		Type:     notificationType,
+		Priority: priority,
+		Title:    title,
+		Message:  message,
+		Sent:     false,
+	}
+
+	m.notifications = append(m.notifications, notification)
+	return notification, nil
+}
+
+// GetNotification mocks retrieving a notification by ID
+func (m *MockNotificationService) GetNotification(ctx context.Context, id string) (*models.Notification, error) {
+	m.calls["GetNotification"]++
+
+	if m.shouldFail {
+		return nil, errors.New("mock get notification failure")
+	}
+
+	// Simple mock implementation that doesn't actually check the ID
+	if len(m.notifications) > 0 {
+		return m.notifications[0], nil
+	}
+
+	return nil, nil
+}
+
+// ListUnsentNotifications mocks listing unsent notifications
+func (m *MockNotificationService) ListUnsentNotifications(ctx context.Context) ([]*models.Notification, error) {
+	m.calls["ListUnsentNotifications"]++
+
+	if m.shouldFail {
+		return nil, errors.New("mock list notifications failure")
+	}
+
+	// Filter for unsent notifications
+	unsent := make([]*models.Notification, 0)
+	for _, n := range m.notifications {
+		if !n.Sent {
+			unsent = append(unsent, n)
+		}
+	}
+
+	return unsent, nil
+}
+
+// ProcessUnsentNotifications mocks processing unsent notifications
+func (m *MockNotificationService) ProcessUnsentNotifications(ctx context.Context) error {
+	m.calls["ProcessUnsentNotifications"]++
+
+	if m.shouldFail {
+		return errors.New("mock process notifications failure")
+	}
+
+	// Mark all as sent
+	for _, n := range m.notifications {
+		if !n.Sent {
+			n.Sent = true
+		}
+	}
+
+	return nil
+}
+
+// Start mocks starting the notification service
+func (m *MockNotificationService) Start() {
+	m.calls["Start"]++
+}
+
+// Stop mocks stopping the notification service
+func (m *MockNotificationService) Stop() {
+	m.calls["Stop"]++
+}
+
+// IsRunning mocks checking if the notification service is running
+func (m *MockNotificationService) IsRunning() bool {
+	m.calls["IsRunning"]++
+	return true
 }

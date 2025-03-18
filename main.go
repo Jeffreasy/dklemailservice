@@ -162,7 +162,7 @@ func main() {
 	}
 
 	// Initialiseer handlers
-	emailHandler := handlers.NewEmailHandler(serviceFactory.EmailService)
+	emailHandler := handlers.NewEmailHandler(serviceFactory.EmailService, serviceFactory.NotificationService)
 	authHandler := handlers.NewAuthHandler(serviceFactory.AuthService, rateLimiter)
 	metricsHandler := handlers.NewMetricsHandler(serviceFactory.EmailMetrics, rateLimiter)
 
@@ -172,6 +172,7 @@ func main() {
 		repoFactory.ContactAntwoord,
 		serviceFactory.EmailService,
 		serviceFactory.AuthService,
+		serviceFactory.NotificationService,
 	)
 
 	aanmeldingHandler := handlers.NewAanmeldingHandler(

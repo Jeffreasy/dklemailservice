@@ -85,3 +85,31 @@ type EmailAutoFetcherInterface interface {
 	// GetLastRunTime geeft de laatste keer dat emails zijn opgehaald
 	GetLastRunTime() time.Time
 }
+
+// NotificationService definieert de interface voor notificaties
+type NotificationService interface {
+	// SendNotification verstuurt een notificatie
+	SendNotification(ctx context.Context, notification *models.Notification) error
+
+	// CreateNotification maakt een nieuwe notificatie aan
+	CreateNotification(ctx context.Context, notificationType models.NotificationType,
+		priority models.NotificationPriority, title, message string) (*models.Notification, error)
+
+	// GetNotification haalt een notificatie op basis van ID
+	GetNotification(ctx context.Context, id string) (*models.Notification, error)
+
+	// ListUnsentNotifications haalt alle niet verzonden notificaties op
+	ListUnsentNotifications(ctx context.Context) ([]*models.Notification, error)
+
+	// ProcessUnsentNotifications verwerkt alle niet verzonden notificaties
+	ProcessUnsentNotifications(ctx context.Context) error
+
+	// Start begint het periodiek verzenden van notificaties
+	Start()
+
+	// Stop stopt het periodiek verzenden van notificaties
+	Stop()
+
+	// IsRunning controleert of de service actief is
+	IsRunning() bool
+}

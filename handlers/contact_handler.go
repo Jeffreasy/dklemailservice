@@ -6,6 +6,7 @@ import (
 	"dklautomationgo/models"
 	"dklautomationgo/repository"
 	"dklautomationgo/services"
+	"fmt"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -17,6 +18,7 @@ type ContactHandler struct {
 	contactAntwoordRepo repository.ContactAntwoordRepository
 	emailService        *services.EmailService
 	authService         services.AuthService
+	notificationService services.NotificationService
 }
 
 // NewContactHandler maakt een nieuwe contact handler
@@ -25,12 +27,14 @@ func NewContactHandler(
 	contactAntwoordRepo repository.ContactAntwoordRepository,
 	emailService *services.EmailService,
 	authService services.AuthService,
+	notificationService services.NotificationService,
 ) *ContactHandler {
 	return &ContactHandler{
 		contactRepo:         contactRepo,
 		contactAntwoordRepo: contactAntwoordRepo,
 		emailService:        emailService,
 		authService:         authService,
+		notificationService: notificationService,
 	}
 }
 
@@ -471,4 +475,38 @@ func (h *ContactHandler) GetContactFormulierenByStatus(c *fiber.Ctx) error {
 
 	// Stuur resultaat terug
 	return c.JSON(contacts)
+}
+
+// handleContactNotification stuurt een notificatie voor een nieuw contactformulier
+func (h *ContactHandler) handleContactNotification(ctx context.Context, contact *models.ContactFormulier) {
+	// Skip als de notification service niet beschikbaar is
+	if h.notificationService == nil {
+		return
+	}
+
+	priority := models.NotificationPriorityMedium
+	title := "Nieuw Contactverzoek"
+	message := fmt.Sprintf(
+		"<b>%s</b> heeft contact opgenomen.\n\n"+
+			"<b>Email:</b> %s\n\n"+
+			"<b>Bericht:</b>\n%s",
+		contact.Naam,
+		contact.Email,
+		contact.Bericht,
+	)
+
+	// Maak een notificatie aan
+	_, err := h.notificationService.CreateNotification(
+		ctx,
+		models.NotificationTypeContact,
+		priority,
+		title,
+		message,
+	)
+
+	if err != nil {
+		logger.Error("Fout bij aanmaken contact notificatie",
+			"error", err,
+			"contact_id", contact.ID)
+	}
 }

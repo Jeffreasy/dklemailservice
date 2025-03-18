@@ -3,6 +3,7 @@ package services
 
 import (
 	"dklautomationgo/logger"
+	"dklautomationgo/models"
 	"dklautomationgo/repository"
 	"os"
 	"strconv"
@@ -11,13 +12,14 @@ import (
 
 // ServiceFactory bevat alle services
 type ServiceFactory struct {
-	EmailService     *EmailService
-	SMTPClient       SMTPClient
-	RateLimiter      RateLimiterInterface
-	EmailMetrics     *EmailMetrics
-	EmailBatcher     *EmailBatcher
-	AuthService      AuthService
-	EmailAutoFetcher EmailAutoFetcherInterface
+	EmailService        *EmailService
+	SMTPClient          SMTPClient
+	RateLimiter         RateLimiterInterface
+	EmailMetrics        *EmailMetrics
+	EmailBatcher        *EmailBatcher
+	AuthService         AuthService
+	EmailAutoFetcher    EmailAutoFetcherInterface
+	NotificationService NotificationService
 }
 
 // NewServiceFactory maakt een nieuwe service factory
@@ -45,17 +47,21 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 	// Initialiseer auth service
 	authService := NewAuthService(repoFactory.Gebruiker)
 
+	// Initialiseer notification service
+	notificationService := createNotificationService(repoFactory.Notification)
+
 	// Maak een EmailAutoFetcher aan
 	// Nog niet geinitialiseerd omdat MailFetcher buiten de ServiceFactory wordt aangemaakt in main.go
 
 	return &ServiceFactory{
-		EmailService:     emailService,
-		SMTPClient:       smtpClient,
-		RateLimiter:      rateLimiter,
-		EmailMetrics:     emailMetrics,
-		EmailBatcher:     emailBatcher,
-		AuthService:      authService,
-		EmailAutoFetcher: nil, // Dit wordt later in main.go ingesteld
+		EmailService:        emailService,
+		SMTPClient:          smtpClient,
+		RateLimiter:         rateLimiter,
+		EmailMetrics:        emailMetrics,
+		EmailBatcher:        emailBatcher,
+		AuthService:         authService,
+		EmailAutoFetcher:    nil, // Dit wordt later in main.go ingesteld
+		NotificationService: notificationService,
 	}
 }
 
@@ -115,6 +121,74 @@ func createEmailBatcher(emailService *EmailService) *EmailBatcher {
 	batchSize, _ := strconv.Atoi(getEnvWithDefault("EMAIL_BATCH_SIZE", "10"))
 	batchWindow, _ := strconv.Atoi(getEnvWithDefault("EMAIL_BATCH_WINDOW", "300"))
 	return NewEmailBatcher(emailService, batchSize, time.Duration(batchWindow)*time.Second)
+}
+
+// createNotificationService maakt een nieuwe notification service
+func createNotificationService(notificationRepo repository.NotificationRepository) NotificationService {
+	// Check of notificaties zijn ingeschakeld
+	enabled := getEnvWithDefault("ENABLE_NOTIFICATIONS", "false") == "true"
+	if !enabled {
+		logger.Info("Notificaties zijn uitgeschakeld")
+		return nil
+	}
+
+	// Haal Telegram configuratie op
+	botToken := getEnvWithDefault("TELEGRAM_BOT_TOKEN", "")
+	chatID := getEnvWithDefault("TELEGRAM_CHAT_ID", "")
+
+	// Als Telegram niet geconfigureerd is, return nil
+	if botToken == "" || chatID == "" {
+		logger.Warn("Telegram configuratie ontbreekt, notificaties worden niet verzonden",
+			"bot_token_provided", botToken != "",
+			"chat_id_provided", chatID != "")
+		return nil
+	}
+
+	// Maak een nieuwe Telegram client
+	telegramClient := NewTelegramClient(botToken, chatID)
+
+	// Parseer throttle duration
+	throttleDurationStr := getEnvWithDefault("NOTIFICATION_THROTTLE", "15m")
+	throttleDuration, err := time.ParseDuration(throttleDurationStr)
+	if err != nil {
+		logger.Warn("Ongeldige throttle duur, gebruik standaard 15 minuten",
+			"duration", throttleDurationStr,
+			"error", err)
+		throttleDuration = 15 * time.Minute
+	}
+
+	// Parseer minimale prioriteit
+	minPriorityStr := getEnvWithDefault("NOTIFICATION_MIN_PRIORITY", "medium")
+	var minPriority models.NotificationPriority
+	switch minPriorityStr {
+	case "low":
+		minPriority = models.NotificationPriorityLow
+	case "medium":
+		minPriority = models.NotificationPriorityMedium
+	case "high":
+		minPriority = models.NotificationPriorityHigh
+	case "critical":
+		minPriority = models.NotificationPriorityCritical
+	default:
+		minPriority = models.NotificationPriorityMedium
+	}
+
+	// Maak een nieuwe notification service
+	notificationService := NewNotificationService(
+		notificationRepo,
+		telegramClient,
+		throttleDuration,
+		minPriority,
+	)
+
+	// Start de notification service
+	go notificationService.Start()
+
+	logger.Info("Notificatie service geïnitialiseerd",
+		"throttle", throttleDuration.String(),
+		"min_priority", minPriority)
+
+	return notificationService
 }
 
 // getEnvWithDefault haalt een omgevingsvariabele op met een standaardwaarde
