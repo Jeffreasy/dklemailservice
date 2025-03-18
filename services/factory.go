@@ -20,7 +20,7 @@ type ServiceFactory struct {
 }
 
 // NewServiceFactory maakt een nieuwe service factory
-func NewServiceFactory(repoFactory *repository.RepositoryFactory) *ServiceFactory {
+func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 	logger.Info("Initialiseren service factory")
 
 	// Initialiseer Prometheus metrics

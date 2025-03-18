@@ -1015,6 +1015,136 @@ function Test-AanmeldingRolFilterEndpoint {
     return $response
 }
 
+# Functie om de mail lijst endpoint te testen
+function Test-MailListEndpoint {
+    Show-Title -Title "Mail Lijst Endpoint Testen"
+    
+    if (-not $script:isLoggedIn) {
+        Write-Host "Je moet eerst inloggen als admin om deze endpoint te testen." -ForegroundColor $errorColor
+        return $null
+    }
+    
+    $response = Invoke-ApiCall -Name "Mail Lijst" -Method "Get" -Endpoint "/api/mail" -UseAuth -Session $script:session -RetryCount 2
+    
+    # Sla het eerste mail ID op voor gebruik in andere tests
+    if ($response -and $response.Count -gt 0) {
+        $script:mailId = $response[0].id
+        Write-Host "Mail ID opgeslagen voor gebruik in andere tests: $($script:mailId)" -ForegroundColor $infoColor
+    } else {
+        Write-Host "Geen e-mails gevonden om te testen." -ForegroundColor $promptColor
+    }
+    
+    return $response
+}
+
+# Functie om de mail details endpoint te testen
+function Test-MailDetailsEndpoint {
+    Show-Title -Title "Mail Details Endpoint Testen"
+    
+    if (-not $script:isLoggedIn) {
+        Write-Host "Je moet eerst inloggen als admin om deze endpoint te testen." -ForegroundColor $errorColor
+        return $null
+    }
+    
+    if (-not $script:mailId) {
+        Write-Host "Geen mail ID beschikbaar. Voer eerst de Mail Lijst test uit." -ForegroundColor $promptColor
+        return $null
+    }
+    
+    $response = Invoke-ApiCall -Name "Mail Details" -Method "Get" -Endpoint "/api/mail/$($script:mailId)" -UseAuth -Session $script:session -RetryCount 2
+    
+    return $response
+}
+
+# Functie om de unprocessed mails endpoint te testen
+function Test-UnprocessedMailsEndpoint {
+    Show-Title -Title "Onverwerkte Mail Lijst Endpoint Testen"
+    
+    if (-not $script:isLoggedIn) {
+        Write-Host "Je moet eerst inloggen als admin om deze endpoint te testen." -ForegroundColor $errorColor
+        return $null
+    }
+    
+    $response = Invoke-ApiCall -Name "Onverwerkte Mails" -Method "Get" -Endpoint "/api/mail/unprocessed" -UseAuth -Session $script:session -RetryCount 2
+    
+    return $response
+}
+
+# Functie om de mail fetch endpoint te testen
+function Test-FetchMailsEndpoint {
+    Show-Title -Title "Mail Ophalen Endpoint Testen"
+    
+    if (-not $script:isLoggedIn) {
+        Write-Host "Je moet eerst inloggen als admin om deze endpoint te testen." -ForegroundColor $errorColor
+        return $null
+    }
+    
+    $response = Invoke-ApiCall -Name "Mail Ophalen" -Method "Post" -Endpoint "/api/mail/fetch" -UseAuth -Session $script:session -RetryCount 2 -UseTestMode
+    
+    return $response
+}
+
+# Functie om de mark as processed endpoint te testen
+function Test-MarkMailAsProcessedEndpoint {
+    Show-Title -Title "Mail Als Verwerkt Markeren Endpoint Testen"
+    
+    if (-not $script:isLoggedIn) {
+        Write-Host "Je moet eerst inloggen als admin om deze endpoint te testen." -ForegroundColor $errorColor
+        return $null
+    }
+    
+    if (-not $script:mailId) {
+        Write-Host "Geen mail ID beschikbaar. Voer eerst de Mail Lijst test uit." -ForegroundColor $promptColor
+        return $null
+    }
+    
+    $response = Invoke-ApiCall -Name "Mail Als Verwerkt Markeren" -Method "Put" -Endpoint "/api/mail/$($script:mailId)/processed" -UseAuth -Session $script:session -RetryCount 2
+    
+    return $response
+}
+
+# Functie om mails per account type te testen
+function Test-MailsByAccountTypeEndpoint {
+    Show-Title -Title "Mails Per Account Type Endpoint Testen"
+    
+    if (-not $script:isLoggedIn) {
+        Write-Host "Je moet eerst inloggen als admin om deze endpoint te testen." -ForegroundColor $errorColor
+        return $null
+    }
+    
+    # Test met account type "info"
+    $accountType = "info"
+    
+    $response = Invoke-ApiCall -Name "Mails Per Account Type" -Method "Get" -Endpoint "/api/mail/account/$accountType" -UseAuth -Session $script:session -RetryCount 2
+    
+    return $response
+}
+
+# Functie om de delete mail endpoint te testen
+function Test-DeleteMailEndpoint {
+    Show-Title -Title "Mail Verwijderen Endpoint Testen"
+    
+    if (-not $script:isLoggedIn) {
+        Write-Host "Je moet eerst inloggen als admin om deze endpoint te testen." -ForegroundColor $errorColor
+        return $null
+    }
+    
+    if (-not $script:mailId) {
+        Write-Host "Geen mail ID beschikbaar. Voer eerst de Mail Lijst test uit." -ForegroundColor $promptColor
+        return $null
+    }
+    
+    $response = Invoke-ApiCall -Name "Mail Verwijderen" -Method "Delete" -Endpoint "/api/mail/$($script:mailId)" -UseAuth -Session $script:session -RetryCount 2
+    
+    if ($response) {
+        # Als het verwijderen succesvol was, reset dan de mail ID
+        $script:mailId = $null
+        Write-Host "Mail ID gereset na succesvolle verwijdering." -ForegroundColor $infoColor
+    }
+    
+    return $response
+}
+
 # Functie voor parallelle testuitvoering
 function Invoke-ParallelTests {
     param (
@@ -1261,9 +1391,33 @@ function Test-AllEndpoints {
         }
         $results.AanmeldingRolFilter = Test-AanmeldingRolFilterEndpoint
         
-        # Stap 5: Test overige admin endpoints
+        # Stap 5: Test Mail Beheer endpoints
         Write-Host "" -ForegroundColor $infoColor
-        Write-Host "Stap 5: Overige admin endpoints testen..." -ForegroundColor $highlightColor
+        Write-Host "Stap 5: Mail Beheer endpoints testen..." -ForegroundColor $highlightColor
+        
+        # Eerst nieuwe e-mails ophalen om te testen
+        $results.FetchMails = Test-FetchMailsEndpoint
+        
+        # Wacht even om zeker te zijn dat de mails zijn opgehaald
+        Write-Host "Even wachten om zeker te zijn dat de e-mails zijn opgehaald..." -ForegroundColor $infoColor
+        Start-Sleep -Seconds 5
+        
+        $results.MailList = Test-MailListEndpoint
+        $results.UnprocessedMails = Test-UnprocessedMailsEndpoint
+        $results.MailsByAccountType = Test-MailsByAccountTypeEndpoint
+        
+        if ($script:mailId) {
+            $results.MailDetails = Test-MailDetailsEndpoint
+            $results.MarkMailAsProcessed = Test-MarkMailAsProcessedEndpoint
+            # Test verwijderen als laatste
+            $results.DeleteMail = Test-DeleteMailEndpoint
+        } else {
+            Write-Host "Geen mail ID gevonden, sla gerelateerde tests over." -ForegroundColor $promptColor
+        }
+        
+        # Stap 6: Test overige admin endpoints
+        Write-Host "" -ForegroundColor $infoColor
+        Write-Host "Stap 6: Overige admin endpoints testen..." -ForegroundColor $highlightColor
         
         $results.EmailMetrics = Test-EmailMetricsEndpoint
         $results.RateLimitMetrics = Test-RateLimitMetricsEndpoint
@@ -1273,9 +1427,9 @@ function Test-AllEndpoints {
         Write-Host "Kon niet inloggen als admin, sla admin-gerelateerde endpoints over." -ForegroundColor $errorColor
     }
     
-    # Stap 6: Test Jeffrey account
+    # Stap 7: Test Jeffrey account
     Write-Host "" -ForegroundColor $infoColor
-    Write-Host "Stap 6: Jeffrey account testen..." -ForegroundColor $highlightColor
+    Write-Host "Stap 7: Jeffrey account testen..." -ForegroundColor $highlightColor
     
     # Wacht even om rate limiting te voorkomen
     Write-Host "Even wachten om rate limiting te voorkomen..." -ForegroundColor $infoColor
@@ -1291,9 +1445,9 @@ function Test-AllEndpoints {
         Write-Host "Kon niet inloggen als Jeffrey, sla Jeffrey-gerelateerde endpoints over." -ForegroundColor $errorColor
     }
     
-    # Stap 7: Logout admin en test Prometheus metrics
+    # Stap 8: Logout admin en test Prometheus metrics
     Write-Host "" -ForegroundColor $infoColor
-    Write-Host "Stap 7: Admin uitloggen en Prometheus metrics testen..." -ForegroundColor $highlightColor
+    Write-Host "Stap 8: Admin uitloggen en Prometheus metrics testen..." -ForegroundColor $highlightColor
     
     # Logout admin als laatste
     if ($script:isLoggedIn) {
@@ -1378,6 +1532,7 @@ $script:jeffreySession = $null
 $script:jeffreyJwtToken = $null
 $script:contactId = $null
 $script:aanmeldingId = $null
+$script:mailId = $null
 
 # Welkomstbericht
 Show-Title -Title "DKL Email Service API Geautomatiseerde Test Tool"

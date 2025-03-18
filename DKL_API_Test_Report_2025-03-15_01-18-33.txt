@@ -1,0 +1,21 @@
+﻿DKL Email Service API Test Rapport
+Gegenereerd op: 03/15/2025 01:18:33
+API URL: https://dklemailservice.onrender.com
+
+Testresultaten:
+- Succesvol: 5/7
+- Mislukt: 2/7
+- Totale duur: 75.45 seconden
+
+Details per endpoint:
+- PrometheusMetrics: SUCCESS
+- ContactEmail: FAILED
+- Root: SUCCESS
+- AanmeldingEmail: FAILED
+- Health: SUCCESS
+- JeffreyLogin: SUCCESS
+- AdminLogin: SUCCESS
+
+Mislukte endpoints:
+- ContactEmail
+- AanmeldingEmail

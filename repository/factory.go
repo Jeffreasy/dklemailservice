@@ -1,39 +1,37 @@
 package repository
 
 import (
-	"dklautomationgo/logger"
-
 	"gorm.io/gorm"
 )
 
-// RepositoryFactory bevat alle repositories
-type RepositoryFactory struct {
+// Repository is een overkoepelende struct die alle specifieke repositories bevat
+type Repository struct {
 	Contact            ContactRepository
 	ContactAntwoord    ContactAntwoordRepository
 	Aanmelding         AanmeldingRepository
 	AanmeldingAntwoord AanmeldingAntwoordRepository
-	EmailTemplate      EmailTemplateRepository
-	VerzondEmail       VerzondEmailRepository
 	Gebruiker          GebruikerRepository
+	VerzondEmail       VerzondEmailRepository
+	EmailTemplate      EmailTemplateRepository
 	Migratie           MigratieRepository
+	IncomingEmail      IncomingEmailRepository
 }
 
-// NewRepositoryFactory maakt een nieuwe repository factory
-func NewRepositoryFactory(db *gorm.DB) *RepositoryFactory {
-	logger.Info("Initialiseren repository factory")
-
-	// Maak de basis repository
+// NewRepository maakt een nieuwe Repository met concrete implementaties
+func NewRepository(db *gorm.DB) *Repository {
 	baseRepo := NewPostgresRepository(db)
 
-	// Maak alle repositories
-	return &RepositoryFactory{
+	repo := &Repository{
 		Contact:            NewPostgresContactRepository(baseRepo),
 		ContactAntwoord:    NewPostgresContactAntwoordRepository(baseRepo),
 		Aanmelding:         NewPostgresAanmeldingRepository(baseRepo),
 		AanmeldingAntwoord: NewPostgresAanmeldingAntwoordRepository(baseRepo),
-		EmailTemplate:      NewPostgresEmailTemplateRepository(baseRepo),
-		VerzondEmail:       NewPostgresVerzondEmailRepository(baseRepo),
 		Gebruiker:          NewPostgresGebruikerRepository(baseRepo),
+		VerzondEmail:       NewPostgresVerzondEmailRepository(baseRepo),
+		EmailTemplate:      NewPostgresEmailTemplateRepository(baseRepo),
 		Migratie:           NewPostgresMigratieRepository(baseRepo),
+		IncomingEmail:      NewPostgresIncomingEmailRepository(db),
 	}
+
+	return repo
 }

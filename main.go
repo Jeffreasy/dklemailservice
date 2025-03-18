@@ -139,7 +139,7 @@ func main() {
 	}
 
 	// Initialiseer repository factory
-	repoFactory := repository.NewRepositoryFactory(db)
+	repoFactory := repository.NewRepository(db)
 
 	// Voer database migraties uit
 	migrationManager := database.NewMigrationManager(db, repoFactory.Migratie)
@@ -180,6 +180,10 @@ func main() {
 		serviceFactory.EmailService,
 		serviceFactory.AuthService,
 	)
+
+	// Configureer en initialiseer de mail fetcher service
+	mailFetcher := initializeMailFetcher(serviceFactory.EmailMetrics)
+	mailHandler := handlers.NewMailHandler(mailFetcher, repoFactory.IncomingEmail, serviceFactory.AuthService)
 
 	// Create Fiber app
 	app := fiber.New(fiber.Config{
@@ -300,6 +304,9 @@ func main() {
 	contactHandler.RegisterRoutes(app)
 	aanmeldingHandler.RegisterRoutes(app)
 
+	// Registreer de mailHandler in de main functie na repo en authService
+	mailHandler.RegisterRoutes(app)
+
 	// Voeg Prometheus metrics endpoint toe aan Fiber app in plaats van standaard HTTP server
 	app.Get("/metrics", func(c *fiber.Ctx) error {
 		// Eenvoudige implementatie die een string teruggeeft
@@ -349,4 +356,28 @@ func main() {
 	}
 
 	logger.Info("Server succesvol afgesloten")
+}
+
+// Configureer en initialiseer de mail fetcher service
+func initializeMailFetcher(metrics *services.EmailMetrics) *services.MailFetcher {
+	mailFetcher := services.NewMailFetcher(metrics)
+
+	// Voeg de accounts toe
+	mailFetcher.AddAccount(
+		"info@dekoninklijkeloop.nl",
+		"X6FdeT5dTakH^Ae^f5BV",
+		"mail.hostnet.nl",
+		993, // IMAP SSL poort
+		"info",
+	)
+
+	mailFetcher.AddAccount(
+		"inschrijving@dekoninklijkeloop.nl",
+		"y9tKkS&^1pbp2X6KuUbb",
+		"mail.hostnet.nl",
+		993, // IMAP SSL poort
+		"inschrijving",
+	)
+
+	return mailFetcher
 }

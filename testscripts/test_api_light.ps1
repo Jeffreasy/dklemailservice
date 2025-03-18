@@ -14,6 +14,7 @@ param(
     [switch]$DetailedHealth,
     [switch]$SkipEmailTests,
     [switch]$TestMetrics,
+    [switch]$TestMailEndpoints,
     [string]$OutputFile = "DKL_API_Test_Report_$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss').txt"
 )
 
@@ -407,6 +408,40 @@ function Test-SecuredEndpoints {
     return $null
 }
 
+# Test de mail gerelateerde endpoints
+function Test-MailEndpoints {
+    if (-not $TestMailEndpoints -or -not $IncludeSecuredEndpoints) {
+        if (-not $TestMailEndpoints) {
+            Write-Host "Mail endpoints tests overgeslagen (-TestMailEndpoints parameter niet opgegeven)" -ForegroundColor $promptColor
+        } elseif (-not $IncludeSecuredEndpoints) {
+            Write-Host "Mail endpoints tests overgeslagen (vereist -IncludeSecuredEndpoints)" -ForegroundColor $promptColor
+        }
+        return $null
+    }
+    
+    Show-Title -Title "Mail Endpoints (Auth Vereist)"
+    
+    # Test het ophalen van e-mails (GET /api/mail)
+    $mailListResult = Invoke-ApiCall -Name "Inkomende e-mails overzicht" -Method "GET" -Endpoint "/api/mail" -RequiresAuth -RetryCount 2
+    
+    # Test het ophalen van specifieke e-mail (GET /api/mail/1)
+    # Alleen als we een lijst van e-mails hebben kunnen ophalen
+    $mailItemResult = $null
+    if ($mailListResult -and $mailListResult.emails -and $mailListResult.emails.Count -gt 0) {
+        $firstEmailId = $mailListResult.emails[0].id
+        $mailItemResult = Invoke-ApiCall -Name "Specifieke e-mail ophalen" -Method "GET" -Endpoint "/api/mail/$firstEmailId" -RequiresAuth -RetryCount 2
+    }
+    
+    # Test het actief ophalen van nieuwe e-mails (POST /api/mail/fetch)
+    $fetchEmailsResult = Invoke-ApiCall -Name "E-mails ophalen van server" -Method "POST" -Endpoint "/api/mail/fetch" -RequiresAuth -RetryCount 2 -Body @{}
+    
+    return @{
+        MailListResult = $mailListResult
+        MailItemResult = $mailItemResult
+        FetchEmailsResult = $fetchEmailsResult
+    }
+}
+
 # Toont gedetailleerde analyse van health check
 function Show-HealthAnalysis {
     param ([object]$HealthData)
@@ -532,6 +567,9 @@ function Start-ApiTest {
         $apiKeyText = if ($ApiKey) { "aangepast" } else { "standaard" }
         Write-Host "Metrics testen: ingeschakeld (API key: $apiKeyText)" -ForegroundColor $infoColor
     }
+    if ($TestMailEndpoints) {
+        Write-Host "Mail endpoints testen: ingeschakeld" -ForegroundColor $infoColor
+    }
     
     # Test beschikbare endpoints via root endpoint
     $rootResult = Test-RootEndpoint
@@ -547,6 +585,9 @@ function Start-ApiTest {
     
     # Test beveiligde endpoints indien ingeschakeld
     $securedResults = Test-SecuredEndpoints
+    
+    # Test mail endpoints indien ingeschakeld
+    $mailResults = Test-MailEndpoints
     
     # Toon health check analyse indien ingeschakeld
     if ($DetailedHealth -and $healthResult) {
@@ -600,6 +641,25 @@ function Start-ApiTest {
             Write-Host "  Standaard credentials: admin@dekoninklijkeloop.nl / admin123" -ForegroundColor $promptColor
             Write-Host "  Alternatieve gebruikers: jeffrey@dekoninklijkeloop.nl" -ForegroundColor $promptColor
             Write-Host "  Voorbeeld: -IncludeSecuredEndpoints -Username admin@dekoninklijkeloop.nl -Password admin123" -ForegroundColor $promptColor
+        }
+    }
+    
+    # Mail endpoints toegang
+    if ($TestMailEndpoints -and $IncludeSecuredEndpoints) {
+        if ($mailResults -and ($mailResults.MailListResult -or $mailResults.FetchEmailsResult)) {
+            Write-Host "Mail Endpoints: ✅ Toegang verkregen" -ForegroundColor $successColor
+            
+            if ($mailResults.FetchEmailsResult -and $mailResults.FetchEmailsResult.count -gt 0) {
+                Write-Host "  Er zijn $($mailResults.FetchEmailsResult.count) nieuwe e-mails opgehaald" -ForegroundColor $successColor
+            } elseif ($mailResults.FetchEmailsResult) {
+                Write-Host "  Er zijn geen nieuwe e-mails opgehaald (0)" -ForegroundColor $infoColor
+            }
+            
+            if ($mailResults.MailListResult -and $mailResults.MailListResult.emails -and $mailResults.MailListResult.emails.Count -gt 0) {
+                Write-Host "  Er zijn $($mailResults.MailListResult.emails.Count) e-mails in de database" -ForegroundColor $infoColor
+            }
+        } else {
+            Write-Host "Mail Endpoints: ❌ Toegang mislukt of endpoints niet beschikbaar" -ForegroundColor $errorColor
         }
     }
     

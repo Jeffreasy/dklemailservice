@@ -514,3 +514,120 @@ func (r *MockAanmeldingAntwoordRepository) Delete(ctx context.Context, id string
 	delete(r.db.aanmeldingAntwoorden, id)
 	return nil
 }
+
+// MockGebruikerRepository is een mock implementatie van GebruikerRepository
+type MockGebruikerRepository struct {
+	db *MockDB
+}
+
+// NewMockGebruikerRepository maakt een nieuwe mock gebruiker repository
+func NewMockGebruikerRepository(db *MockDB) *MockGebruikerRepository {
+	return &MockGebruikerRepository{
+		db: db,
+	}
+}
+
+// Create slaat een nieuwe gebruiker op
+func (r *MockGebruikerRepository) Create(ctx context.Context, gebruiker *models.Gebruiker) error {
+	r.db.mu.Lock()
+	defer r.db.mu.Unlock()
+
+	if gebruiker.ID == "" {
+		return errors.New("gebruiker ID is vereist")
+	}
+
+	r.db.gebruikers[gebruiker.ID] = gebruiker
+	return nil
+}
+
+// GetByID haalt een gebruiker op basis van ID
+func (r *MockGebruikerRepository) GetByID(ctx context.Context, id string) (*models.Gebruiker, error) {
+	r.db.mu.RLock()
+	defer r.db.mu.RUnlock()
+
+	gebruiker, exists := r.db.gebruikers[id]
+	if !exists {
+		return nil, nil
+	}
+
+	return gebruiker, nil
+}
+
+// GetByEmail haalt een gebruiker op basis van email
+func (r *MockGebruikerRepository) GetByEmail(ctx context.Context, email string) (*models.Gebruiker, error) {
+	r.db.mu.RLock()
+	defer r.db.mu.RUnlock()
+
+	for _, gebruiker := range r.db.gebruikers {
+		if gebruiker.Email == email {
+			return gebruiker, nil
+		}
+	}
+
+	return nil, nil
+}
+
+// List haalt een lijst van gebruikers op
+func (r *MockGebruikerRepository) List(ctx context.Context, limit, offset int) ([]*models.Gebruiker, error) {
+	r.db.mu.RLock()
+	defer r.db.mu.RUnlock()
+
+	var result []*models.Gebruiker
+	for _, gebruiker := range r.db.gebruikers {
+		result = append(result, gebruiker)
+	}
+
+	// Pas limit en offset toe
+	if offset >= len(result) {
+		return []*models.Gebruiker{}, nil
+	}
+
+	end := offset + limit
+	if end > len(result) {
+		end = len(result)
+	}
+
+	return result[offset:end], nil
+}
+
+// Update werkt een gebruiker bij
+func (r *MockGebruikerRepository) Update(ctx context.Context, gebruiker *models.Gebruiker) error {
+	r.db.mu.Lock()
+	defer r.db.mu.Unlock()
+
+	if _, exists := r.db.gebruikers[gebruiker.ID]; !exists {
+		return errors.New("gebruiker niet gevonden")
+	}
+
+	r.db.gebruikers[gebruiker.ID] = gebruiker
+	return nil
+}
+
+// Delete verwijdert een gebruiker
+func (r *MockGebruikerRepository) Delete(ctx context.Context, id string) error {
+	r.db.mu.Lock()
+	defer r.db.mu.Unlock()
+
+	if _, exists := r.db.gebruikers[id]; !exists {
+		return nil // Geen fout als de gebruiker niet bestaat
+	}
+
+	delete(r.db.gebruikers, id)
+	return nil
+}
+
+// UpdateLastLogin werkt de laatste login tijd van een gebruiker bij
+func (r *MockGebruikerRepository) UpdateLastLogin(ctx context.Context, id string) error {
+	r.db.mu.Lock()
+	defer r.db.mu.Unlock()
+
+	gebruiker, exists := r.db.gebruikers[id]
+	if !exists {
+		return errors.New("gebruiker niet gevonden")
+	}
+
+	now := time.Now()
+	gebruiker.LaatsteLogin = &now
+	r.db.gebruikers[id] = gebruiker
+	return nil
+}

@@ -175,3 +175,30 @@ type MigratieRepository interface {
 	// GetLatest haalt de laatste migratie op
 	GetLatest(ctx context.Context) (*models.Migratie, error)
 }
+
+// IncomingEmailRepository definieert de interface voor inkomende e-mail operaties
+type IncomingEmailRepository interface {
+	// Create slaat een nieuwe inkomende e-mail op
+	Create(ctx context.Context, email *models.IncomingEmail) error
+
+	// GetByID haalt een inkomende e-mail op basis van ID
+	GetByID(ctx context.Context, id string) (*models.IncomingEmail, error)
+
+	// List haalt een lijst van inkomende e-mails op
+	List(ctx context.Context, limit, offset int) ([]*models.IncomingEmail, error)
+
+	// Update werkt een bestaande inkomende e-mail bij
+	Update(ctx context.Context, email *models.IncomingEmail) error
+
+	// Delete verwijdert een inkomende e-mail
+	Delete(ctx context.Context, id string) error
+
+	// FindByUID zoekt een inkomende e-mail op basis van UID
+	FindByUID(ctx context.Context, uid string) (*models.IncomingEmail, error)
+
+	// FindUnprocessed haalt alle onverwerkte e-mails op
+	FindUnprocessed(ctx context.Context) ([]*models.IncomingEmail, error)
+
+	// FindByAccountType zoekt inkomende e-mails op basis van account type
+	FindByAccountType(ctx context.Context, accountType string) ([]*models.IncomingEmail, error)
+}
