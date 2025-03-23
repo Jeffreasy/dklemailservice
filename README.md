@@ -726,8 +726,80 @@ Uitgebreide documentatie is beschikbaar in de `/docs` directory:
 - `AUTH.md` - Authenticatie documentatie (Nieuw)
 - `CONTACT_AANMELDING.md` - Contact en Aanmelding Beheer documentatie (Nieuw)
 
-## 🔄 Recente Updates
+## 📮 Telegram Bot Service
 
+De DKL Email Service bevat een geïntegreerde Telegram bot die beheerders in staat stelt om contactformulieren en aanmeldingen direct vanuit Telegram te bekijken en beheren. De bot biedt realtime notificaties en maakt het mogelijk om snel te reageren op nieuwe contactverzoeken en aanmeldingen.
+
+### Functionaliteiten
+
+- **Realtime Notificaties**: Ontvang direct notificaties bij nieuwe contactformulieren en aanmeldingen
+- **Commando Interface**: Gebruik eenvoudige commando's om informatie op te vragen
+- **Status Monitoring**: Bekijk de huidige status van de service en statistieken
+- **Beveiligde Toegang**: Alleen geautoriseerde beheerders hebben toegang tot de bot
+
+### Configuratie
+
+De Telegram bot kan worden ingeschakeld en geconfigureerd via de volgende omgevingsvariabelen:
+
+```env
+# Telegram Bot configuratie
+ENABLE_TELEGRAM_BOT=true        # Zet op "true" om de Telegram bot in te schakelen
+TELEGRAM_BOT_TOKEN=your_bot_token  # Token verkregen van BotFather (@BotFather)
+TELEGRAM_CHAT_ID=your_chat_id      # Chat ID voor het ontvangen van berichten
+NOTIFICATION_MIN_PRIORITY=medium   # Minimale prioriteit voor notificaties (low, medium, high, critical)
+NOTIFICATION_THROTTLE=15m          # Throttle tijd voor vergelijkbare notificaties
+```
+
+### Instellen van de Bot
+
+1. **Bot Aanmaken**:
+   - Start een chat met de [BotFather](https://t.me/botfather) op Telegram
+   - Gebruik het commando `/newbot` om een nieuwe bot aan te maken
+   - Volg de instructies en noteer het bot token
+
+2. **Chat ID Verkrijgen**:
+   - Start een chat met je nieuwe bot
+   - Stuur een bericht naar de bot
+   - Gebruik de API om je chat ID te vinden: `https://api.telegram.org/bot<YourBOTToken>/getUpdates`
+   - Noteer het `chat_id` uit de JSON respons
+
+3. **Configuratie Toepassen**:
+   - Voeg het bot token en chat ID toe aan je omgevingsvariabelen
+   - Herstart de service om de wijzigingen toe te passen
+
+### Beschikbare Commando's
+
+| Commando        | Beschrijving                            |
+|-----------------|----------------------------------------|
+| `/start`        | Start de interactie met de bot         |
+| `/help`         | Toon alle beschikbare commando's       |
+| `/contact`      | Toon recente contactformulieren        |
+| `/contactnew`   | Toon nieuwe contactformulieren         |
+| `/aanmelding`   | Toon recente aanmeldingen              |
+| `/aanmeldingnew`| Toon onverwerkte aanmeldingen          |
+| `/status`       | Toon service status en statistieken    |
+
+### Migreren naar een Nieuwe Chat
+
+Als je de bot wilt verplaatsen naar een andere chat of groep, volg dan deze stappen:
+
+1. Voeg de bot toe aan de nieuwe groep
+2. Verkrijg het nieuwe chat ID
+3. Update de `TELEGRAM_CHAT_ID` omgevingsvariabele
+4. Herstart de service of gebruik het API endpoint om notificaties opnieuw te verwerken:
+
+```
+POST /api/v1/notifications/reprocess-all
+Authorization: Bearer <your_jwt_token>
+```
+
+### Probleemoplossing
+
+- **Bot Reageert Niet**: Controleer of `ENABLE_TELEGRAM_BOT` is ingesteld op "true"
+- **Conflictfout**: Als je een "Conflict: terminated by other getUpdates request" fout ziet, betekent dit dat er meerdere instanties van de bot actief zijn. Voer een harde herstart uit van de service.
+- **Geen Notificaties**: Controleer of `NOTIFICATION_MIN_PRIORITY` niet te hoog is ingesteld
+
+## 🔄 Recente Updates
 
 ### Maart 2025
 - Toegevoegd: API key authenticatie voor metrics endpoints
@@ -744,6 +816,12 @@ Uitgebreide documentatie is beschikbaar in de `/docs` directory:
 - Toegevoegd: Configuratie opties voor email ophaal interval en aan/uit zetten
 - Verbeterd: Graceful shutdown met correcte afsluiting van achtergrondprocessen
 - Toegevoegd: Test ondersteuning voor mail endpoints in test_api_light.ps1
+- Toegevoegd: Telegram Bot Service voor het bekijken van contactformulieren en aanmeldingen
+- Toegevoegd: Commando interface voor het opvragen van informatie via Telegram
+- Toegevoegd: Testgegevens migraties voor het testen van contactformulieren en aanmeldingen
+- Verbeterd: Probleemoplossing voor Telegram bot configuratie
+- Toegevoegd: API endpoint voor het opnieuw verwerken van notificaties
+- Toegevoegd: Test commando voor het verificeren van de Telegram bot configuratie
 
 # DKL Email Service - API Test Tools
 
@@ -778,7 +856,7 @@ SSL Mode: require
 ### API configuratie
 
 ```
-Base URL: https://dkl-email-service.onrender.com
+Base URL: https://dklemailservice.onrender.com/
 ```
 
 Je kunt deze configuratie aanpassen door omgevingsvariabelen in te stellen:
