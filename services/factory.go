@@ -20,6 +20,7 @@ type ServiceFactory struct {
 	AuthService         AuthService
 	EmailAutoFetcher    EmailAutoFetcherInterface
 	NotificationService NotificationService
+	TelegramBotService  *TelegramBotService
 }
 
 // NewServiceFactory maakt een nieuwe service factory
@@ -50,6 +51,9 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 	// Initialiseer notification service
 	notificationService := createNotificationService(repoFactory.Notification)
 
+	// Initialiseer telegram bot service
+	telegramBotService := createTelegramBotService(repoFactory.Contact, repoFactory.Aanmelding)
+
 	// Maak een EmailAutoFetcher aan
 	// Nog niet geinitialiseerd omdat MailFetcher buiten de ServiceFactory wordt aangemaakt in main.go
 
@@ -62,6 +66,7 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 		AuthService:         authService,
 		EmailAutoFetcher:    nil, // Dit wordt later in main.go ingesteld
 		NotificationService: notificationService,
+		TelegramBotService:  telegramBotService,
 	}
 }
 
@@ -189,6 +194,27 @@ func createNotificationService(notificationRepo repository.NotificationRepositor
 		"min_priority", minPriority)
 
 	return notificationService
+}
+
+// createTelegramBotService maakt een nieuwe Telegram bot service
+func createTelegramBotService(contactRepo repository.ContactRepository, aanmeldingRepo repository.AanmeldingRepository) *TelegramBotService {
+	// Check of bot enabled is in omgevingsvariabelen
+	enabled := getEnvWithDefault("ENABLE_TELEGRAM_BOT", "false") == "true"
+	if !enabled {
+		logger.Info("Telegram bot is uitgeschakeld")
+		return nil
+	}
+
+	// Maak een nieuwe Telegram bot service
+	telegramBotService := NewTelegramBotService(contactRepo, aanmeldingRepo)
+
+	// Als de service succesvol is aangemaakt, start polling
+	if telegramBotService != nil {
+		logger.Info("Telegram bot service geïnitialiseerd, polling wordt gestart")
+		telegramBotService.StartPolling()
+	}
+
+	return telegramBotService
 }
 
 // getEnvWithDefault haalt een omgevingsvariabele op met een standaardwaarde
