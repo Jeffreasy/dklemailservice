@@ -39,6 +39,7 @@ func (h *NotificationHandler) RegisterRoutes(app *fiber.App) {
 	notificationGroup.Post("/", h.CreateNotification)
 	notificationGroup.Get("/:id", h.GetNotification)
 	notificationGroup.Delete("/:id", h.DeleteNotification)
+	notificationGroup.Post("/reprocess-all", h.ReprocessAllNotifications)
 }
 
 // authMiddleware controleert of de gebruiker geauthenticeerd is
@@ -209,5 +210,80 @@ func (h *NotificationHandler) DeleteNotification(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"success": true,
 		"message": "Notificatie succesvol verwijderd",
+	})
+}
+
+// ReprocessAllNotifications markeert alle notificaties als niet-verzonden en verwerkt ze opnieuw
+func (h *NotificationHandler) ReprocessAllNotifications(c *fiber.Ctx) error {
+	// Controleer of notificationService beschikbaar is
+	if h.notificationService == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error": "Notification service is niet beschikbaar",
+		})
+	}
+
+	// Haal alle notificaties op uit de database (een nieuwe repository functie nodig)
+	ctx := c.Context()
+
+	// Haal notificaties op per type om de database niet te overbelasten
+	types := []models.NotificationType{
+		models.NotificationTypeContact,
+		models.NotificationTypeAanmelding,
+		models.NotificationTypeAuth,
+		models.NotificationTypeSystem,
+		models.NotificationTypeHealth,
+	}
+
+	totalCount := 0
+	reprocessedCount := 0
+
+	for _, notificationType := range types {
+		notifications, err := h.notificationRepo.ListByType(ctx, notificationType)
+		if err != nil {
+			logger.Error("Fout bij ophalen notificaties voor herverwerking",
+				"error", err,
+				"type", notificationType)
+			continue
+		}
+
+		totalCount += len(notifications)
+
+		// Markeer elke notificatie als niet verzonden en update in de database
+		for _, notification := range notifications {
+			// Alleen verwerk notificaties die prioriteit medium of hoger hebben
+			if notification.Priority == models.NotificationPriorityLow {
+				continue
+			}
+
+			oldSentStatus := notification.Sent
+			notification.Sent = false
+			notification.SentAt = nil
+
+			if err := h.notificationRepo.Update(ctx, notification); err != nil {
+				logger.Error("Fout bij markeren notificatie als niet verzonden",
+					"error", err,
+					"id", notification.ID)
+				continue
+			}
+
+			// Verwerk de notificatie direct
+			if err := h.notificationService.SendNotification(ctx, notification); err != nil {
+				logger.Error("Fout bij opnieuw verzenden notificatie",
+					"error", err,
+					"id", notification.ID)
+				continue
+			}
+
+			if oldSentStatus {
+				reprocessedCount++
+			}
+		}
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"success":     true,
+		"message":     "Notificaties opnieuw verwerkt",
+		"total":       totalCount,
+		"reprocessed": reprocessedCount,
 	})
 }
