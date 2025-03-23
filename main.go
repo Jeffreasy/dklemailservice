@@ -1,7 +1,6 @@
 package main
 
 import (
-	apiPkg "dklautomationgo/api"
 	"dklautomationgo/config"
 	"dklautomationgo/database"
 	"dklautomationgo/handlers"
@@ -9,15 +8,12 @@ import (
 	"dklautomationgo/repository"
 	"dklautomationgo/services"
 	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
-
-	"bytes"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -62,11 +58,6 @@ func ValidateEnv() error {
 	}
 
 	return nil
-}
-
-// CreateTelegramBotHandler maakt een nieuwe TelegramBotHandler aan
-func CreateTelegramBotHandler(service *services.TelegramBotService) *apiPkg.TelegramBotHandler {
-	return apiPkg.NewTelegramBotHandler(service)
 }
 
 func main() {
@@ -346,52 +337,105 @@ func main() {
 
 	// Registreer telegram bot handler indien ingeschakeld
 	if serviceFactory.TelegramBotService != nil {
-		// Maak een http.ServeMux voor de Telegram bot API endpoints
-		telegramBotHandler := CreateTelegramBotHandler(serviceFactory.TelegramBotService)
-		mux := http.NewServeMux()
-		telegramBotHandler.RegisterRoutes(mux)
+		// Registreer Telegram API endpoints direct in Fiber
+		app.Get("/api/v1/telegrambot/config", func(c *fiber.Ctx) error {
+			// JWT authenticatie controleren
+			authHeader := c.Get("Authorization")
+			if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+				return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+					"error": "Unauthorized",
+				})
+			}
 
-		// Registreer routes voor Telegram bot handler
-		// Dit gebruikt een adapter om HTTP requests om te zetten naar Fiber context
-		app.Use("/api/v1/telegrambot/*", func(c *fiber.Ctx) error {
-			// Maak een nieuwe HTTP request
-			req, err := http.NewRequest(
-				c.Method(),
-				c.Path(),
-				bytes.NewReader(c.Body()),
-			)
+			// Check bestaande service
+			if serviceFactory.TelegramBotService == nil {
+				return c.Status(fiber.StatusOK).JSON(fiber.Map{
+					"enabled":  false,
+					"message":  "Telegram bot service is niet geactiveerd",
+					"chatId":   "",
+					"commands": []string{},
+				})
+			}
+
+			// Gegevens ophalen
+			return c.Status(fiber.StatusOK).JSON(fiber.Map{
+				"enabled": true,
+				"message": "Telegram bot service is actief",
+				"chatId":  serviceFactory.TelegramBotService.GetChatID(),
+			})
+		})
+
+		app.Post("/api/v1/telegrambot/send", func(c *fiber.Ctx) error {
+			// JWT authenticatie controleren
+			authHeader := c.Get("Authorization")
+			if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+				return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+					"error": "Unauthorized",
+				})
+			}
+
+			// Check bestaande service
+			if serviceFactory.TelegramBotService == nil {
+				return c.Status(fiber.StatusOK).JSON(fiber.Map{
+					"success": false,
+					"message": "Telegram bot service is niet geactiveerd",
+				})
+			}
+
+			// Parse request body
+			var req struct {
+				Message string `json:"message"`
+			}
+
+			if err := c.BodyParser(&req); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"success": false,
+					"message": "Ongeldige request",
+				})
+			}
+
+			// Bericht versturen
+			err := serviceFactory.TelegramBotService.SendMessage(req.Message)
 			if err != nil {
-				return err
+				logger.Error("Fout bij verzenden Telegram bericht", "error", err)
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"success": false,
+					"message": "Fout bij verzenden bericht: " + err.Error(),
+				})
 			}
 
-			// Kopieer headers
-			for key, vals := range c.GetReqHeaders() {
-				if len(vals) > 0 {
-					req.Header.Set(key, vals[0]) // Eerste waarde gebruiken
-				}
+			return c.Status(fiber.StatusOK).JSON(fiber.Map{
+				"success": true,
+				"message": "Bericht succesvol verzonden",
+			})
+		})
+
+		app.Get("/api/v1/telegrambot/commands", func(c *fiber.Ctx) error {
+			// JWT authenticatie controleren
+			authHeader := c.Get("Authorization")
+			if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+				return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+					"error": "Unauthorized",
+				})
 			}
 
-			// Maak een responseWriter
-			rw := &responseWriter{
-				headers: make(http.Header),
-				body:    &bytes.Buffer{},
+			// Check bestaande service
+			if serviceFactory.TelegramBotService == nil {
+				return c.Status(fiber.StatusOK).JSON(fiber.Map{
+					"success":  false,
+					"message":  "Telegram bot service is niet geactiveerd",
+					"commands": []interface{}{},
+				})
 			}
 
-			// Verwerk de request
-			mux.ServeHTTP(rw, req)
+			// Gegevens ophalen
+			commands := serviceFactory.TelegramBotService.GetCommands()
 
-			// Kopieer headers naar de response
-			for key, values := range rw.headers {
-				for _, value := range values {
-					c.Set(key, value)
-				}
-			}
-
-			// Zet de status code
-			c.Status(rw.statusCode)
-
-			// Schrijf de response body
-			return c.Send(rw.body.Bytes())
+			return c.Status(fiber.StatusOK).JSON(fiber.Map{
+				"success":  true,
+				"message":  "Commando's succesvol opgehaald",
+				"commands": commands,
+			})
 		})
 
 		logger.Info("Telegram bot routes geregistreerd")
@@ -477,26 +521,4 @@ func initializeMailFetcher(metrics *services.EmailMetrics) *services.MailFetcher
 	)
 
 	return mailFetcher
-}
-
-// responseWriter implementeert http.ResponseWriter
-type responseWriter struct {
-	headers    http.Header
-	body       *bytes.Buffer
-	statusCode int
-}
-
-func (rw *responseWriter) Header() http.Header {
-	return rw.headers
-}
-
-func (rw *responseWriter) Write(b []byte) (int, error) {
-	if rw.statusCode == 0 {
-		rw.statusCode = http.StatusOK
-	}
-	return rw.body.Write(b)
-}
-
-func (rw *responseWriter) WriteHeader(statusCode int) {
-	rw.statusCode = statusCode
 }
