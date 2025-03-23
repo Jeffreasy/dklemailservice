@@ -16,6 +16,7 @@ param(
     [switch]$TestMetrics,
     [switch]$TestMailEndpoints,
     [switch]$TestNotifications,
+    [switch]$TestTelegramBot,
     [string]$OutputFile = "DKL_API_Test_Report_$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss').txt"
 )
 
@@ -490,6 +491,44 @@ function Test-NotificationEndpoints {
     }
 }
 
+# Test telegram bot service
+function Test-TelegramBotService {
+    if (-not $TestTelegramBot -or -not $IncludeSecuredEndpoints) {
+        if (-not $TestTelegramBot) {
+            Write-Host "Telegram bot tests overgeslagen (-TestTelegramBot parameter niet opgegeven)" -ForegroundColor $promptColor
+        } elseif (-not $IncludeSecuredEndpoints) {
+            Write-Host "Telegram bot tests overgeslagen (vereist -IncludeSecuredEndpoints)" -ForegroundColor $promptColor
+        }
+        return $null
+    }
+    
+    Show-Title -Title "Telegram Bot Service Tests (Auth Vereist)"
+    
+    # Test configuratie ophalen
+    $configResult = Invoke-ApiCall -Name "Telegram Bot Configuratie Ophalen" -Method "GET" -Endpoint "/api/v1/telegrambot/config" -RequiresAuth -RetryCount 2
+    
+    # Test test-bericht verzenden
+    $testMessageResult = $null
+    if ($configResult -and $configResult.enabled) {
+        $testMessage = @{
+            message = "Dit is een testbericht vanuit het test script van DKL Email Service."
+        }
+        $testMessageResult = Invoke-ApiCall -Name "Telegram Test Bericht Verzenden" -Method "POST" -Endpoint "/api/v1/telegrambot/send" -Body $testMessage -RequiresAuth -RetryCount 2
+    }
+    
+    # Test beschikbare commando's ophalen
+    $commandsResult = $null
+    if ($configResult -and $configResult.enabled) {
+        $commandsResult = Invoke-ApiCall -Name "Telegram Commando's Ophalen" -Method "GET" -Endpoint "/api/v1/telegrambot/commands" -RequiresAuth -RetryCount 2
+    }
+    
+    return @{
+        ConfigResult = $configResult
+        TestMessageResult = $testMessageResult
+        CommandsResult = $commandsResult
+    }
+}
+
 # Test contact formulier notificaties
 function Test-ContactNotifications {
     if (-not $TestNotifications -or -not $IncludeSecuredEndpoints) {
@@ -675,6 +714,9 @@ function Start-ApiTest {
     if ($TestNotifications) {
         Write-Host "Notificatie endpoints testen: ingeschakeld" -ForegroundColor $infoColor
     }
+    if ($TestTelegramBot) {
+        Write-Host "Telegram bot testen: ingeschakeld" -ForegroundColor $infoColor
+    }
     
     # Test root endpoint
     Write-Host "`nTesten van root endpoint..." -ForegroundColor $infoColor
@@ -710,6 +752,9 @@ function Start-ApiTest {
     
     # Test notificatie endpoints indien ingeschakeld
     $notificationResults = Test-NotificationEndpoints
+    
+    # Test telegram bot service indien ingeschakeld
+    $telegramBotResults = Test-TelegramBotService
     
     # Test contact formulier notificaties indien ingeschakeld
     $contactNotificationResults = Test-ContactNotifications
@@ -814,6 +859,33 @@ function Start-ApiTest {
             }
         } else {
             Write-Host "Notificatie Endpoints: ❌ Toegang mislukt of endpoints niet beschikbaar" -ForegroundColor $errorColor
+        }
+    }
+    
+    # Telegram bot service toegang
+    if ($TestTelegramBot -and $IncludeSecuredEndpoints) {
+        if ($telegramBotResults -and $telegramBotResults.ConfigResult) {
+            if ($telegramBotResults.ConfigResult.enabled) {
+                Write-Host "Telegram Bot Service: ✅ Actief en bereikbaar" -ForegroundColor $successColor
+                
+                if ($telegramBotResults.TestMessageResult -and $telegramBotResults.TestMessageResult.success) {
+                    Write-Host "  Test bericht succesvol verzonden" -ForegroundColor $successColor
+                } else {
+                    Write-Host "  Test bericht verzenden mislukt" -ForegroundColor $errorColor
+                }
+                
+                if ($telegramBotResults.CommandsResult -and $telegramBotResults.CommandsResult.commands) {
+                    Write-Host "  Beschikbare commando's:" -ForegroundColor $infoColor
+                    foreach ($command in $telegramBotResults.CommandsResult.commands) {
+                        Write-Host "    - /$($command.command): $($command.description)" -ForegroundColor $infoColor
+                    }
+                }
+            } else {
+                Write-Host "Telegram Bot Service: ⚠️ Uitgeschakeld in configuratie" -ForegroundColor $warningColor
+                Write-Host "  Zet ENABLE_TELEGRAM_BOT=true in .env bestand om in te schakelen" -ForegroundColor $promptColor
+            }
+        } else {
+            Write-Host "Telegram Bot Service: ❌ Niet beschikbaar of endpoints niet geïmplementeerd" -ForegroundColor $errorColor
         }
     }
     

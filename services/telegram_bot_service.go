@@ -64,6 +64,12 @@ type TelegramResponse struct {
 	Error  string          `json:"description,omitempty"`
 }
 
+// TelegramCommand representeert een beschikbaar Telegram commando
+type TelegramCommand struct {
+	Command     string `json:"command"`
+	Description string `json:"description"`
+}
+
 // NewTelegramBotService maakt een nieuwe TelegramBotService
 func NewTelegramBotService(
 	contactRepo repository.ContactRepository,
@@ -531,4 +537,23 @@ func formatDuration(d time.Duration) string {
 		return fmt.Sprintf("%dd %dh %dm", days, hours, minutes)
 	}
 	return fmt.Sprintf("%dh %dm", hours, minutes)
+}
+
+// GetChatID geeft de chat ID terug voor de Telegram bot
+func (s *TelegramBotService) GetChatID() string {
+	return s.chatID
+}
+
+// GetCommands geeft de beschikbare commando's terug
+func (s *TelegramBotService) GetCommands() []TelegramCommand {
+	commands := []TelegramCommand{
+		{Command: "start", Description: "Start de bot"},
+		{Command: "help", Description: "Toon beschikbare commando's"},
+		{Command: "contact", Description: "Toon recente contactformulieren"},
+		{Command: "contactnew", Description: "Toon nieuwe contactformulieren"},
+		{Command: "aanmelding", Description: "Toon recente aanmeldingen"},
+		{Command: "aanmeldingnew", Description: "Toon onverwerkte aanmeldingen"},
+		{Command: "status", Description: "Toon status van de service"},
+	}
+	return commands
 }
