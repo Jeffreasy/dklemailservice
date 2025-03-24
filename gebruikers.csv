@@ -1,0 +1,2 @@
+"id","naam","email","wachtwoord_hash","rol","is_actief","laatste_login","created_at","updated_at"
+"87e79135-f2f2-4e5a-bbf5-8a73ac705fd9","Admin","admin@dekoninklijkeloop.nl","$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy","admin",True,NULL,"2025-03-14 13:47:40.318393","2025-03-14 13:47:40.318393"
