@@ -1,17 +1,106 @@
-INSERT INTO "public"."aanmeldingen" ("id", "naam", "email", "telefoon", "status", "created_at", "updated_at", "rol", "afstand", "ondersteuning", "bijzonderheden", "terms", "email_verzonden", "email_verzonden_op")
-SELECT * FROM (VALUES
-    (CAST('9f464844-8c93-4190-90f0-e74765c7f09a' AS UUID), 'Karin de Jong', 'karin.de.jong82@outlook.com', null, 'nieuw', CAST('2025-03-24 18:47:05.053651' AS TIMESTAMP), CAST('2025-03-24 18:47:05.053651' AS TIMESTAMP), 'Deelnemer', '6 KM', 'Nee', '', true, false, null),
-    (CAST('51855fec-eab9-494a-9321-c40d22da4ffc' AS UUID), 'Mirjam Kerkvliet', 'mirjam.kerkvliet@gmail.com', null, 'nieuw', CAST('2025-03-24 17:27:25.191642' AS TIMESTAMP), CAST('2025-03-24 17:27:25.191642' AS TIMESTAMP), 'Deelnemer', '15 KM', 'Nee', '', true, false, null),
-    (CAST('47775742-8950-4b94-9dd1-571ff4902688' AS UUID), 'Arno Kerkvliet', 'arno.kerkvliet@gmail.com', null, 'nieuw', CAST('2025-03-24 17:26:12.1724' AS TIMESTAMP), CAST('2025-03-24 17:26:12.1724' AS TIMESTAMP), 'Deelnemer', '15 KM', 'Nee', '', true, false, null),
-    (CAST('d92ed75c-c275-47a4-88a9-ff7a4106f8ee' AS UUID), 'Jean-paul Hup', 'molenkamp.19@sheerenloo.nl', null, 'nieuw', CAST('2025-03-24 09:17:59.726501' AS TIMESTAMP), CAST('2025-03-24 09:17:59.726501' AS TIMESTAMP), 'Deelnemer', '6 KM', 'Nee', '', true, false, null),
-    (CAST('ecb8332b-ea39-4611-9f58-64921226f2a6' AS UUID), 'Annerieke Mandemaker-Timmer', 'annerieketimmer@hotmail.com', '06 17 37 28 40 ', 'nieuw', CAST('2025-03-24 09:16:42.111808' AS TIMESTAMP), CAST('2025-03-24 09:16:42.111808' AS TIMESTAMP), 'Begeleider', '6 KM', 'Nee', '', true, false, null)
-) AS new_registrations
-WHERE NOT EXISTS (
-    SELECT 1 FROM "public"."aanmeldingen" WHERE id IN (
-        '9f464844-8c93-4190-90f0-e74765c7f09a',
-        '51855fec-eab9-494a-9321-c40d22da4ffc',
-        '47775742-8950-4b94-9dd1-571ff4902688',
-        'd92ed75c-c275-47a4-88a9-ff7a4106f8ee',
-        'ecb8332b-ea39-4611-9f58-64921226f2a6'
+-- Voeg nieuwe registraties toe
+INSERT INTO "public"."aanmeldingen" 
+(
+    id,
+    naam,
+    email,
+    telefoon,
+    status,
+    created_at,
+    updated_at,
+    rol,
+    afstand,
+    ondersteuning,
+    bijzonderheden,
+    terms,
+    email_verzonden,
+    email_verzonden_op,
+    test_mode
+)
+VALUES 
+    (
+        CAST('9f464844-8c93-4190-90f0-e74765c7f09a' AS UUID),
+        'Karin de Jong',
+        'karin.de.jong82@outlook.com',
+        NULL,
+        'nieuw',
+        TIMESTAMP '2025-03-24 18:47:05.053651',
+        TIMESTAMP '2025-03-24 18:47:05.053651',
+        'Deelnemer',
+        '6 KM',
+        'Nee',
+        '',
+        TRUE,
+        FALSE,
+        NULL,
+        FALSE
+    ),
+    (
+        CAST('51855fec-eab9-494a-9321-c40d22da4ffc' AS UUID),
+        'Mirjam Kerkvliet',
+        'mirjam.kerkvliet@gmail.com',
+        NULL,
+        'nieuw',
+        TIMESTAMP '2025-03-24 17:27:25.191642',
+        TIMESTAMP '2025-03-24 17:27:25.191642',
+        'Deelnemer',
+        '15 KM',
+        'Nee',
+        '',
+        TRUE,
+        FALSE,
+        NULL,
+        FALSE
+    ),
+    (
+        CAST('47775742-8950-4b94-9dd1-571ff4902688' AS UUID),
+        'Arno Kerkvliet',
+        'arno.kerkvliet@gmail.com',
+        NULL,
+        'nieuw',
+        TIMESTAMP '2025-03-24 17:26:12.1724',
+        TIMESTAMP '2025-03-24 17:26:12.1724',
+        'Deelnemer',
+        '15 KM',
+        'Nee',
+        '',
+        TRUE,
+        FALSE,
+        NULL,
+        FALSE
+    ),
+    (
+        CAST('d92ed75c-c275-47a4-88a9-ff7a4106f8ee' AS UUID),
+        'Jean-paul Hup',
+        'molenkamp.19@sheerenloo.nl',
+        NULL,
+        'nieuw',
+        TIMESTAMP '2025-03-24 09:17:59.726501',
+        TIMESTAMP '2025-03-24 09:17:59.726501',
+        'Deelnemer',
+        '6 KM',
+        'Nee',
+        '',
+        TRUE,
+        FALSE,
+        NULL,
+        FALSE
+    ),
+    (
+        CAST('ecb8332b-ea39-4611-9f58-64921226f2a6' AS UUID),
+        'Annerieke Mandemaker-Timmer',
+        'annerieketimmer@hotmail.com',
+        '06 17 37 28 40 ',
+        'nieuw',
+        TIMESTAMP '2025-03-24 09:16:42.111808',
+        TIMESTAMP '2025-03-24 09:16:42.111808',
+        'Begeleider',
+        '6 KM',
+        'Nee',
+        '',
+        TRUE,
+        FALSE,
+        NULL,
+        FALSE
     )
-); 
+ON CONFLICT (id) DO NOTHING; 
