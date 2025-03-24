@@ -6,7 +6,8 @@ ALTER TABLE contact_antwoorden
 DROP COLUMN IF EXISTS onderwerp,
 DROP COLUMN IF EXISTS bericht,
 ADD COLUMN IF NOT EXISTS tekst TEXT NOT NULL,
-ADD COLUMN IF NOT EXISTS email_verzonden BOOLEAN NOT NULL DEFAULT false;
+ADD COLUMN IF NOT EXISTS email_verzonden BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN IF NOT EXISTS verzonden_door VARCHAR(255);
 
 -- Indices aanmaken voor betere performance
 CREATE INDEX IF NOT EXISTS idx_contact_antwoorden_contact_id ON contact_antwoorden(contact_id);
@@ -17,7 +18,8 @@ ALTER TABLE aanmelding_antwoorden
 DROP COLUMN IF EXISTS onderwerp,
 DROP COLUMN IF EXISTS bericht,
 ADD COLUMN IF NOT EXISTS tekst TEXT NOT NULL,
-ADD COLUMN IF NOT EXISTS email_verzonden BOOLEAN NOT NULL DEFAULT false;
+ADD COLUMN IF NOT EXISTS email_verzonden BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN IF NOT EXISTS verzonden_door VARCHAR(255);
 
 -- Indices aanmaken voor betere performance
 CREATE INDEX IF NOT EXISTS idx_aanmelding_antwoorden_aanmelding_id ON aanmelding_antwoorden(aanmelding_id);
