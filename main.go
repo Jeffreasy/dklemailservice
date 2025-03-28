@@ -57,6 +57,18 @@ func ValidateEnv() error {
 		}
 	}
 
+	// Whisky for Charity configuratie is optioneel
+	wfcConfigured := os.Getenv("WFC_SMTP_HOST") != "" &&
+		os.Getenv("WFC_SMTP_USER") != "" &&
+		os.Getenv("WFC_SMTP_PASSWORD") != "" &&
+		os.Getenv("WFC_SMTP_FROM") != ""
+
+	if wfcConfigured {
+		logger.Info("Whisky for Charity SMTP configuratie gevonden")
+	} else {
+		logger.Info("Whisky for Charity SMTP configuratie niet gevonden, deze functionaliteit is uitgeschakeld")
+	}
+
 	return nil
 }
 
@@ -81,6 +93,7 @@ func main() {
 		"SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM",
 		"REGISTRATION_SMTP_HOST", "REGISTRATION_SMTP_PORT", "REGISTRATION_SMTP_USER",
 		"REGISTRATION_SMTP_PASSWORD", "REGISTRATION_SMTP_FROM",
+		"WFC_SMTP_HOST", "WFC_SMTP_PORT", "WFC_SMTP_USER", "WFC_SMTP_PASSWORD", "WFC_SMTP_FROM",
 		"ADMIN_EMAIL", "REGISTRATION_EMAIL",
 		"JWT_SECRET",
 	} {
@@ -292,6 +305,7 @@ func main() {
 				{"path": "/api/aanmelding/:id", "method": "DELETE", "description": "Delete registration (requires admin auth)"},
 				{"path": "/api/aanmelding/:id/antwoord", "method": "POST", "description": "Add reply to registration (requires admin auth)"},
 				{"path": "/api/aanmelding/rol/:rol", "method": "GET", "description": "Filter registrations by role (requires admin auth)"},
+				{"path": "/api/wfc/order-email", "method": "POST", "description": "Send Whisky for Charity order emails (requires API key)"},
 				{"path": "/metrics", "method": "GET", "description": "Prometheus metrics"},
 			},
 		})
@@ -334,6 +348,10 @@ func main() {
 
 	// Registreer de mailHandler in de main functie na repo en authService
 	mailHandler.RegisterRoutes(app)
+
+	// Registreer de WFC routes voor order emails
+	// Deze routes gebruiken aparte API key authenticatie en worden niet in telegram gelogd
+	handlers.RegisterWFCOrderRoutes(app, serviceFactory.EmailService)
 
 	// Registreer telegram bot handler indien ingeschakeld
 	if serviceFactory.TelegramBotService != nil {

@@ -59,6 +59,8 @@ func NewEmailServiceWithTemplatesDir(smtpClient SMTPClient, metrics *EmailMetric
 		"contact_email",
 		"aanmelding_admin_email",
 		"aanmelding_email",
+		"wfc_order_confirmation",
+		"wfc_order_admin",
 	}
 
 	for _, name := range templateFiles {
@@ -423,5 +425,115 @@ func (s *EmailService) SendWhiskyForCharityEmail(to, subject, body string) error
 	if s.prometheusMetrics != nil {
 		s.prometheusMetrics.RecordEmailSent("wfc_email", "success")
 	}
+	return nil
+}
+
+// SendWFCOrderEmail sends order emails for Whisky for Charity
+func (s *EmailService) SendWFCOrderEmail(data *models.WFCOrderEmailData) error {
+	start := time.Now()
+
+	var templateName string
+	var subject string
+	var recipient string
+
+	if data.ToAdmin {
+		templateName = "wfc_order_admin"
+		subject = "New Order Received - Whisky for Charity"
+		recipient = data.AdminEmail
+	} else {
+		templateName = "wfc_order_confirmation"
+		subject = "Order Confirmation - Whisky for Charity"
+		recipient = data.Order.CustomerEmail
+	}
+
+	// Get the template
+	template := s.GetTemplate(templateName)
+	if template == nil {
+		logger.Error("Template not found", "template", templateName)
+		return fmt.Errorf("template not found: %s", templateName)
+	}
+
+	// Add custom functions to template context
+	tmplWithFuncs := template.Funcs(map[string]interface{}{
+		"multiply": func(a, b interface{}) float64 {
+			// Convert interface values to float64
+			var floatA, floatB float64
+			switch v := a.(type) {
+			case int:
+				floatA = float64(v)
+			case float64:
+				floatA = v
+			}
+			switch v := b.(type) {
+			case int:
+				floatB = float64(v)
+			case float64:
+				floatB = v
+			}
+			return floatA * floatB
+		},
+		"currentYear": func() int {
+			return time.Now().Year()
+		},
+	})
+
+	// Generate email body
+	var body bytes.Buffer
+	if err := tmplWithFuncs.Execute(&body, data); err != nil {
+		logger.Error("Failed to execute template", "template", templateName, "error", err)
+		return fmt.Errorf("failed to execute template: %v", err)
+	}
+
+	// Check rate limits
+	if !s.rateLimiter.AllowEmail("wfc_email", "") {
+		if s.metrics != nil {
+			s.metrics.RecordEmailFailed("wfc_email")
+		}
+		if s.prometheusMetrics != nil {
+			s.prometheusMetrics.RecordEmailFailed("wfc_email", "rate_limited")
+		}
+		return fmt.Errorf("rate limit exceeded")
+	}
+
+	// Prepare message
+	msg := &EmailMessage{
+		To:       recipient,
+		Subject:  subject,
+		Body:     body.String(),
+		TestMode: false,
+	}
+
+	// Send via WFC SMTP
+	err := s.smtpClient.SendWFC(msg)
+
+	elapsedTime := time.Since(start)
+
+	// Update metrics
+	if err != nil {
+		if s.metrics != nil {
+			s.metrics.RecordEmailFailed("wfc_email")
+		}
+		if s.prometheusMetrics != nil {
+			s.prometheusMetrics.RecordEmailFailed("wfc_email", "smtp_error")
+			s.prometheusMetrics.ObserveEmailLatency("wfc_email", elapsedTime.Seconds())
+		}
+		logger.Error("Failed to send WFC order email", "recipient", recipient, "error", err)
+		return err
+	}
+
+	// Success
+	if s.metrics != nil {
+		s.metrics.RecordEmailSent("wfc_email")
+	}
+	if s.prometheusMetrics != nil {
+		s.prometheusMetrics.RecordEmailSent("wfc_email", "success")
+		s.prometheusMetrics.ObserveEmailLatency("wfc_email", elapsedTime.Seconds())
+	}
+
+	logger.Info("WFC order email sent successfully",
+		"template", templateName,
+		"recipient", recipient,
+		"order_id", data.Order.ID)
+
 	return nil
 }

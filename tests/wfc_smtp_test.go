@@ -46,6 +46,11 @@ func (m *WFCMockSMTPClient) SendWFCEmail(to, subject, body string) error {
 	return m.Error
 }
 
+// Implement Dial method to satisfy the SMTPDialer interface
+func (m *WFCMockSMTPClient) Dial() error {
+	return m.Error
+}
+
 func TestWhiskyForCharitySMTP(t *testing.T) {
 	// Setup test environment variables
 	os.Setenv("WFC_SMTP_HOST", "arg-plplcl14.argewebhosting.nl")
@@ -72,7 +77,7 @@ func TestWhiskyForCharitySMTP(t *testing.T) {
 		)
 
 		// Setup mock SMTP
-		mockSMTP := newMockSMTP()
+		mockSMTP := &WFCMockSMTPClient{}
 		client.SetDialer(mockSMTP)
 
 		// Test WFC email sending
@@ -84,7 +89,8 @@ func TestWhiskyForCharitySMTP(t *testing.T) {
 
 		err := client.SendWFC(msg)
 		assert.NoError(t, err)
-		assert.Equal(t, msg, mockSMTP.GetLastEmail())
+		assert.Equal(t, "test@example.com", mockSMTP.LastTo)
+		assert.Equal(t, "WFC Test", mockSMTP.LastSubject)
 	})
 
 	t.Run("EmailService with WFC config", func(t *testing.T) {
