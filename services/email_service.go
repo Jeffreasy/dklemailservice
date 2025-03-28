@@ -52,6 +52,30 @@ func NewEmailService(smtpClient SMTPClient, metrics *EmailMetrics, rateLimiter R
 
 // NewEmailServiceWithTemplatesDir maakt een nieuwe EmailService met de opgegeven SMTP client en templates directory
 func NewEmailServiceWithTemplatesDir(smtpClient SMTPClient, metrics *EmailMetrics, rateLimiter RateLimiterInterface, prometheusMetrics PrometheusMetricsInterface, templatesDir string) *EmailService {
+	// Definieer template functies
+	templateFuncs := template.FuncMap{
+		"multiply": func(a, b interface{}) float64 {
+			// Convert interface values to float64
+			var floatA, floatB float64
+			switch v := a.(type) {
+			case int:
+				floatA = float64(v)
+			case float64:
+				floatA = v
+			}
+			switch v := b.(type) {
+			case int:
+				floatB = float64(v)
+			case float64:
+				floatB = v
+			}
+			return floatA * floatB
+		},
+		"currentYear": func() int {
+			return time.Now().Year()
+		},
+	}
+
 	// Laad alle templates bij initialisatie
 	templates := make(map[string]*template.Template)
 	templateFiles := []string{
@@ -65,7 +89,12 @@ func NewEmailServiceWithTemplatesDir(smtpClient SMTPClient, metrics *EmailMetric
 
 	for _, name := range templateFiles {
 		templatePath := filepath.Join(templatesDir, name+".html")
-		tmpl, err := template.ParseFiles(templatePath)
+
+		// Maak een nieuwe template met functies
+		tmpl := template.New(name + ".html").Funcs(templateFuncs)
+
+		// Parse het template bestand
+		tmpl, err := tmpl.ParseFiles(templatePath)
 		if err != nil {
 			logger.Error("Failed to load template", "template", name, "error", err)
 			continue
@@ -453,33 +482,9 @@ func (s *EmailService) SendWFCOrderEmail(data *models.WFCOrderEmailData) error {
 		return fmt.Errorf("template not found: %s", templateName)
 	}
 
-	// Add custom functions to template context
-	tmplWithFuncs := template.Funcs(map[string]interface{}{
-		"multiply": func(a, b interface{}) float64 {
-			// Convert interface values to float64
-			var floatA, floatB float64
-			switch v := a.(type) {
-			case int:
-				floatA = float64(v)
-			case float64:
-				floatA = v
-			}
-			switch v := b.(type) {
-			case int:
-				floatB = float64(v)
-			case float64:
-				floatB = v
-			}
-			return floatA * floatB
-		},
-		"currentYear": func() int {
-			return time.Now().Year()
-		},
-	})
-
-	// Generate email body
+	// Generate email body (functies zijn nu al geregistreerd tijdens initialisatie)
 	var body bytes.Buffer
-	if err := tmplWithFuncs.Execute(&body, data); err != nil {
+	if err := template.Execute(&body, data); err != nil {
 		logger.Error("Failed to execute template", "template", templateName, "error", err)
 		return fmt.Errorf("failed to execute template: %v", err)
 	}
