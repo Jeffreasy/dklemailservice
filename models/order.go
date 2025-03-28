@@ -39,11 +39,15 @@ type WFCOrderEmailData struct {
 
 // WFCOrderRequest represents an incoming order email request
 type WFCOrderRequest struct {
-	OrderID       string         `json:"order_id"`
-	CustomerName  string         `json:"customer_name"`
-	CustomerEmail string         `json:"customer_email"`
-	TotalAmount   float64        `json:"total_amount"`
-	Items         []WFCOrderItem `json:"items"`
-	NotifyAdmin   bool           `json:"notify_admin,omitempty"`
-	TemplateType  string         `json:"template_type"`
+	OrderID         string         `json:"order_id"`
+	CustomerName    string         `json:"customer_name"`
+	CustomerEmail   string         `json:"customer_email"`
+	CustomerAddress string         `json:"customer_address,omitempty"`
+	CustomerCity    string         `json:"customer_city,omitempty"`
+	CustomerPostal  string         `json:"customer_postal,omitempty"`
+	CustomerCountry string         `json:"customer_country,omitempty"`
+	TotalAmount     float64        `json:"total_amount"`
+	Items           []WFCOrderItem `json:"items"`
+	NotifyAdmin     bool           `json:"notify_admin,omitempty"`
+	TemplateType    string         `json:"template_type"`
 }

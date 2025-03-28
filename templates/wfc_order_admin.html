@@ -59,6 +59,28 @@
             border-radius: 4px;
             margin-top: 15px;
         }
+        .info-box {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .info-box h4 {
+            margin-top: 0;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+            color: #2c3e50;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .highlight {
+            color: #e74c3c;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -69,45 +91,77 @@
         <h2>New Order Received</h2>
         <p>A new order has been placed on the Whisky for Charity website.</p>
         
-        <h3>Order Details</h3>
-        <p><strong>Order ID:</strong> {{.Order.ID}}</p>
-        <p><strong>Date:</strong> {{.Order.CreatedAt.Format "January 2, 2006 15:04"}}</p>
-        <p><strong>Customer:</strong> {{.Order.CustomerName}}</p>
-        <p><strong>Email:</strong> {{.Order.CustomerEmail}}</p>
-        
-        <h3>Order Summary</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>Item</th>
-                    <th>Quantity</th>
-                    <th>Price</th>
-                    <th>Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{range .Order.Items}}
-                <tr>
-                    <td>{{.ProductName}}</td>
-                    <td>{{.Quantity}}</td>
-                    <td>€{{printf "%.2f" .Price}}</td>
-                    <td>€{{printf "%.2f" (multiply .Price .Quantity)}}</td>
-                </tr>
+        <div class="info-grid">
+            <div class="info-box">
+                <h4>Order Information</h4>
+                <p><strong>Order ID:</strong> {{.Order.ID}}</p>
+                <p><strong>Date:</strong> {{.Order.CreatedAt.Format "January 2, 2006 15:04"}}</p>
+                <p><strong>Total Amount:</strong> <span class="highlight">€{{printf "%.2f" .Order.TotalAmount}}</span></p>
+                <p><strong>Status:</strong> {{.Order.Status}}</p>
+                {{if .Order.PaymentReference}}
+                <p><strong>Payment Reference:</strong> {{.Order.PaymentReference}}</p>
                 {{end}}
-                <tr>
-                    <td colspan="3" class="total">Total Amount:</td>
-                    <td>€{{printf "%.2f" .Order.TotalAmount}}</td>
-                </tr>
-            </tbody>
-        </table>
+            </div>
+            
+            <div class="info-box">
+                <h4>Customer Information</h4>
+                <p><strong>Name:</strong> {{.Order.CustomerName}}</p>
+                <p><strong>Email:</strong> <a href="mailto:{{.Order.CustomerEmail}}">{{.Order.CustomerEmail}}</a></p>
+                {{if .Order.CustomerAddress}}
+                <p><strong>Address:</strong> {{.Order.CustomerAddress}}</p>
+                {{end}}
+                {{if or .Order.CustomerCity .Order.CustomerPostal}}
+                <p>
+                    <strong>City/Postal:</strong> 
+                    {{if .Order.CustomerPostal}}{{.Order.CustomerPostal}}{{end}}
+                    {{if .Order.CustomerCity}}{{.Order.CustomerCity}}{{end}}
+                </p>
+                {{end}}
+                {{if .Order.CustomerCountry}}
+                <p><strong>Country:</strong> {{.Order.CustomerCountry}}</p>
+                {{end}}
+            </div>
+        </div>
         
-        <h3>Shipping Information</h3>
-        <p>
-            {{.Order.CustomerName}}<br>
-            {{.Order.CustomerAddress}}<br>
-            {{.Order.CustomerPostal}} {{.Order.CustomerCity}}<br>
-            {{.Order.CustomerCountry}}
-        </p>
+        <div class="info-box">
+            <h4>Order Details</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Product ID</th>
+                        <th>Quantity</th>
+                        <th>Price</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Order.Items}}
+                    <tr>
+                        <td>{{.ProductName}}</td>
+                        <td>{{.ProductID}}</td>
+                        <td>{{.Quantity}}</td>
+                        <td>€{{printf "%.2f" .Price}}</td>
+                        <td>€{{printf "%.2f" (multiply .Price .Quantity)}}</td>
+                    </tr>
+                    {{end}}
+                    <tr>
+                        <td colspan="4" class="total">Total Amount:</td>
+                        <td>€{{printf "%.2f" .Order.TotalAmount}}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="info-box">
+            <h4>Shipping Information</h4>
+            <p>
+                {{.Order.CustomerName}}<br>
+                {{if .Order.CustomerAddress}}{{.Order.CustomerAddress}}<br>{{end}}
+                {{if .Order.CustomerPostal}}{{.Order.CustomerPostal}}{{end}} {{if .Order.CustomerCity}}{{.Order.CustomerCity}}{{end}}<br>
+                {{if .Order.CustomerCountry}}{{.Order.CustomerCountry}}{{end}}
+            </p>
+        </div>
         
         {{if .SiteURL}}
         <p>

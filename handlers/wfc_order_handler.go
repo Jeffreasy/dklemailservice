@@ -77,13 +77,17 @@ func (h *WFCOrderHandler) HandleWFCOrderEmail(c *fiber.Ctx) error {
 
 	// Create order data
 	order := &models.WFCOrder{
-		ID:            req.OrderID,
-		CustomerName:  req.CustomerName,
-		CustomerEmail: req.CustomerEmail,
-		TotalAmount:   req.TotalAmount,
-		Items:         req.Items,
-		Status:        "pending", // Default status
-		CreatedAt:     time.Now(),
+		ID:              req.OrderID,
+		CustomerName:    req.CustomerName,
+		CustomerEmail:   req.CustomerEmail,
+		CustomerAddress: req.CustomerAddress,
+		CustomerCity:    req.CustomerCity,
+		CustomerPostal:  req.CustomerPostal,
+		CustomerCountry: req.CustomerCountry,
+		TotalAmount:     req.TotalAmount,
+		Items:           req.Items,
+		Status:          "pending", // Default status
+		CreatedAt:       time.Now(),
 	}
 
 	// Get admin email from environment
