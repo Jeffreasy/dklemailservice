@@ -21,15 +21,18 @@ type SMTPConfig struct {
 	Username string
 	Password string
 	From     string
+	UseSSL   bool // Toegevoegd voor directe SSL verbindingen
 }
 
 // RealSMTPClient implementeert de SMTP client interface
 type RealSMTPClient struct {
 	defaultConf        *SMTPConfig
 	regConf            *SMTPConfig
+	wfcConf            *SMTPConfig // Nieuwe configuratie voor Whisky for Charity
 	dialer             SMTPDialer
 	defaultDialer      *gomail.Dialer
 	registrationDialer *gomail.Dialer
+	wfcDialer          *gomail.Dialer // Nieuwe dialer voor Whisky for Charity
 	connMutex          sync.Mutex
 }
 
@@ -51,6 +54,7 @@ func NewRealSMTPClient(host, port, user, password, from, regHost, regPort, regUs
 		Username: user,
 		Password: password,
 		From:     from,
+		UseSSL:   false,
 	}
 
 	regConf := &SMTPConfig{
@@ -59,6 +63,7 @@ func NewRealSMTPClient(host, port, user, password, from, regHost, regPort, regUs
 		Username: regUser,
 		Password: regPassword,
 		From:     regFrom,
+		UseSSL:   false,
 	}
 
 	// Maak persistente dialers voor betere performance
@@ -78,6 +83,37 @@ func NewRealSMTPClient(host, port, user, password, from, regHost, regPort, regUs
 	}
 }
 
+// NewRealSMTPClientWithWFC creates a new SMTP client including Whisky for Charity configuration
+func NewRealSMTPClientWithWFC(host, port, user, password, from, regHost, regPort, regUser, regPassword, regFrom, wfcHost, wfcPort, wfcUser, wfcPassword, wfcFrom string, wfcUseSSL bool) *RealSMTPClient {
+	// Maak eerst de standaard client
+	client := NewRealSMTPClient(host, port, user, password, from, regHost, regPort, regUser, regPassword, regFrom)
+
+	// Voeg Whisky for Charity configuratie toe
+	wfcPortNum, err := strconv.Atoi(wfcPort)
+	if err != nil {
+		wfcPortNum = 465 // Default SSL SMTP port
+	}
+
+	wfcConf := &SMTPConfig{
+		Host:     wfcHost,
+		Port:     wfcPortNum,
+		Username: wfcUser,
+		Password: wfcPassword,
+		From:     wfcFrom,
+		UseSSL:   wfcUseSSL,
+	}
+
+	// Maak een nieuwe dialer
+	wfcDialer := gomail.NewDialer(wfcHost, wfcPortNum, wfcUser, wfcPassword)
+	wfcDialer.SSL = wfcUseSSL // Direct SSL voor port 465
+
+	// Stel de nieuwe dialer in
+	client.wfcConf = wfcConf
+	client.wfcDialer = wfcDialer
+
+	return client
+}
+
 // SetDialer stelt een custom dialer in voor tests
 func (c *RealSMTPClient) SetDialer(d SMTPDialer) {
 	c.dialer = d
@@ -91,6 +127,14 @@ func (c *RealSMTPClient) Send(msg *EmailMessage) error {
 // SendRegistration verzendt een email met de registratie configuratie
 func (c *RealSMTPClient) SendRegistration(msg *EmailMessage) error {
 	return c.sendWithDialer(msg, c.regConf, c.registrationDialer)
+}
+
+// SendWFC verzendt een email met de Whisky for Charity configuratie
+func (c *RealSMTPClient) SendWFC(msg *EmailMessage) error {
+	if c.wfcDialer == nil || c.wfcConf == nil {
+		return fmt.Errorf("whisky for charity email configuration is not set")
+	}
+	return c.sendWithDialer(msg, c.wfcConf, c.wfcDialer)
 }
 
 // sendWithDialer verzendt een email met de opgegeven configuratie en dialer
@@ -142,4 +186,14 @@ func (c *RealSMTPClient) SendEmail(to, subject, body string) error {
 		Body:    body,
 	}
 	return c.Send(msg)
+}
+
+// SendWFCEmail is een helper functie voor het verzenden van Whisky for Charity emails
+func (c *RealSMTPClient) SendWFCEmail(to, subject, body string) error {
+	msg := &EmailMessage{
+		To:      to,
+		Subject: subject,
+		Body:    body,
+	}
+	return c.SendWFC(msg)
 }

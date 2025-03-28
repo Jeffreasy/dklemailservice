@@ -118,6 +118,23 @@ func createSMTPClient() SMTPClient {
 	regPassword := getEnvWithDefault("REG_SMTP_PASSWORD", password)
 	regFrom := getEnvWithDefault("REG_SMTP_FROM", from)
 
+	// Whisky for Charity SMTP configuratie
+	wfcHost := getEnvWithDefault("WFC_SMTP_HOST", "")
+	wfcPort := getEnvWithDefault("WFC_SMTP_PORT", "465")
+	wfcUsername := getEnvWithDefault("WFC_SMTP_USER", "")
+	wfcPassword := getEnvWithDefault("WFC_SMTP_PASSWORD", "")
+	wfcFrom := getEnvWithDefault("WFC_SMTP_FROM", "")
+	wfcUseSSL := getEnvWithDefault("WFC_SMTP_SSL", "true") == "true"
+
+	// Als WFC configuratie aanwezig is, gebruik die
+	if wfcHost != "" && wfcUsername != "" {
+		return NewRealSMTPClientWithWFC(
+			host, port, username, password, from,
+			regHost, regPort, regUsername, regPassword, regFrom,
+			wfcHost, wfcPort, wfcUsername, wfcPassword, wfcFrom, wfcUseSSL)
+	}
+
+	// Anders, gebruik standaard client
 	return NewRealSMTPClient(host, port, username, password, from, regHost, regPort, regUsername, regPassword, regFrom)
 }
 

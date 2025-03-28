@@ -20,6 +20,8 @@ type SMTPClient interface {
 	Send(msg *EmailMessage) error
 	SendRegistration(msg *EmailMessage) error
 	SendEmail(to, subject, body string) error
+	SendWFC(msg *EmailMessage) error             // Nieuwe methode voor Whisky for Charity
+	SendWFCEmail(to, subject, body string) error // Helper methode voor Whisky for Charity
 }
 
 // EmailService is verantwoordelijk voor het versturen van emails
@@ -376,4 +378,50 @@ func (s *EmailService) SetMetrics(metrics *EmailMetrics) {
 // SetRateLimiter stelt een nieuwe rate limiter in (voor testen)
 func (s *EmailService) SetRateLimiter(limiter RateLimiterInterface) {
 	s.rateLimiter = limiter
+}
+
+// SendWhiskyForCharityEmail verzendt een email via de WFC configuratie
+func (s *EmailService) SendWhiskyForCharityEmail(to, subject, body string) error {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start)
+		if s.prometheusMetrics != nil {
+			s.prometheusMetrics.ObserveEmailLatency("wfc_email", duration.Seconds())
+		}
+	}()
+
+	if !s.rateLimiter.AllowEmail("email_generic", "") {
+		if s.metrics != nil {
+			s.metrics.RecordEmailFailed("wfc_email")
+		}
+		if s.prometheusMetrics != nil {
+			s.prometheusMetrics.RecordEmailFailed("wfc_email", "rate_limited")
+		}
+		return fmt.Errorf("rate limit exceeded")
+	}
+
+	msg := &EmailMessage{
+		To:      to,
+		Subject: subject,
+		Body:    body,
+	}
+
+	err := s.smtpClient.SendWFC(msg)
+	if err != nil {
+		if s.metrics != nil {
+			s.metrics.RecordEmailFailed("wfc_email")
+		}
+		if s.prometheusMetrics != nil {
+			s.prometheusMetrics.RecordEmailFailed("wfc_email", "smtp_error")
+		}
+		return err
+	}
+
+	if s.metrics != nil {
+		s.metrics.RecordEmailSent("wfc_email")
+	}
+	if s.prometheusMetrics != nil {
+		s.prometheusMetrics.RecordEmailSent("wfc_email", "success")
+	}
+	return nil
 }

@@ -251,6 +251,16 @@ func (m *MockSMTPClient) SendRegistration(msg *services.EmailMessage) error {
 	return m.Send(msg)
 }
 
+// SendWFC implementeert de SendWFC methode van de SMTP client interface
+func (m *MockSMTPClient) SendWFC(msg *services.EmailMessage) error {
+	return m.Send(msg)
+}
+
+// SendWFCEmail implementeert de SendWFCEmail methode van de SMTP client interface
+func (m *MockSMTPClient) SendWFCEmail(to, subject, body string) error {
+	return m.SendEmail(to, subject, body)
+}
+
 // mockRateLimiter is een mock implementatie van de RateLimiterInterface
 //
 //nolint:unused // These mocks are kept for future tests
@@ -505,4 +515,31 @@ func (m *MockNotificationService) Stop() {
 func (m *MockNotificationService) IsRunning() bool {
 	m.calls["IsRunning"]++
 	return true
+}
+
+//nolint:unused // These mocks are kept for future tests
+func (m *mockSMTP) SendWFC(msg *services.EmailMessage) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if msg.To == "" {
+		return fmt.Errorf("invalid recipient")
+	}
+
+	if m.shouldFail {
+		return fmt.Errorf("mock email error")
+	}
+
+	m.sentEmails = append(m.sentEmails, msg)
+	return nil
+}
+
+//nolint:unused // These mocks are kept for future tests
+func (m *mockSMTP) SendWFCEmail(to, subject, body string) error {
+	msg := &services.EmailMessage{
+		To:      to,
+		Subject: subject,
+		Body:    body,
+	}
+	return m.SendWFC(msg)
 }
