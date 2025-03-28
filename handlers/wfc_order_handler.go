@@ -86,34 +86,68 @@ func (h *WFCOrderHandler) HandleWFCOrderEmail(c *fiber.Ctx) error {
 		CreatedAt:     time.Now(),
 	}
 
-	// Create email data
-	emailData := &models.WFCOrderEmailData{
-		Order:   order,
-		ToAdmin: req.NotifyAdmin,
-		SiteURL: os.Getenv("WFC_SITE_URL"),
+	// Get admin email from environment
+	adminEmail := os.Getenv("WFC_ADMIN_EMAIL")
+	if adminEmail == "" {
+		adminEmail = "info@whiskyforcharity.com" // Fallback
 	}
 
-	// If this is an admin notification, set admin email
-	if req.NotifyAdmin {
-		emailData.AdminEmail = os.Getenv("WFC_ADMIN_EMAIL")
-		if emailData.AdminEmail == "" {
-			emailData.AdminEmail = "info@whiskyforcharity.com" // Fallback
-		}
+	// Get site URL from environment
+	siteURL := os.Getenv("WFC_SITE_URL")
+
+	// Track success
+	var emailErrors []error
+	var customerEmailSent bool
+	var adminEmailSent bool
+
+	// 1. Always send customer confirmation email
+	customerEmailData := &models.WFCOrderEmailData{
+		Order:      order,
+		ToAdmin:    false,      // This is for customer
+		AdminEmail: adminEmail, // Include admin email even though not directly used
+		SiteURL:    siteURL,
 	}
 
-	// Send the email
-	if err := h.emailService.SendWFCOrderEmail(emailData); err != nil {
-		logger.Error("Failed to send WFC order email", "error", err, "order_id", req.OrderID)
+	// Send customer email
+	if err := h.emailService.SendWFCOrderEmail(customerEmailData); err != nil {
+		logger.Error("Failed to send WFC customer order email", "error", err, "order_id", req.OrderID)
+		emailErrors = append(emailErrors, err)
+	} else {
+		customerEmailSent = true
+		logger.Info("WFC customer order email sent successfully", "recipient", order.CustomerEmail, "order_id", req.OrderID)
+	}
+
+	// 2. Always send admin notification email
+	adminEmailData := &models.WFCOrderEmailData{
+		Order:      order,
+		ToAdmin:    true, // This is for admin
+		AdminEmail: adminEmail,
+		SiteURL:    siteURL,
+	}
+
+	// Send admin email
+	if err := h.emailService.SendWFCOrderEmail(adminEmailData); err != nil {
+		logger.Error("Failed to send WFC admin order email", "error", err, "order_id", req.OrderID)
+		emailErrors = append(emailErrors, err)
+	} else {
+		adminEmailSent = true
+		logger.Info("WFC admin order email sent successfully", "recipient", adminEmail, "order_id", req.OrderID)
+	}
+
+	// Check if at least one email was sent successfully
+	if !customerEmailSent && !adminEmailSent {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to send email",
+			"error":        "Failed to send all emails",
+			"error_detail": emailErrors[0].Error(),
 		})
 	}
 
-	// Respond with success
+	// Respond with success status for each email
 	return c.Status(http.StatusOK).JSON(fiber.Map{
-		"success":  true,
-		"message":  "Order email sent successfully",
-		"order_id": req.OrderID,
+		"success":             true,
+		"customer_email_sent": customerEmailSent,
+		"admin_email_sent":    adminEmailSent,
+		"order_id":            req.OrderID,
 	})
 }
 
