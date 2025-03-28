@@ -8,9 +8,11 @@ import (
 	"dklautomationgo/repository"
 	"dklautomationgo/services"
 	"fmt"
+	"net/http/httptest"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -18,6 +20,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // ValidateEnv controleert of alle benodigde omgevingsvariabelen zijn ingesteld
@@ -57,6 +61,28 @@ func ValidateEnv() error {
 		}
 	}
 
+	// Controleer email fetcher configuratie indien ingeschakeld
+	if os.Getenv("DISABLE_AUTO_EMAIL_FETCH") != "true" {
+		emailFetcherVars := []string{
+			"INFO_EMAIL",
+			"INFO_EMAIL_PASSWORD",
+			"INSCHRIJVING_EMAIL",
+			"INSCHRIJVING_EMAIL_PASSWORD",
+		}
+
+		missingVars := []string{}
+		for _, env := range emailFetcherVars {
+			if os.Getenv(env) == "" {
+				missingVars = append(missingVars, env)
+			}
+		}
+
+		if len(missingVars) > 0 {
+			logger.Warn("Email fetcher credentials missing, some accounts will not be configured",
+				"missing_vars", strings.Join(missingVars, ", "))
+		}
+	}
+
 	// Whisky for Charity configuratie is optioneel
 	wfcConfigured := os.Getenv("WFC_SMTP_HOST") != "" &&
 		os.Getenv("WFC_SMTP_USER") != "" &&
@@ -86,28 +112,32 @@ func main() {
 	logger.Setup(logLevel)
 	defer logger.Sync()
 
-	// Debug: Print alle omgevingsvariabelen
-	logger.Info("Omgevingsvariabelen debug:")
-	for _, env := range []string{
-		"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "DB_SSL_MODE",
-		"SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM",
-		"REGISTRATION_SMTP_HOST", "REGISTRATION_SMTP_PORT", "REGISTRATION_SMTP_USER",
-		"REGISTRATION_SMTP_PASSWORD", "REGISTRATION_SMTP_FROM",
-		"WFC_SMTP_HOST", "WFC_SMTP_PORT", "WFC_SMTP_USER", "WFC_SMTP_PASSWORD", "WFC_SMTP_FROM",
-		"ADMIN_EMAIL", "REGISTRATION_EMAIL",
-		"JWT_SECRET",
-	} {
-		value := os.Getenv(env)
-		if value == "" {
-			logger.Warn("Omgevingsvariabele niet gevonden", "key", env)
-		} else {
-			// Verberg wachtwoorden in logs
-			if strings.Contains(env, "PASSWORD") {
-				logger.Info("Omgevingsvariabele gevonden", "key", env, "value", "********")
+	// Debug: Print alle omgevingsvariabelen alleen bij DEBUG logniveau
+	if strings.ToUpper(logLevel) == logger.DebugLevel {
+		logger.Debug("Omgevingsvariabelen debug:")
+		for _, env := range []string{
+			"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "DB_SSL_MODE",
+			"SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM",
+			"REGISTRATION_SMTP_HOST", "REGISTRATION_SMTP_PORT", "REGISTRATION_SMTP_USER",
+			"REGISTRATION_SMTP_PASSWORD", "REGISTRATION_SMTP_FROM",
+			"WFC_SMTP_HOST", "WFC_SMTP_PORT", "WFC_SMTP_USER", "WFC_SMTP_PASSWORD", "WFC_SMTP_FROM",
+			"ADMIN_EMAIL", "REGISTRATION_EMAIL",
+			"JWT_SECRET",
+		} {
+			value := os.Getenv(env)
+			if value == "" {
+				logger.Debug("Omgevingsvariabele niet gevonden", "key", env)
 			} else {
-				logger.Info("Omgevingsvariabele gevonden", "key", env, "value", value)
+				// Verberg wachtwoorden in logs
+				if strings.Contains(env, "PASSWORD") {
+					logger.Debug("Omgevingsvariabele gevonden", "key", env, "value", "********")
+				} else {
+					logger.Debug("Omgevingsvariabele gevonden", "key", env, "value", value)
+				}
 			}
 		}
+	} else {
+		logger.Info("Omgevingsvariabelen debug overgeslagen (alleen beschikbaar in DEBUG modus)")
 	}
 
 	// Setup ELK integratie als omgevingsvariabele is ingesteld
@@ -168,11 +198,9 @@ func main() {
 	// Initialiseer service factory
 	serviceFactory := services.NewServiceFactory(repoFactory)
 
-	// Type assertion voor RateLimiter
-	rateLimiter, ok := serviceFactory.RateLimiter.(*services.RateLimiter)
-	if !ok {
-		logger.Fatal("Kon RateLimiter niet casten naar juiste type")
-	}
+	// Gebruik de GetRateLimiter methode in de ServiceFactory om direct het concrete
+	// type terug te krijgen, zonder type assertion
+	rateLimiter := serviceFactory.GetRateLimiter()
 
 	// Initialiseer handlers
 	emailHandler := handlers.NewEmailHandler(serviceFactory.EmailService, serviceFactory.NotificationService)
@@ -459,11 +487,28 @@ func main() {
 		logger.Info("Telegram bot routes geregistreerd")
 	}
 
-	// Voeg Prometheus metrics endpoint toe aan Fiber app in plaats van standaard HTTP server
+	// Voeg Prometheus metrics endpoint toe aan standaard HTTP server
 	app.Get("/metrics", func(c *fiber.Ctx) error {
-		// Eenvoudige implementatie die een string teruggeeft
-		// In een volledige implementatie zou je hier de Prometheus metrics moeten teruggeven
-		return c.Status(fiber.StatusOK).SendString("Prometheus metrics endpoint")
+		// Gebruik een simpele proxy naar de standaard Prometheus HTTP handler
+		registry := prometheus.DefaultRegisterer.(*prometheus.Registry)
+		handler := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
+
+		// Maak een HTTP test recorder om de output vast te leggen
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest("GET", "/metrics", nil)
+
+		// Voer de request uit
+		handler.ServeHTTP(recorder, request)
+
+		// Kopieer headers naar Fiber response
+		for k, v := range recorder.Header() {
+			for _, val := range v {
+				c.Set(k, val)
+			}
+		}
+
+		// Stuur de body terug met de juiste status code
+		return c.Status(recorder.Code).Send(recorder.Body.Bytes())
 	})
 
 	// Start server
@@ -521,22 +566,55 @@ func main() {
 func initializeMailFetcher(metrics *services.EmailMetrics) *services.MailFetcher {
 	mailFetcher := services.NewMailFetcher(metrics)
 
-	// Voeg de accounts toe
-	mailFetcher.AddAccount(
-		"info@dekoninklijkeloop.nl",
-		"X6FdeT5dTakH^Ae^f5BV",
-		"mail.hostnet.nl",
-		993, // IMAP SSL poort
-		"info",
-	)
+	// Get email account credentials from environment variables
+	infoEmail := os.Getenv("INFO_EMAIL")
+	infoPassword := os.Getenv("INFO_EMAIL_PASSWORD")
+	inschrijvingEmail := os.Getenv("INSCHRIJVING_EMAIL")
+	inschrijvingPassword := os.Getenv("INSCHRIJVING_EMAIL_PASSWORD")
+	imapServer := os.Getenv("IMAP_SERVER")
+	imapPort := os.Getenv("IMAP_PORT")
 
-	mailFetcher.AddAccount(
-		"inschrijving@dekoninklijkeloop.nl",
-		"y9tKkS&^1pbp2X6KuUbb",
-		"mail.hostnet.nl",
-		993, // IMAP SSL poort
-		"inschrijving",
-	)
+	// Default values for server and port if not set
+	if imapServer == "" {
+		imapServer = "mail.hostnet.nl"
+		logger.Warn("IMAP_SERVER not set, using default", "server", imapServer)
+	}
+
+	port := 993 // Default IMAP SSL port
+	if imapPort != "" {
+		if p, err := strconv.Atoi(imapPort); err == nil {
+			port = p
+		} else {
+			logger.Warn("Invalid IMAP_PORT, using default", "port", port, "error", err)
+		}
+	}
+
+	// Add the accounts if credentials are provided
+	if infoEmail != "" && infoPassword != "" {
+		mailFetcher.AddAccount(
+			infoEmail,
+			infoPassword,
+			imapServer,
+			port,
+			"info",
+		)
+		logger.Info("Added info email account", "email", infoEmail)
+	} else {
+		logger.Warn("Info email credentials not set, skipping account setup")
+	}
+
+	if inschrijvingEmail != "" && inschrijvingPassword != "" {
+		mailFetcher.AddAccount(
+			inschrijvingEmail,
+			inschrijvingPassword,
+			imapServer,
+			port,
+			"inschrijving",
+		)
+		logger.Info("Added inschrijving email account", "email", inschrijvingEmail)
+	} else {
+		logger.Warn("Inschrijving email credentials not set, skipping account setup")
+	}
 
 	return mailFetcher
 }

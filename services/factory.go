@@ -23,6 +23,18 @@ type ServiceFactory struct {
 	TelegramBotService  *TelegramBotService
 }
 
+// GetRateLimiter retourneert de RateLimiter als het concrete type
+// Dit helpt om onveilige type assertions in de code te vermijden
+func (sf *ServiceFactory) GetRateLimiter() *RateLimiter {
+	// Veilige type assertion met error checking
+	rateLimiter, ok := sf.RateLimiter.(*RateLimiter)
+	if !ok {
+		logger.Fatal("Kon RateLimiter niet casten naar juiste type")
+		return nil // Voor compilatie, wordt nooit bereikt na Fatal
+	}
+	return rateLimiter
+}
+
 // NewServiceFactory maakt een nieuwe service factory
 func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 	logger.Info("Initialiseren service factory")
