@@ -799,9 +799,213 @@ Authorization: Bearer <your_jwt_token>
 - **Conflictfout**: Als je een "Conflict: terminated by other getUpdates request" fout ziet, betekent dit dat er meerdere instanties van de bot actief zijn. Voer een harde herstart uit van de service.
 - **Geen Notificaties**: Controleer of `NOTIFICATION_MIN_PRIORITY` niet te hoog is ingesteld
 
+## 🥃 Whisky for Charity Integratie
+
+De DKL Email Service bevat een gespecialiseerde module voor het afhandelen van orders voor het Whisky for Charity platform. Deze module is volledig gescheiden van de hoofdfunctionaliteit en heeft zijn eigen configuratie, templates en API endpoints.
+
+### Features
+
+- **Dedicated API Endpoint**: Beveiligd endpoint (`/api/wfc/order-email`) voor het versturen van orderbevestigingen
+- **API Key Authenticatie**: Beveiligde toegang met een specifieke API key voor WFC integratie
+- **Gescheiden Email Templates**: Speciaal ontworpen email templates voor WFC orders
+- **Dual Email Flow**: Automatisch verzenden van zowel klantenbevestigingen als admin notificaties
+- **Separate SMTP Configuratie**: Aparte SMTP-instellingen voor het Whisky for Charity domein
+- **Geen Telegram Logging**: WFC-emails worden niet gelogd naar het Telegram kanaal voor privacy
+
+### Architectuur
+
+De WFC module is opgebouwd uit de volgende componenten:
+
+#### Models
+- `WFCOrder`: Representeert een Whisky for Charity bestelling met klantgegevens en items
+- `WFCOrderItem`: Bevat gegevens over individuele items in een bestelling
+- `WFCOrderEmailData`: Container voor email-gerelateerde data
+- `WFCOrderRequest`: Definieert de verwachte structuur voor inkomende API requests
+
+#### Handlers
+- `WFCOrderHandler`: Verwerkt inkomende order requests en stuurt zowel klant- als adminemails
+- `WFCAPIKeyMiddleware`: Middleware voor API key-gebaseerde authenticatie
+
+#### Services
+- `SendWFCOrderEmail`: Specifieke service-methode voor het verzenden van WFC order emails
+- `SendWFC`: Gespecialiseerde methode in de SMTP client voor het gebruik van WFC-specifieke SMTP configuratie
+
+#### Templates
+- `wfc_order_confirmation.html`: Template voor klantenbevestigingen
+- `wfc_order_admin.html`: Template voor admin notificaties met uitgebreide orderdetails
+
+### API Documentatie
+
+#### Order Email API Endpoint
+
+- **URL**: `/api/wfc/order-email`
+- **Methode**: `POST`
+- **Authenticatie**: API Key (via `X-API-Key` header)
+- **Content-Type**: `application/json`
+
+**Request Body**:
+```json
+{
+  "order_id": "string",              // Verplicht: Unieke order ID
+  "customer_name": "string",         // Verplicht: Naam van de klant
+  "customer_email": "string",        // Verplicht: Email van de klant
+  "customer_address": "string",      // Optioneel: Adres van de klant
+  "customer_city": "string",         // Optioneel: Stad van de klant
+  "customer_postal": "string",       // Optioneel: Postcode van de klant
+  "customer_country": "string",      // Optioneel: Land van de klant
+  "total_amount": 0.00,              // Verplicht: Totaalbedrag van de order
+  "items": [                         // Verplicht: Array van bestelde items
+    {
+      "id": "string",                // Unieke ID van het item
+      "order_id": "string",          // Order ID waartoe dit item behoort
+      "product_id": "string",        // Product ID referentie
+      "product_name": "string",      // Naam van het product
+      "quantity": 0,                 // Aantal stuks
+      "price": 0.00                  // Prijs per stuk
+    }
+  ],
+  "notify_admin": true,              // Optioneel: Niet meer gebruikt (beide emails worden altijd verstuurd)
+  "template_type": "string"          // Optioneel: Type template om te gebruiken
+}
+```
+
+**Voorbeeld Response (Success)**:
+```json
+{
+  "success": true,
+  "customer_email_sent": true,
+  "admin_email_sent": true,
+  "order_id": "order_123456"
+}
+```
+
+**Voorbeeld Response (Error)**:
+```json
+{
+  "error": "Missing required fields"
+}
+```
+
+**Status Codes**:
+- `200 OK`: Verzoek succesvol verwerkt
+- `400 Bad Request`: Ongeldige input of ontbrekende velden
+- `401 Unauthorized`: Ontbrekende of ongeldige API key
+- `500 Internal Server Error`: Server error bij het verwerken van het verzoek
+
+### Configuratie
+
+De Whisky for Charity integratie wordt geconfigureerd via de volgende omgevingsvariabelen:
+
+```env
+# WFC SMTP Configuratie
+WFC_SMTP_HOST=mail.example.com        // SMTP server voor WFC emails
+WFC_SMTP_PORT=465                     // SMTP poort (meestal 465 voor SSL)
+WFC_SMTP_USER=noreply@example.com     // SMTP gebruikersnaam
+WFC_SMTP_PASSWORD=your_smtp_password  // SMTP wachtwoord
+WFC_SMTP_FROM=noreply@example.com     // Afzender email adres
+
+# WFC API Beveiliging
+WFC_API_KEY=your_api_key              // API key voor WFC endpoint authenticatie
+
+# WFC Admin Configuratie
+WFC_ADMIN_EMAIL=admin@example.com     // Admin email adres voor ordernotificaties
+WFC_SITE_URL=https://example.com      // Site URL voor links in emails
+```
+
+### Email Templates
+
+De WFC module gebruikt twee gespecialiseerde email templates:
+
+#### Customer Order Confirmation
+
+Dit template wordt gebruikt voor het verzenden van orderbevestigingen naar klanten. Het bevat:
+- Order details (ID, datum, totaalbedrag)
+- Itemlijst met productnamen, aantallen en prijzen
+- Verzendgegevens
+- Links naar de orderpagina op de website
+
+#### Admin Order Notification
+
+Dit template wordt gebruikt voor het informeren van admins over nieuwe orders. Het bevat:
+- Gedetailleerde orderinformatie
+- Uitgebreide klantgegevens inclusief contactinformatie
+- Volledige itemlijst met product IDs, prijzen en totalen
+- Responsieve layout met geformatteerde secties
+
+Beide templates ondersteunen de volgende template functies:
+- `multiply`: Voor het berekenen van totaalbedragen per item (prijs × aantal)
+- `currentYear`: Voor het dynamisch weergeven van het huidige jaar in copyright notices
+
+### Integratie met Frontend
+
+Het WFC order email endpoint is ontworpen om naadloos te integreren met het Whisky for Charity webplatform. De frontend maakt een HTTP POST request naar het endpoint met de ordergegevens nadat een bestelling is geplaatst.
+
+De frontend moet de volgende stappen volgen:
+1. Verzamel alle benodigde ordergegevens (klantinfo, items, bedragen)
+2. Formateer de data volgens het verwachte request formaat (snake_case JSON)
+3. Voeg de API key toe aan de `X-API-Key` header
+4. Verstuur de POST request naar het `/api/wfc/order-email` endpoint
+5. Verwerk de response om te bevestigen dat emails succesvol zijn verzonden
+
+### Veiligheid en Privacy
+
+De WFC module is ontworpen met speciale aandacht voor veiligheid en privacy:
+
+1. **API Key Authenticatie**: Alle requests vereisen een geldige API key
+2. **Gescheiden SMTP Configuratie**: WFC emails worden verzonden via een specifieke SMTP server
+3. **Geen Telegram Logging**: WFC ordergegevens worden niet doorgestuurd naar Telegram voor privacy
+4. **TLS Encryptie**: Alle SMTP communicatie is versleuteld met TLS
+5. **Rate Limiting**: Standaard rate limiting wordt toegepast om misbruik te voorkomen
+
+### Foutafhandeling
+
+De WFC module bevat robuuste foutafhandeling:
+
+1. **Request Validatie**: Controleert of alle vereiste velden aanwezig zijn
+2. **Template Validatie**: Valideert templates voordat ze worden gebruikt
+3. **SMTP Error Handling**: Vangt SMTP fouten af en logt deze voor troubleshooting
+4. **Partial Success Handling**: Bij gedeeltelijk succes (bijv. alleen admin email verzonden) wordt dit in de response aangegeven
+5. **Rate Limit Errors**: Bij overschrijding van rate limits wordt een duidelijke foutmelding gegeven
+
+### Lokaal Testen
+
+Voor lokaal testen van de WFC integratie:
+
+1. Configureer de WFC omgevingsvariabelen in je `.env` bestand
+2. Start de applicatie met `go run main.go`
+3. Gebruik een tool zoals Postman of cURL om requests te sturen naar het endpoint:
+
+```bash
+curl -X POST http://localhost:8080/api/wfc/order-email \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your_api_key" \
+  -d '{
+    "order_id": "test_123",
+    "customer_name": "Test User",
+    "customer_email": "test@example.com",
+    "total_amount": 150.00,
+    "items": [
+      {
+        "id": "item_1",
+        "order_id": "test_123",
+        "product_id": "prod_1",
+        "product_name": "Test Whisky",
+        "quantity": 2,
+        "price": 75.00
+      }
+    ]
+  }'
+```
+
 ## 🔄 Recente Updates
 
 ### Maart 2025
+- Toegevoegd: Whisky for Charity (WFC) integratie met API endpoints, modellen en email templates
+- Verbeterd: WFC admin email template met uitgebreide orderdetails en responsieve layout
+- Toegevoegd: Dual-email flow voor WFC orders (klant en admin notificaties)
+- Toegevoegd: Gescheiden SMTP configuratie voor Whisky for Charity emails
+- Toegevoegd: API key authenticatie voor WFC endpoints
+- Toegevoegd: API documentatie voor WFC integratie
 - Toegevoegd: API key authenticatie voor metrics endpoints
 - Verbeterd: Metrics endpoints voor email en rate limiting statistieken
 - Toegevoegd: Prometheus metrics endpoint
@@ -822,118 +1026,3 @@ Authorization: Bearer <your_jwt_token>
 - Verbeterd: Probleemoplossing voor Telegram bot configuratie
 - Toegevoegd: API endpoint voor het opnieuw verwerken van notificaties
 - Toegevoegd: Test commando voor het verificeren van de Telegram bot configuratie
-
-# DKL Email Service - API Test Tools
-
-Dit project bevat scripts voor het testen van de DKL Email Service API, specifiek gericht op de Contact en Aanmelding Beheer endpoints.
-
-## Inhoud
-
-- `insert_test_data.ps1`: Script voor het genereren van SQL om testgegevens in de database in te voegen
-- `run_api_test.ps1`: Script voor het testen van de API endpoints
-
-## Vereisten
-
-- PowerShell 5.1 of hoger
-- Toegang tot de DKL Email Service API
-- PostgreSQL client tools (optioneel, voor het uitvoeren van de SQL queries)
-
-## Configuratie
-
-De scripts gebruiken standaard de volgende configuratie:
-
-### Database configuratie
-
-```
-Host: dpg-cva4c01c1ekc738q6q0g-a
-Port: 5432
-Database: dekoninklijkeloopdatabase
-Username: dekoninklijkeloopdatabase_user
-Password: I4QP3JwyCcEbn8tGl6k3ErEvjUZ9V5rB
-SSL Mode: require
-```
-
-### API configuratie
-
-```
-Base URL: https://dklemailservice.onrender.com/
-```
-
-Je kunt deze configuratie aanpassen door omgevingsvariabelen in te stellen:
-
-```powershell
-# Database configuratie
-$env:DB_HOST = "jouw-database-host"
-$env:DB_PORT = "jouw-database-port"
-$env:DB_NAME = "jouw-database-naam"
-$env:DB_USER = "jouw-database-gebruiker"
-$env:DB_PASSWORD = "jouw-database-wachtwoord"
-$env:DB_SSL_MODE = "jouw-ssl-mode"
-
-# API configuratie
-$env:API_BASE_URL = "jouw-api-base-url"
-```
-
-## Gebruik
-
-### Stap 1: Testgegevens invoegen
-
-Voer het volgende commando uit om het script voor het genereren van testgegevens te starten:
-
-```powershell
-.\insert_test_data.ps1
-```
-
-Dit script genereert een SQL bestand (`insert_test_data.sql`) met queries om testgegevens in te voegen. Je kunt deze SQL uitvoeren met een PostgreSQL client zoals psql of pgAdmin.
-
-Met psql:
-
-```bash
-psql -h <host> -p <port> -d <database> -U <username> -f insert_test_data.sql
-```
-
-### Stap 2: API tests uitvoeren
-
-Nadat je de testgegevens hebt ingevoegd, kun je de API tests uitvoeren met:
-
-```powershell
-.\run_api_test.ps1
-```
-
-Dit script test de volgende endpoints:
-
-#### Contact Beheer Endpoints
-
-1. `GET /api/contact/beheer` - Ophalen van alle contactformulieren
-2. `GET /api/contact/beheer/{id}` - Ophalen van een specifiek contactformulier
-3. `PATCH /api/contact/beheer/{id}` - Bijwerken van een contactformulier status
-4. `POST /api/contact/beheer/{id}/antwoord` - Beantwoorden van een contactformulier
-
-#### Aanmelding Beheer Endpoints
-
-1. `GET /api/aanmelding/beheer` - Ophalen van alle aanmeldingen
-2. `GET /api/aanmelding/beheer/{id}` - Ophalen van een specifieke aanmelding
-3. `PATCH /api/aanmelding/beheer/{id}` - Bijwerken van een aanmelding status
-4. `POST /api/aanmelding/beheer/{id}/antwoord` - Beantwoorden van een aanmelding
-
-## Probleemoplossing
-
-### API niet bereikbaar
-
-Als de API niet bereikbaar is, controleer dan:
-
-1. Of de API-server draait
-2. Of de Base URL correct is
-3. Of er netwerkproblemen zijn
-
-### Database problemen
-
-Als je problemen hebt met het invoegen van testgegevens:
-
-1. Controleer of de database-inloggegevens correct zijn
-2. Controleer of je toegang hebt tot de database
-3. Controleer of de tabellen bestaan in de database
-
-## Licentie
-
-Dit project is eigendom van De Koninklijke Loop en mag alleen worden gebruikt met toestemming.
