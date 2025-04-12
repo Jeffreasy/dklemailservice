@@ -511,6 +511,12 @@ func main() {
 		return c.Status(recorder.Code).Send(recorder.Body.Bytes())
 	})
 
+	// Initialiseer de nieuwe admin mail handler
+	adminMailHandler := handlers.NewAdminMailHandler(serviceFactory.EmailService, serviceFactory.AuthService)
+
+	// Registreer de admin mail routes
+	adminMailHandler.RegisterRoutes(app)
+
 	// Start server
 	port := os.Getenv("PORT")
 	if port == "" {
