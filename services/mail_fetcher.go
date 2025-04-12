@@ -71,6 +71,10 @@ func (f *MailFetcher) FetchMails() ([]*models.IncomingEmail, error) {
 	// Maak een timestamp van nu om de lastFetch bij te werken
 	fetchTime := time.Now()
 
+	// Begin FetchMails
+	currentLastFetch := f.lastFetch
+	logger.Info("FetchMails start", "huidige_lastFetch", currentLastFetch)
+
 	for _, account := range f.accounts {
 		wg.Add(1)
 		go func(acc *MailAccount) {
@@ -99,6 +103,9 @@ func (f *MailFetcher) FetchMails() ([]*models.IncomingEmail, error) {
 	// Update de lastFetch timestamp voor de volgende keer
 	f.lastFetch = fetchTime
 
+	// Vlak voor return allMails, nil of de error return
+	logger.Info("FetchMails einde", "nieuwe_lastFetch", f.lastFetch)
+
 	if len(errors) > 0 {
 		errMessages := make([]string, len(errors))
 		for i, err := range errors {
@@ -112,6 +119,8 @@ func (f *MailFetcher) FetchMails() ([]*models.IncomingEmail, error) {
 
 // fetchFromAccount haalt e-mails op van één specifiek account
 func (f *MailFetcher) fetchFromAccount(account *MailAccount, since time.Time) ([]*models.IncomingEmail, error) {
+	// Begin fetchFromAccount
+	logger.Info("Start fetchFromAccount", "account", account.Username, "since_parameter", since)
 	// Verbind met de IMAP server
 	imapAddr := fmt.Sprintf("%s:%d", account.Host, account.Port)
 	c, err := client.DialTLS(imapAddr, nil)
@@ -145,6 +154,8 @@ func (f *MailFetcher) fetchFromAccount(account *MailAccount, since time.Time) ([
 	if err != nil {
 		return nil, fmt.Errorf("zoeken mislukt: %w", err)
 	}
+
+	logger.Info("IMAP Search resultaat", "account", account.Username, "aantal_uids", len(uids))
 
 	if len(uids) == 0 {
 		return []*models.IncomingEmail{}, nil
