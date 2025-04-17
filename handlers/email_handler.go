@@ -391,6 +391,22 @@ func (h *EmailHandler) HandleAanmeldingEmail(c *fiber.Ctx) error {
 		logger.Info("Bevestigingsemail verzonden",
 			"user_email", aanmelding.Email,
 			"elapsed", time.Since(start))
+
+		// Werk de aanmelding bij in de database om aan te geven dat emails zijn verzonden
+		now := time.Now()
+		nieuweAanmelding.EmailVerzonden = true
+		nieuweAanmelding.EmailVerzondenOp = &now
+		ctx := c.Context() // Gebruik dezelfde context als voor create
+		if err := h.aanmeldingRepo.Update(ctx, nieuweAanmelding); err != nil {
+			// Log de fout, maar ga door omdat de hoofdactie (aanmelding + emails) al gelukt is.
+			// We willen geen 500 error teruggeven aan de gebruiker op dit punt.
+			logger.Error("Fout bij bijwerken aanmelding na email verzending",
+				"error", err,
+				"aanmelding_id", nieuweAanmelding.ID)
+		} else {
+			logger.Info("Aanmelding bijgewerkt met email verzendstatus",
+				"aanmelding_id", nieuweAanmelding.ID)
+		}
 	}
 
 	// Stuur een notificatie voor een nieuwe aanmelding
