@@ -3,6 +3,7 @@ package tests
 import (
 	"dklautomationgo/handlers"
 	"dklautomationgo/logger"
+	"dklautomationgo/tests/mocks"
 	"testing"
 )
 
@@ -58,9 +59,10 @@ func TestHandlerLogging(t *testing.T) {
 	// Maak een mock email service
 	mockService := newMockEmailService()
 	mockNotificationService := NewMockNotificationService()
+	mockAanmeldingRepo := new(mocks.MockAanmeldingRepository)
 
 	// Maak de email handler
-	handler := handlers.NewEmailHandler(mockService, mockNotificationService)
+	handler := handlers.NewEmailHandler(mockService, mockNotificationService, mockAanmeldingRepo)
 
 	// Simuleer het afhandelen van een aanvraag (zonder daadwerkelijk HTTP te gebruiken)
 	// We roepen hier alleen bepaalde functies aan die loggen

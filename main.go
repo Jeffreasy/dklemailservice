@@ -203,7 +203,11 @@ func main() {
 	rateLimiter := serviceFactory.GetRateLimiter()
 
 	// Initialiseer handlers
-	emailHandler := handlers.NewEmailHandler(serviceFactory.EmailService, serviceFactory.NotificationService)
+	emailHandler := handlers.NewEmailHandler(
+		serviceFactory.EmailService,
+		serviceFactory.NotificationService,
+		repoFactory.Aanmelding,
+	)
 	authHandler := handlers.NewAuthHandler(serviceFactory.AuthService, rateLimiter)
 	metricsHandler := handlers.NewMetricsHandler(serviceFactory.EmailMetrics, rateLimiter)
 

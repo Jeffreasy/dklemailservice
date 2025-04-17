@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"dklautomationgo/handlers"
 	"dklautomationgo/models"
+	"dklautomationgo/tests/mocks"
 	"encoding/json"
 	"net/http/httptest"
 	"testing"
@@ -71,13 +72,14 @@ func TestEmailHandlerFlow(t *testing.T) {
 			// Gebruik de bestaande mock uit mocks.go
 			mockService := newMockEmailService()
 			mockNotificationService := NewMockNotificationService()
+			mockAanmeldingRepo := new(mocks.MockAanmeldingRepository)
 
 			// Stel shouldFail in als we een error willen simuleren
 			if tt.name == "Email verzending mislukt" {
 				mockService.shouldFail = true
 			}
 
-			handler := handlers.NewEmailHandler(mockService, mockNotificationService)
+			handler := handlers.NewEmailHandler(mockService, mockNotificationService, mockAanmeldingRepo)
 
 			app.Post("/contact-email", handler.HandleContactEmail)
 
