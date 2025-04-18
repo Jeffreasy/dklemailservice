@@ -155,7 +155,7 @@ func (r *PostgresIncomingEmailRepository) ListByAccountTypePaginated(ctx context
 	}
 
 	// Query om het totaal aantal te tellen
-	countQuery := tx.Model(&models.IncomingEmail{}).Where("account_tag = ?", accountType)
+	countQuery := tx.Model(&models.IncomingEmail{}).Where("account_type = ?", accountType)
 	if err := countQuery.Count(&totalCount).Error; err != nil {
 		tx.Rollback() // Rollback bij fout
 		logger.Error("Fout bij tellen inkomende e-mails op account type", "error", err, "account_type", accountType)
@@ -164,7 +164,7 @@ func (r *PostgresIncomingEmailRepository) ListByAccountTypePaginated(ctx context
 
 	// Query om de gepagineerde data op te halen
 	dataQuery := tx.Model(&models.IncomingEmail{}).
-		Where("account_tag = ?", accountType).
+		Where("account_type = ?", accountType).
 		Order("received_at desc").
 		Limit(limit).
 		Offset(offset)
