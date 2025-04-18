@@ -30,9 +30,8 @@ var (
 
 // JWTClaims definieert de claims in het JWT token
 type JWTClaims struct {
-	UserID string `json:"user_id"`
-	Email  string `json:"email"`
-	Role   string `json:"role"`
+	Email string `json:"email"`
+	Role  string `json:"role"`
 	jwt.RegisteredClaims
 }
 
@@ -128,25 +127,40 @@ func (s *AuthServiceImpl) ValidateToken(token string) (string, error) {
 	})
 
 	if err != nil {
-		logger.Error("Fout bij valideren token", "error", err)
+		// Verbeterde logging om specifieke JWT validatiefouten te tonen
+		if errors.Is(err, jwt.ErrTokenMalformed) {
+			logger.Error("Fout bij valideren token: Malformed token", "error", err)
+		} else if errors.Is(err, jwt.ErrTokenSignatureInvalid) {
+			logger.Error("Fout bij valideren token: Invalid signature", "error", err)
+		} else if errors.Is(err, jwt.ErrTokenExpired) || errors.Is(err, jwt.ErrTokenNotValidYet) {
+			logger.Warn("Fout bij valideren token: Token expired or not valid yet", "error", err)
+		} else {
+			logger.Error("Fout bij valideren token: Andere fout", "error", err)
+		}
 		return "", ErrInvalidToken
 	}
 
-	// Controleer of token geldig is
+	// Controleer of token geldig is (ParseWithClaims doet dit al, maar extra check kan geen kwaad)
 	if !parsedToken.Valid {
-		logger.Warn("Ongeldig token")
+		logger.Warn("Ongeldig token (parsedToken.Valid is false)")
 		return "", ErrInvalidToken
 	}
 
 	// Haal claims op
 	claims, ok := parsedToken.Claims.(*JWTClaims)
 	if !ok {
-		logger.Error("Kon claims niet parsen")
+		logger.Error("Kon claims niet naar *JWTClaims casten")
 		return "", ErrInvalidToken
 	}
 
-	logger.Info("Token gevalideerd", "user_id", claims.UserID)
-	return claims.UserID, nil
+	// Controleer of Subject (user ID) leeg is
+	if claims.Subject == "" {
+		logger.Error("Token gevalideerd, maar Subject (user ID) claim is leeg")
+		return "", ErrInvalidToken // Behandel lege user ID als ongeldig token
+	}
+
+	logger.Info("Token gevalideerd", "user_id", claims.Subject) // Gebruik claims.Subject
+	return claims.Subject, nil                                  // Geef Subject (user ID) terug
 }
 
 // GetUserFromToken haalt de gebruiker op basis van een JWT token
@@ -235,9 +249,8 @@ func (s *AuthServiceImpl) ResetPassword(ctx context.Context, email, nieuwWachtwo
 func (s *AuthServiceImpl) generateToken(gebruiker *models.Gebruiker) (string, error) {
 	// Maak claims
 	claims := JWTClaims{
-		UserID: gebruiker.ID,
-		Email:  gebruiker.Email,
-		Role:   gebruiker.Rol,
+		Email: gebruiker.Email,
+		Role:  gebruiker.Rol,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.tokenExpiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
