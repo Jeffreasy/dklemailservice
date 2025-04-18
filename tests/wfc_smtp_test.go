@@ -102,7 +102,7 @@ func TestWhiskyForCharitySMTP(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Test the WFC email method
-		err = emailService.SendWhiskyForCharityEmail("test@example.com", "WFC Test", "<p>Testing WFC</p>")
+		err = emailService.SendWFCEmail("test@example.com", "WFC Test", "<p>Testing WFC</p>")
 		assert.NoError(t, err)
 
 		// Verify correct method was called on client

@@ -18,17 +18,43 @@ type AdminMailHandler struct {
 
 // SendMailRequest defines the expected JSON body for the send mail endpoint.
 type SendMailRequest struct {
-	To      string `json:"to" validate:"required,email"`
-	Subject string `json:"subject" validate:"required,min=1"`
-	Body    string `json:"body" validate:"required,min=1"`
+	To                string                 `json:"to" validate:"required,email"`
+	Subject           string                 `json:"subject" validate:"required,min=1"`
+	Body              string                 `json:"body,omitempty"` // Body is now optional if template is used
+	TemplateName      string                 `json:"template_name,omitempty"`
+	TemplateVariables map[string]interface{} `json:"template_variables,omitempty"`
+}
+
+// ValidateSendMailRequest performs custom validation logic
+func ValidateSendMailRequest(sl validator.StructLevel) {
+	req := sl.Current().Interface().(SendMailRequest)
+
+	if req.Body == "" && req.TemplateName == "" {
+		sl.ReportError(req.Body, "body", "Body", "required_without", "TemplateName")
+		sl.ReportError(req.TemplateName, "template_name", "TemplateName", "required_without", "Body")
+	}
+
+	if req.TemplateName != "" && req.Body != "" {
+		sl.ReportError(req.TemplateName, "template_name", "TemplateName", "excluded_with", "Body")
+		sl.ReportError(req.Body, "body", "Body", "excluded_with", "TemplateName")
+	}
+
+	if req.TemplateName != "" && (req.TemplateVariables == nil || len(req.TemplateVariables) == 0) {
+		// Optionally require variables if template is used, or allow empty maps
+		// sl.ReportError(req.TemplateVariables, "template_variables", "TemplateVariables", "required_with", "TemplateName")
+	}
 }
 
 // NewAdminMailHandler creates a new AdminMailHandler instance.
 func NewAdminMailHandler(emailSvc services.EmailSender, authSvc services.AuthService) *AdminMailHandler {
+	v := validator.New()
+	// Register custom validation
+	v.RegisterStructValidation(ValidateSendMailRequest, SendMailRequest{})
+
 	return &AdminMailHandler{
 		emailService: emailSvc,
 		authService:  authSvc,
-		validate:     validator.New(),
+		validate:     v,
 	}
 }
 
@@ -57,7 +83,7 @@ func (h *AdminMailHandler) HandleSendMail(c *fiber.Ctx) error {
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"success": false, "error": "Ongeldige request body: " + err.Error()})
 	}
 
-	// Validate the request body using the validator
+	// Validate the request body using the validator (including custom validation)
 	if err := h.validate.Struct(req); err != nil {
 		errors := FormatValidationErrors(err) // Helper function to format errors nicely
 		logger.Warn("Validation failed for /admin/mail/send", "errors", errors, "ip", c.IP())
@@ -71,11 +97,11 @@ func (h *AdminMailHandler) HandleSendMail(c *fiber.Ctx) error {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": "Interne serverfout: Gebruikerscontext ontbreekt."})
 	}
 
-	logger.Info("Processing admin mail send request", "adminUserID", userID, "to", req.To, "subject", req.Subject, "test_mode", isTestMode, "ip", c.IP())
+	logger.Info("Processing admin mail send request", "adminUserID", userID, "to", req.To, "subject", req.Subject, "template", req.TemplateName, "has_body", req.Body != "", "test_mode", isTestMode, "ip", c.IP())
 
 	// --- Test Mode Check ---
 	if isTestMode {
-		logger.Info("[TEST MODE] Admin mail send skipped.", "adminUserID", userID, "to", req.To, "subject", req.Subject, "ip", c.IP())
+		logger.Info("[TEST MODE] Admin mail send skipped.", "adminUserID", userID, "to", req.To, "subject", req.Subject, "template", req.TemplateName, "ip", c.IP())
 		return c.Status(http.StatusOK).JSON(fiber.Map{
 			"success":   true,
 			"message":   "[TEST MODE] Email verzoek verwerkt, geen echte email verzonden.",
@@ -84,14 +110,21 @@ func (h *AdminMailHandler) HandleSendMail(c *fiber.Ctx) error {
 	}
 	// --- End Test Mode Check ---
 
-	// Send the email using the existing generic SendEmail method (only if not in test mode)
-	err := h.emailService.SendEmail(req.To, req.Subject, req.Body)
+	var err error
+	if req.TemplateName != "" {
+		// Send using template
+		err = h.emailService.SendTemplateEmail(req.To, req.Subject, req.TemplateName, req.TemplateVariables)
+	} else {
+		// Send using plain body
+		err = h.emailService.SendEmail(req.To, req.Subject, req.Body)
+	}
+
 	if err != nil {
-		logger.Error("Error sending admin email", "error", err, "to", req.To, "adminUserID", userID, "ip", c.IP())
+		logger.Error("Error sending admin email", "error", err, "to", req.To, "template", req.TemplateName, "adminUserID", userID, "ip", c.IP())
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": "Kon email niet verzenden: " + err.Error()})
 	}
 
-	logger.Info("Admin mail sent successfully", "adminUserID", userID, "to", req.To, "subject", req.Subject, "ip", c.IP())
+	logger.Info("Admin mail sent successfully", "adminUserID", userID, "to", req.To, "subject", req.Subject, "template", req.TemplateName, "ip", c.IP())
 	return c.Status(http.StatusOK).JSON(fiber.Map{"success": true, "message": "Email succesvol verzonden."})
 }
 

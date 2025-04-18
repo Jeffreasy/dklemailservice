@@ -65,6 +65,10 @@ type AuthService interface {
 
 type EmailSender interface {
 	SendEmail(to, subject, body string) error
+	// SendWFCEmail stuurt een Whisky for Charity e-mail met platte tekst body
+	SendWFCEmail(to, subject, body string) error
+	// SendTemplateEmail stuurt een e-mail met behulp van een template en variabelen
+	SendTemplateEmail(recipient, subject, templateName string, templateData map[string]interface{}) error
 }
 
 type TemplateRenderer interface {

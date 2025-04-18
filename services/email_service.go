@@ -411,8 +411,8 @@ func (s *EmailService) SetRateLimiter(limiter RateLimiterInterface) {
 	s.rateLimiter = limiter
 }
 
-// SendWhiskyForCharityEmail verzendt een email via de WFC configuratie
-func (s *EmailService) SendWhiskyForCharityEmail(to, subject, body string) error {
+// SendWFCEmail verzendt een email via de WFC configuratie (hernoemd van SendWhiskyForCharityEmail)
+func (s *EmailService) SendWFCEmail(to, subject, body string) error {
 	start := time.Now()
 	defer func() {
 		duration := time.Since(start)
