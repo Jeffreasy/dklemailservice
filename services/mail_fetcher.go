@@ -13,6 +13,7 @@ import (
 
 	"github.com/emersion/go-imap"
 	"github.com/emersion/go-imap/client"
+	"github.com/microcosm-cc/bluemonday"
 )
 
 // MailAccount bevat de configuratie voor een mail account
@@ -224,6 +225,13 @@ func processMessage(msg *imap.Message, section imap.BodySectionName, accountType
 		return nil, fmt.Errorf("kan body niet lezen: %w", err)
 	}
 	body = string(bodyBytes)
+
+	// Sanitize HTML body if content type is text/html
+	if strings.Contains(strings.ToLower(contentType), "text/html") {
+		p := bluemonday.UGCPolicy() // User Generated Content policy, allows basic formatting
+		body = p.Sanitize(body)
+		logger.Debug("HTML body gesanitized", "message_id", messageId, "uid", msg.Uid)
+	}
 
 	// Parse de datum
 	var receivedAt time.Time
