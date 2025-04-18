@@ -269,7 +269,7 @@ func main() {
 	// Configure CORS
 	allowedOrigins := strings.Split(os.Getenv("ALLOWED_ORIGINS"), ",")
 	if len(allowedOrigins) == 0 || (len(allowedOrigins) == 1 && allowedOrigins[0] == "") {
-		allowedOrigins = []string{"https://www.dekoninklijkeloop.nl", "https://dekoninklijkeloop.nl", "http://localhost:3000", "http://localhost:5173"}
+		allowedOrigins = []string{"https://www.dekoninklijkeloop.nl", "https://dekoninklijkeloop.nl", "admin.dekoninklijkeloop.nl", "http://localhost:3000", "http://localhost:5173"}
 	}
 
 	logger.Info("CORS geconfigureerd", "origins", allowedOrigins)
