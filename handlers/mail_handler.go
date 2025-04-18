@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"dklautomationgo/logger"
+	"dklautomationgo/models"
 	"dklautomationgo/repository"
 	"dklautomationgo/services"
 	"os"
@@ -10,6 +11,12 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 )
+
+// PaginatedEmailsResponse definieert de structuur voor gepagineerde email responses
+type PaginatedEmailsResponse struct {
+	Emails     []*models.IncomingEmail `json:"emails"`
+	TotalCount int64                   `json:"totalCount"`
+}
 
 // MailHandler bevat handlers voor e-mail beheer
 type MailHandler struct {
@@ -403,14 +410,16 @@ func (h *MailHandler) ListUnprocessedEmails(c *fiber.Ctx) error {
 	return c.JSON(emails)
 }
 
-// ListEmailsByAccountType haalt emails op basis van account type op
-// @Summary Emails filteren op account type
-// @Description Haalt een lijst van emails op gefilterd op account type
+// ListEmailsByAccountType haalt een lijst van emails op per account type met paginering
+// @Summary Lijst van emails ophalen per account type
+// @Description Haalt een gepagineerde lijst van emails op voor een specifiek account type
 // @Tags Mail
 // @Accept json
 // @Produce json
-// @Param type path string true "Account type (info, inschrijving)"
-// @Success 200 {array} models.IncomingEmail
+// @Param type path string true "Account Type (bv. 'info', 'inschrijving')"
+// @Param limit query int false "Aantal resultaten per pagina (standaard 10)"
+// @Param offset query int false "Offset voor paginering (standaard 0)"
+// @Success 200 {object} PaginatedEmailsResponse
 // @Failure 400 {object} map[string]interface{}
 // @Failure 401 {object} map[string]interface{}
 // @Failure 403 {object} map[string]interface{}
@@ -426,60 +435,46 @@ func (h *MailHandler) ListEmailsByAccountType(c *fiber.Ctx) error {
 		})
 	}
 
-	// Valideer account type
-	if accountType != "info" && accountType != "inschrijving" {
+	// Haal query parameters op
+	limit := c.QueryInt("limit", 10)
+	offset := c.QueryInt("offset", 0)
+
+	// Valideer parameters
+	if limit < 1 || limit > 100 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Ongeldig account type (gebruik 'info' of 'inschrijving')",
+			"error": "Limit moet tussen 1 en 100 liggen",
 		})
 	}
 
-	// Haal emails op
+	if offset < 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Offset mag niet negatief zijn",
+		})
+	}
+
+	// Haal emails en totaal aantal op
 	ctx := c.Context()
-	emails, err := h.incomingEmailRepo.FindByAccountType(ctx, accountType)
+	emails, totalCount, err := h.incomingEmailRepo.ListByAccountTypePaginated(ctx, accountType, limit, offset)
 	if err != nil {
-		logger.Error("Fout bij ophalen emails op account type", "error", err, "type", accountType)
+		logger.Error("Fout bij ophalen gepagineerde emails per account type", "error", err, "account_type", accountType)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon emails niet ophalen",
 		})
+	}
+
+	// Bouw de response
+	response := PaginatedEmailsResponse{
+		Emails:     emails,
+		TotalCount: totalCount,
 	}
 
 	// Stuur resultaat terug
-	return c.JSON(emails)
+	return c.JSON(response)
 }
 
-// GetEmails haalt alle inkomende emails op
+// GetEmails is verouderd en niet meer gebruikt. Behoud voor mogelijke interne logica, maar niet blootstellen als API endpoint.
+// TODO: Verwijder deze functie als deze nergens meer wordt aangeroepen.
 func (h *MailHandler) GetEmails(c *fiber.Ctx) error {
-	// Admin check
-	user, err := h.authService.GetUserFromToken(c.Context(), string(c.Request().Header.Peek("Authorization")))
-	if err != nil {
-		logger.Error("Fout bij ophalen gebruiker", "error", err)
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Niet geautoriseerd",
-		})
-	}
-
-	// Controleer of gebruiker admin is (direct op rol)
-	if user.Rol != "admin" {
-		logger.Warn("Toegang geweigerd: gebruiker is geen admin", "user_id", user.ID, "role", user.Rol)
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"error": "Alleen beheerders hebben toegang tot deze functie",
-		})
-	}
-
-	// Debug logging voor database issues
-	logger.Info("GetEmails API aangeroepen door admin", "user_id", user.ID, "user_email", user.Email)
-
-	// Haal emails op uit de repository
-	emails, err := h.incomingEmailRepo.List(c.Context(), 100, 0)
-	if err != nil {
-		logger.Error("Fout bij ophalen inkomende e-mails", "error", err)
-		logger.Error("Fout bij ophalen emails", "error", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Kon emails niet ophalen",
-		})
-	}
-
-	return c.JSON(fiber.Map{
-		"emails": emails,
-	})
+	// Implementatie van GetEmails...
+	return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{"message": "Endpoint not implemented"})
 }
