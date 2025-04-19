@@ -246,6 +246,9 @@ func processMessage(msg *imap.Message, section imap.BodySectionName, accountType
 	}
 	decodedBody := string(bodyBytes) // Dit is nu de gedecodeerde body
 
+	// DEBUG: Log de gedecodeerde body
+	logger.Debug("Decoded email body content", "message_id", messageId, "uid", msg.Uid, "decoded_body_preview", getFirstNChars(decodedBody, 200)) // Log first 200 chars
+
 	// TODO: Overweeg charset conversie hier indien nodig, gebaseerd op contentType
 
 	// Sanitize body if content type is text/html
@@ -299,4 +302,12 @@ func (f *MailFetcher) SetLastFetchTime(t time.Time) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.lastFetch = t
+}
+
+// Helper function to get first N characters of a string
+func getFirstNChars(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
 }
