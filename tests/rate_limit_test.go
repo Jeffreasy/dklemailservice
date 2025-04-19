@@ -19,7 +19,7 @@ func TestEmailRateLimiting(t *testing.T) {
 	os.Setenv("EMAIL_RATE_LIMIT", "3") // 3 per minuut = 1 per 20 seconden
 	defer os.Unsetenv("EMAIL_RATE_LIMIT")
 
-	smtp := newMockSMTP()
+	smtp := &mockSMTP{}
 	emailMetrics := services.NewEmailMetrics(time.Hour)
 	reg := prometheus.NewRegistry()
 	prometheusMetrics := services.NewPrometheusMetricsWithRegistry(reg)
@@ -101,5 +101,37 @@ func TestEmailRateLimit(t *testing.T) {
 	// Vierde verzoek zou geweigerd moeten worden
 	if limiter.AllowEmail("test_email", "") {
 		t.Errorf("Vierde verzoek had geweigerd moeten worden")
+	}
+}
+
+func TestRateLimiterIntegration_Allow(t *testing.T) {
+	mockLimiter := &mockRateLimiter{
+		AllowFunc: func(key string) bool { return true }, // Configure mock to allow
+	}
+	mockSMTP := &mockSMTP{}
+	mockMetrics := &mockPrometheusMetrics{}
+	mockEmailMetrics := services.NewEmailMetrics(time.Hour) // Add missing EmailMetrics
+
+	service := services.NewEmailService(mockSMTP, mockEmailMetrics, mockLimiter, mockMetrics) // Pass all required args
+
+	err := service.SendEmail("allow@example.com", "Test Allow", "<p>Should be allowed</p>")
+	if err != nil {
+		t.Errorf("Expected email to be allowed, but got error: %v", err)
+	}
+}
+
+func TestRateLimiterIntegration_Deny(t *testing.T) {
+	mockLimiter := &mockRateLimiter{
+		AllowFunc: func(key string) bool { return false }, // Configure mock to deny
+	}
+	mockSMTP := &mockSMTP{}
+	mockMetrics := &mockPrometheusMetrics{}
+	mockEmailMetrics := services.NewEmailMetrics(time.Hour) // Add missing EmailMetrics
+
+	service := services.NewEmailService(mockSMTP, mockEmailMetrics, mockLimiter, mockMetrics) // Pass all required args
+
+	err := service.SendEmail("deny@example.com", "Test Deny", "<p>Should be denied</p>")
+	if err == nil {
+		t.Errorf("Expected email to be denied, but got no error")
 	}
 }

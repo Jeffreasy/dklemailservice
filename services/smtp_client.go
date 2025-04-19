@@ -178,14 +178,25 @@ func (c *RealSMTPClient) sendWithDialer(msg *EmailMessage, conf *SMTPConfig, dia
 	return nil
 }
 
-// SendEmail is een helper functie voor backwards compatibility
-func (c *RealSMTPClient) SendEmail(to, subject, body string) error {
+// SendEmail is een helper functie die het juiste Send/SendWithFrom aanroept.
+// De signature is aangepast om te voldoen aan de SMTPClient interface.
+func (c *RealSMTPClient) SendEmail(to, subject, body string, fromAddress ...string) error {
 	msg := &EmailMessage{
 		To:      to,
 		Subject: subject,
 		Body:    body,
 	}
-	return c.Send(msg)
+
+	finalFromAddress := ""
+	if len(fromAddress) > 0 && fromAddress[0] != "" {
+		finalFromAddress = fromAddress[0]
+	}
+
+	if finalFromAddress == "" {
+		return c.Send(msg)
+	} else {
+		return c.SendWithFrom(finalFromAddress, msg)
+	}
 }
 
 // SendWFCEmail is een helper functie voor het verzenden van Whisky for Charity emails
@@ -196,4 +207,59 @@ func (c *RealSMTPClient) SendWFCEmail(to, subject, body string) error {
 		Body:    body,
 	}
 	return c.SendWFC(msg)
+}
+
+// SendWithFrom verzendt een email met de standaard configuratie, maar met een specifiek 'From' adres.
+func (c *RealSMTPClient) SendWithFrom(from string, msg *EmailMessage) error {
+	if from == "" {
+		// Als 'from' leeg is, val terug op de standaard Send methode die de default From gebruikt.
+		return c.Send(msg)
+	}
+
+	if msg.To == "" {
+		return fmt.Errorf("invalid recipient")
+	}
+
+	// Als we een test dialer hebben, gebruik die (voor mocks)
+	// Merk op: dit testpad gebruikt mogelijk niet het 'from' argument correct, afhankelijk van de mock.
+	if c.dialer != nil {
+		if err := c.dialer.Dial(); err != nil {
+			return err
+		}
+		if mockSMTP, ok := c.dialer.(SMTPClient); ok {
+			// Roep de SendWithFrom aan op de mock indien beschikbaar, anders Send
+			if mockWithFrom, okFrom := mockSMTP.(interface {
+				SendWithFrom(from string, msg *EmailMessage) error
+			}); okFrom {
+				return mockWithFrom.SendWithFrom(from, msg)
+			}
+			return mockSMTP.Send(msg)
+		}
+		return nil
+	}
+
+	// Gebruik de default dialer, maar override het 'From' adres
+	dialer := c.defaultDialer
+	if dialer == nil {
+		return fmt.Errorf("default smtp dialer is not configured")
+	}
+
+	m := gomail.NewMessage()
+	m.SetHeader("From", from) // Gebruik het meegegeven 'from' adres
+	m.SetHeader("To", msg.To)
+	m.SetHeader("Subject", msg.Subject)
+	m.SetBody("text/html", msg.Body)
+
+	// Gebruik connection pooling voor betere performance
+	c.connMutex.Lock()
+	defer c.connMutex.Unlock()
+
+	// Probeer e-mail te verzenden met de default dialer
+	err := dialer.DialAndSend(m)
+	if err != nil {
+		log.Printf("Error sending email with specific from address '%s': %v", from, err)
+		return err
+	}
+
+	return nil
 }

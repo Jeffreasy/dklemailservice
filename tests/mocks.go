@@ -5,10 +5,11 @@ import (
 	"context"
 	"dklautomationgo/models"
 	"dklautomationgo/services"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/stretchr/testify/mock"
 )
 
 // mockEmailService implementeert de handlers.EmailServiceInterface
@@ -115,112 +116,172 @@ func (m *mockEmailService) SendBatchEmail(batchKey string, recipients []string, 
 //
 //nolint:unused // These mocks are kept for future tests
 type mockSMTP struct {
-	mu         sync.Mutex
-	sentEmails []*services.EmailMessage
-	shouldFail bool
-	failFirst  bool
-	firstSent  bool
+	mock.Mock
+	mutex              sync.Mutex
+	Dialer             services.SMTPDialer
+	ShouldFail         bool
+	SendCalled         bool
+	SendRegCalled      bool
+	SendWFCCalled      bool
+	SendWithFromCalled bool
+	LastFrom           string
+	LastTo             string
+	LastSubject        string
+	LastBody           string
+	SendError          error
 }
 
 //nolint:unused // These mocks are kept for future tests
 func (m *mockSMTP) Send(msg *services.EmailMessage) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if msg.To == "" {
-		return fmt.Errorf("invalid recipient")
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.SendCalled = true
+	m.LastTo = msg.To
+	m.LastSubject = msg.Subject
+	m.LastBody = msg.Body
+	args := m.Called(msg)
+	if m.SendError != nil {
+		return m.SendError
 	}
-
-	if m.failFirst && !m.firstSent {
-		m.firstSent = true
-		return fmt.Errorf("mock smtp error")
-	}
-
-	if m.shouldFail {
-		return fmt.Errorf("mock email error")
-	}
-
-	m.sentEmails = append(m.sentEmails, msg)
-	return nil
+	return args.Error(0)
 }
 
 //nolint:unused // These mocks are kept for future tests
 func (m *mockSMTP) SendRegistration(msg *services.EmailMessage) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.SendRegCalled = true
+	m.LastTo = msg.To
+	m.LastSubject = msg.Subject
+	m.LastBody = msg.Body
+	args := m.Called(msg)
+	if m.SendError != nil {
+		return m.SendError
+	}
+	return args.Error(0)
+}
 
-	if msg.To == "" {
-		return fmt.Errorf("invalid recipient")
+//nolint:unused // These mocks are kept for future tests
+func (m *mockSMTP) SendWFC(msg *services.EmailMessage) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.SendWFCCalled = true
+	m.LastTo = msg.To
+	m.LastSubject = msg.Subject
+	m.LastBody = msg.Body
+	args := m.Called(msg)
+	if m.SendError != nil {
+		return m.SendError
+	}
+	return args.Error(0)
+}
+
+// Implement SendWithFrom for the mock
+func (m *mockSMTP) SendWithFrom(from string, msg *services.EmailMessage) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.SendWithFromCalled = true
+	m.LastFrom = from // Store the specific from address used
+	m.LastTo = msg.To
+	m.LastSubject = msg.Subject
+	m.LastBody = msg.Body
+	args := m.Called(from, msg)
+	if m.SendError != nil {
+		return m.SendError
+	}
+	return args.Error(0)
+}
+
+// Update SendEmail signature for the mock
+func (m *mockSMTP) SendEmail(to, subject, body string, fromAddress ...string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	finalFrom := ""
+	if len(fromAddress) > 0 {
+		finalFrom = fromAddress[0]
 	}
 
-	if m.shouldFail {
-		return fmt.Errorf("mock email error")
-	}
-
-	m.sentEmails = append(m.sentEmails, msg)
-	return nil
-}
-
-//nolint:unused // These mocks are kept for future tests
-func (m *mockSMTP) Dial() error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if m.shouldFail {
-		return fmt.Errorf("mock dialer error")
-	}
-	return nil
-}
-
-//nolint:unused // These mocks are kept for future tests
-func (m *mockSMTP) SetShouldFail(fail bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.shouldFail = fail
-}
-
-//nolint:unused // These mocks are kept for future tests
-func (m *mockSMTP) SetFailFirst(fail bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.failFirst = fail
-	m.firstSent = false
-}
-
-//nolint:unused // These mocks are kept for future tests
-func (m *mockSMTP) GetLastEmail() *services.EmailMessage {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if len(m.sentEmails) == 0 {
-		return nil
-	}
-	return m.sentEmails[len(m.sentEmails)-1]
-}
-
-//nolint:unused // These mocks are kept for future tests
-func (m *mockSMTP) GetSentEmails() []*services.EmailMessage {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.sentEmails
-}
-
-//nolint:unused // These mocks are kept for future tests
-func newMockSMTP() *mockSMTP {
-	return &mockSMTP{
-		sentEmails: make([]*services.EmailMessage, 0),
-	}
-}
-
-// SendEmail is een helper functie voor backwards compatibility
-//
-//nolint:unused // These mocks are kept for future tests
-func (m *mockSMTP) SendEmail(to, subject, body string) error {
 	msg := &services.EmailMessage{
 		To:      to,
 		Subject: subject,
 		Body:    body,
 	}
-	return m.Send(msg)
+
+	if finalFrom == "" {
+		return m.Send(msg)
+	} else {
+		return m.SendWithFrom(finalFrom, msg)
+	}
+}
+
+//nolint:unused // These mocks are kept for future tests
+func (m *mockSMTP) SendWFCEmail(to, subject, body string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	msg := &services.EmailMessage{
+		To:      to,
+		Subject: subject,
+		Body:    body,
+	}
+	return m.SendWFC(msg)
+}
+
+// Reset clears the mock state
+func (m *mockSMTP) Reset() {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Mock = mock.Mock{}
+	m.SendCalled = false
+	m.SendRegCalled = false
+	m.SendWFCCalled = false
+	m.SendWithFromCalled = false
+	m.LastTo = ""
+	m.LastSubject = ""
+	m.LastBody = ""
+	m.LastFrom = ""
+	m.SendError = nil
+}
+
+// Dial implements the SMTPDialer interface
+//
+//nolint:unused // These mocks are kept for future tests
+func (m *mockSMTP) Dial(addr string) (services.SMTPClient, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	args := m.Called(addr)
+	if m.ShouldFail {
+		return nil, fmt.Errorf("mock SMTP dial error")
+	}
+	clientArg := args.Get(0)
+	if clientArg == nil {
+		return nil, args.Error(1)
+	}
+	if client, ok := clientArg.(services.SMTPClient); ok {
+		return client, args.Error(1)
+	}
+	return nil, fmt.Errorf("mock Dial returned incorrect type: %T", clientArg)
+}
+
+// SetShouldFail configures the mock to return an error on the next Send/Dial
+//
+//nolint:unused // These mocks are kept for future tests
+func (m *mockSMTP) SetShouldFail(shouldFail bool) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if shouldFail {
+		m.SendError = fmt.Errorf("mock SMTP error")
+	} else {
+		m.SendError = nil
+	}
+}
+
+// GetLastEmail returns the details of the last email sent
+//
+//nolint:unused // These mocks are kept for future tests
+func (m *mockSMTP) GetLastEmail() (to, subject, body string) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	return m.LastTo, m.LastSubject, m.LastBody
 }
 
 // MockSMTPClient is een mock implementatie van de SMTP client voor tests
@@ -265,162 +326,142 @@ func (m *MockSMTPClient) SendWFCEmail(to, subject, body string) error {
 //
 //nolint:unused // These mocks are kept for future tests
 type mockRateLimiter struct {
-	shouldLimit bool
-	limits      map[string]struct {
-		limit    int
-		period   time.Duration
-		perEmail bool
-	}
-	currentCounts map[string]int
+	AllowFunc func(key string) bool
 }
 
 //nolint:unused // These mocks are kept for future tests
 func newMockRateLimiter() *mockRateLimiter {
-	return &mockRateLimiter{
-		shouldLimit: false,
-		limits: make(map[string]struct {
-			limit    int
-			period   time.Duration
-			perEmail bool
-		}),
-		currentCounts: make(map[string]int),
-	}
-}
-
-//nolint:unused // These mocks are kept for future tests
-func (m *mockRateLimiter) AllowEmail(operation, email string) bool {
-	return !m.shouldLimit
+	return &mockRateLimiter{}
 }
 
 //nolint:unused // These mocks are kept for future tests
 func (m *mockRateLimiter) Allow(key string) bool {
-	return !m.shouldLimit
-}
-
-//nolint:unused // These mocks are kept for future tests
-func (m *mockRateLimiter) GetLimits() map[string]services.RateLimit {
-	result := make(map[string]services.RateLimit)
-	for op, limit := range m.limits {
-		result[op] = services.RateLimit{
-			Count:  limit.limit,
-			Period: limit.period,
-			PerIP:  limit.perEmail,
-		}
+	if m.AllowFunc != nil {
+		return m.AllowFunc(key)
 	}
-	return result
+	return true // Default allow
 }
 
 //nolint:unused // These mocks are kept for future tests
-func (m *mockRateLimiter) GetCurrentValues() map[string]int {
-	return m.currentCounts
+func (m *mockRateLimiter) AllowEmail(emailType, recipient string) bool {
+	// Simple mock: always allow or use AllowFunc if specific logic needed
+	key := fmt.Sprintf("%s:%s", emailType, recipient)
+	return m.Allow(key)
 }
 
-//nolint:unused // These mocks are kept for future tests
+// Implement AddLimit for the mock (needed by some tests)
+func (m *mockRateLimiter) AddLimit(operationType string, count int, period time.Duration, perIP bool) {
+	// No-op for mock, or add specific test logic if needed
+}
+
+// Implement GetCurrentCount for the mock (to satisfy RateLimiterInterface)
 func (m *mockRateLimiter) GetCurrentCount(operationType string, key string) int {
-	return m.currentCounts[operationType]
+	// Return 0 or some specific test value if needed
+	return 0
 }
 
-//nolint:unused // These mocks are kept for future tests
-func (m *mockRateLimiter) SetShouldLimit(limit bool) {
-	m.shouldLimit = limit
+// Implement Shutdown for the mock
+func (m *mockRateLimiter) Shutdown() {
+	// No-op for mock
 }
 
-//nolint:unused // These mocks are kept for future tests
-func (m *mockRateLimiter) AddLimit(operation string, limit int, period time.Duration, perEmail bool) {
-	m.limits[operation] = struct {
-		limit    int
-		period   time.Duration
-		perEmail bool
-	}{
-		limit:    limit,
-		period:   period,
-		perEmail: perEmail,
-	}
+// Implement GetLimits for the mock
+func (m *mockRateLimiter) GetLimits() map[string]services.RateLimit {
+	// Return an empty map or some default test limits if needed
+	return make(map[string]services.RateLimit)
 }
 
-// SetCurrentCount is een helper functie voor tests
-//
-//nolint:unused // These mocks are kept for future tests
-func (m *mockRateLimiter) SetCurrentCount(operationType string, count int) {
-	m.currentCounts[operationType] = count
+// GetCurrentValues implements the RateLimiterInterface for the mock.
+// Returns a dummy value for testing.
+func (m *mockRateLimiter) GetCurrentValues() map[string]int {
+	// Return a fixed dummy map or implement logic if needed for specific tests
+	return map[string]int{"dummy_key": 0}
 }
 
 // mockPrometheusMetrics implementeert de PrometheusMetrics interface voor tests
 //
 //nolint:unused // These mocks are kept for future tests
 type mockPrometheusMetrics struct {
-	mu           sync.Mutex
-	emailsSent   int
-	emailsFailed int
-	latencies    map[string][]float64
+	mock.Mock
+	mutex        sync.Mutex
+	latencies    map[string]float64
+	emailsSent   map[string]int
+	emailsFailed map[string]int
 }
 
 //nolint:unused // These mocks are kept for future tests
 func newMockPrometheusMetrics() *mockPrometheusMetrics {
 	return &mockPrometheusMetrics{
-		latencies: make(map[string][]float64),
+		latencies:    make(map[string]float64),
+		emailsSent:   make(map[string]int),
+		emailsFailed: make(map[string]int),
 	}
 }
 
 //nolint:unused // These mocks are kept for future tests
 func (m *mockPrometheusMetrics) RecordEmailSent(emailType, status string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.emailsSent++
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.emailsSent == nil {
+		m.emailsSent = make(map[string]int)
+	}
+	m.emailsSent[emailType+"_"+status]++
+	m.Called(emailType, status)
 }
 
 //nolint:unused // These mocks are kept for future tests
 func (m *mockPrometheusMetrics) RecordEmailFailed(emailType, reason string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.emailsFailed++
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.emailsFailed == nil {
+		m.emailsFailed = make(map[string]int)
+	}
+	m.emailsFailed[emailType+"_"+reason]++
+	m.Called(emailType, reason)
 }
 
 //nolint:unused // These mocks are kept for future tests
 func (m *mockPrometheusMetrics) ObserveEmailLatency(emailType string, duration float64) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.latencies[emailType] == nil {
-		m.latencies[emailType] = make([]float64, 0)
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.latencies == nil {
+		m.latencies = make(map[string]float64)
 	}
-	m.latencies[emailType] = append(m.latencies[emailType], duration)
+	m.latencies[emailType] = duration
+	m.Called(emailType, duration)
+}
+
+// RecordRateLimitExceeded implements the PrometheusMetricsInterface
+//
+//nolint:unused
+func (m *mockPrometheusMetrics) RecordRateLimitExceeded(operationType, limitType string) {
+	m.Called(operationType, limitType)
 }
 
 //nolint:unused // These mocks are kept for future tests
 func (m *mockPrometheusMetrics) Reset() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.emailsSent = 0
-	m.emailsFailed = 0
-	m.latencies = make(map[string][]float64)
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Mock = mock.Mock{}
+	m.latencies = make(map[string]float64)
+	m.emailsSent = make(map[string]int)
+	m.emailsFailed = make(map[string]int)
 }
 
 // MockNotificationService implements the services.NotificationService interface for testing
 type MockNotificationService struct {
-	shouldFail    bool
-	calls         map[string]int
-	notifications []*models.Notification
+	mock.Mock
 }
 
 // NewMockNotificationService creates a new mock notification service
 func NewMockNotificationService() *MockNotificationService {
-	return &MockNotificationService{
-		shouldFail:    false,
-		calls:         make(map[string]int),
-		notifications: make([]*models.Notification, 0),
-	}
+	return &MockNotificationService{}
 }
 
 // SendNotification mocks sending a notification
 func (m *MockNotificationService) SendNotification(ctx context.Context, notification *models.Notification) error {
-	m.calls["SendNotification"]++
-
-	if m.shouldFail {
-		return errors.New("mock notification send failure")
-	}
-
-	notification.Sent = true
-	return nil
+	args := m.Called(ctx, notification)
+	return args.Error(0)
 }
 
 // CreateNotification mocks creating a notification
@@ -430,116 +471,121 @@ func (m *MockNotificationService) CreateNotification(
 	priority models.NotificationPriority,
 	title, message string,
 ) (*models.Notification, error) {
-	m.calls["CreateNotification"]++
-
-	if m.shouldFail {
-		return nil, errors.New("mock notification creation failure")
+	args := m.Called(ctx, notificationType, priority, title, message)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-
-	notification := &models.Notification{
-		Type:     notificationType,
-		Priority: priority,
-		Title:    title,
-		Message:  message,
-		Sent:     false,
-	}
-
-	m.notifications = append(m.notifications, notification)
-	return notification, nil
+	return args.Get(0).(*models.Notification), args.Error(1)
 }
 
 // GetNotification mocks retrieving a notification by ID
 func (m *MockNotificationService) GetNotification(ctx context.Context, id string) (*models.Notification, error) {
-	m.calls["GetNotification"]++
-
-	if m.shouldFail {
-		return nil, errors.New("mock get notification failure")
-	}
-
-	// Simple mock implementation that doesn't actually check the ID
-	if len(m.notifications) > 0 {
-		return m.notifications[0], nil
-	}
-
-	return nil, nil
+	args := m.Called(ctx, id)
+	return args.Get(0).(*models.Notification), args.Error(1)
 }
 
 // ListUnsentNotifications mocks listing unsent notifications
 func (m *MockNotificationService) ListUnsentNotifications(ctx context.Context) ([]*models.Notification, error) {
-	m.calls["ListUnsentNotifications"]++
-
-	if m.shouldFail {
-		return nil, errors.New("mock list notifications failure")
-	}
-
-	// Filter for unsent notifications
-	unsent := make([]*models.Notification, 0)
-	for _, n := range m.notifications {
-		if !n.Sent {
-			unsent = append(unsent, n)
-		}
-	}
-
-	return unsent, nil
+	args := m.Called(ctx)
+	return args.Get(0).([]*models.Notification), args.Error(1)
 }
 
 // ProcessUnsentNotifications mocks processing unsent notifications
 func (m *MockNotificationService) ProcessUnsentNotifications(ctx context.Context) error {
-	m.calls["ProcessUnsentNotifications"]++
-
-	if m.shouldFail {
-		return errors.New("mock process notifications failure")
-	}
-
-	// Mark all as sent
-	for _, n := range m.notifications {
-		if !n.Sent {
-			n.Sent = true
-		}
-	}
-
-	return nil
+	args := m.Called(ctx)
+	return args.Error(0)
 }
 
 // Start mocks starting the notification service
 func (m *MockNotificationService) Start() {
-	m.calls["Start"]++
+	m.Called()
 }
 
 // Stop mocks stopping the notification service
 func (m *MockNotificationService) Stop() {
-	m.calls["Stop"]++
+	m.Called()
 }
 
 // IsRunning mocks checking if the notification service is running
 func (m *MockNotificationService) IsRunning() bool {
-	m.calls["IsRunning"]++
-	return true
+	args := m.Called()
+	return args.Bool(0)
 }
 
-//nolint:unused // These mocks are kept for future tests
-func (m *mockSMTP) SendWFC(msg *services.EmailMessage) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+// --- Mock Email Sender (used for testing handlers) ---
+type MockEmailSender struct {
+	mock.Mock
+}
 
-	if msg.To == "" {
-		return fmt.Errorf("invalid recipient")
+func (m *MockEmailSender) SendEmail(to, subject, body string, fromAddress ...string) error {
+	args := m.Called(to, subject, body, fromAddress)
+	return args.Error(0)
+}
+
+func (m *MockEmailSender) SendTemplateEmail(recipient, subject, templateName string, templateData map[string]interface{}, fromAddress ...string) error {
+	args := m.Called(recipient, subject, templateName, templateData, fromAddress)
+	return args.Error(0)
+}
+
+func (m *MockEmailSender) SendContactEmail(data *models.ContactEmailData) error {
+	args := m.Called(data)
+	return args.Error(0)
+}
+
+func (m *MockEmailSender) SendAanmeldingEmail(data *models.AanmeldingEmailData) error {
+	args := m.Called(data)
+	return args.Error(0)
+}
+
+func (m *MockEmailSender) SendWFCEmail(to, subject, body string) error {
+	args := m.Called(to, subject, body)
+	return args.Error(0)
+}
+
+func (m *MockEmailSender) SendWFCOrderEmail(data *models.WFCOrderEmailData) error {
+	args := m.Called(data)
+	return args.Error(0)
+}
+
+// --- WFCMockSMTPClient (als deze specifiek is) ---
+// Als WFCMockSMTPClient bestaat en verschilt van mockSMTP,
+// moet SendEmail en SendWithFrom hier ook aangepast/toegevoegd worden.
+// Voorbeeld:
+type WFCMockSMTPClient struct {
+	mockSMTP // Embed mockSMTP of implementeer methoden opnieuw
+}
+
+// Dial implements the SMTPDialer interface
+func (m *WFCMockSMTPClient) Dial() error {
+	// Mock implementation, return nil or configured error
+	return nil // Or return m.SendError if that's how errors are handled
+}
+
+// Zorg ervoor dat WFCMockSMTPClient ook voldoet aan de interface
+// (Dit vereist mogelijk aanpassingen gebaseerd op de werkelijke implementatie)
+
+// mockSMTPDialer implementeert de services.SMTPDialer interface voor tests
+type mockSMTPDialer struct {
+	ShouldFail bool
+	DialCalled bool
+	mutex      sync.Mutex
+}
+
+// Dial implementeert de Dial methode voor de mock dialer
+func (m *mockSMTPDialer) Dial() error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.DialCalled = true
+	if m.ShouldFail {
+		return fmt.Errorf("mock dialer error")
 	}
-
-	if m.shouldFail {
-		return fmt.Errorf("mock email error")
-	}
-
-	m.sentEmails = append(m.sentEmails, msg)
 	return nil
 }
 
-//nolint:unused // These mocks are kept for future tests
-func (m *mockSMTP) SendWFCEmail(to, subject, body string) error {
-	msg := &services.EmailMessage{
-		To:      to,
-		Subject: subject,
-		Body:    body,
-	}
-	return m.SendWFC(msg)
+// Reset resets the mock dialer state
+func (m *mockSMTPDialer) Reset() {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.ShouldFail = false
+	m.DialCalled = false
 }

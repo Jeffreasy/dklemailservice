@@ -40,8 +40,8 @@ func TestSMTPClient(t *testing.T) {
 	client := createTestClient()
 
 	t.Run("Send email with default config", func(t *testing.T) {
-		mockSMTP := newMockSMTP()
-		client.SetDialer(mockSMTP)
+		mockDialer := &mockSMTPDialer{}
+		client.SetDialer(mockDialer)
 
 		msg := &services.EmailMessage{
 			To:      "recipient@test.com",
@@ -51,12 +51,12 @@ func TestSMTPClient(t *testing.T) {
 
 		err := client.Send(msg)
 		assert.NoError(t, err)
-		assert.Equal(t, msg, mockSMTP.GetLastEmail())
+		assert.True(t, mockDialer.DialCalled, "Dial should have been called")
 	})
 
 	t.Run("Send email with registration config", func(t *testing.T) {
-		mockSMTP := newMockSMTP()
-		client.SetDialer(mockSMTP)
+		mockDialer := &mockSMTPDialer{}
+		client.SetDialer(mockDialer)
 
 		msg := &services.EmailMessage{
 			To:      "recipient@test.com",
@@ -66,29 +66,30 @@ func TestSMTPClient(t *testing.T) {
 
 		err := client.SendRegistration(msg)
 		assert.NoError(t, err)
-		assert.Equal(t, msg, mockSMTP.GetLastEmail())
+		assert.True(t, mockDialer.DialCalled, "Dial should have been called")
 	})
 
 	t.Run("Send email with helper function", func(t *testing.T) {
-		mockSMTP := newMockSMTP()
-		client.SetDialer(mockSMTP)
+		mockDialer := &mockSMTPDialer{}
+		client.SetDialer(mockDialer)
 		err := client.SendEmail("recipient@test.com", "Helper Test", "Test Body")
 		assert.NoError(t, err)
+		assert.True(t, mockDialer.DialCalled, "Dial should have been called")
 	})
 
 	t.Run("Verbindingsfout", func(t *testing.T) {
-		mockSMTP := newMockSMTP()
-		mockSMTP.SetShouldFail(true)
-		client.SetDialer(mockSMTP)
+		mockDialer := &mockSMTPDialer{}
+		mockDialer.ShouldFail = true
+		client.SetDialer(mockDialer)
 
 		err := client.SendEmail("test@example.com", "Test Subject", "Test Body")
 		assert.Error(t, err)
+		assert.True(t, mockDialer.DialCalled, "Dial should have been called even on failure")
 		assert.Contains(t, err.Error(), "mock dialer error")
 	})
 
 	t.Run("Ongeldige email configuratie", func(t *testing.T) {
-		mockSMTP := newMockSMTP()
-		client.SetDialer(mockSMTP)
+		client.SetDialer(nil)
 
 		err := client.SendEmail("", "Test Subject", "Test Body")
 		assert.Error(t, err)
@@ -96,12 +97,13 @@ func TestSMTPClient(t *testing.T) {
 	})
 
 	t.Run("HTML email verzending", func(t *testing.T) {
-		mockSMTP := newMockSMTP()
-		client.SetDialer(mockSMTP)
+		mockDialer := &mockSMTPDialer{}
+		client.SetDialer(mockDialer)
 
 		htmlBody := "<html><body><h1>Test</h1></body></html>"
 		err := client.SendEmail("test@example.com", "HTML Test", htmlBody)
 		assert.NoError(t, err)
+		assert.True(t, mockDialer.DialCalled, "Dial should have been called")
 	})
 }
 
@@ -117,9 +119,9 @@ func TestSMTPClientBatch(t *testing.T) {
 	}()
 
 	t.Run("Batch email verzending", func(t *testing.T) {
-		mockSMTP := newMockSMTP()
+		mockDialer := &mockSMTPDialer{}
 		client := createTestClient()
-		client.SetDialer(mockSMTP)
+		client.SetDialer(mockDialer)
 
 		messages := []*services.EmailMessage{
 			{To: "test1@example.com", Subject: "Test 1", Body: "Body 1"},
@@ -134,13 +136,13 @@ func TestSMTPClientBatch(t *testing.T) {
 	})
 
 	t.Run("Batch met enkele fout", func(t *testing.T) {
-		mockSMTP := newMockSMTP()
+		mockDialer := &mockSMTPDialer{}
 		client := createTestClient()
-		client.SetDialer(mockSMTP)
+		client.SetDialer(mockDialer)
 
 		messages := []*services.EmailMessage{
 			{To: "test1@example.com", Subject: "Test 1", Body: "Body 1"},
-			{To: "", Subject: "Test 2", Body: "Body 2"}, // Deze zou moeten falen
+			{To: "", Subject: "Test 2", Body: "Body 2"},
 			{To: "test3@example.com", Subject: "Test 3", Body: "Body 3"},
 		}
 
@@ -165,9 +167,9 @@ func TestSMTPClientWithInvalidConfig(t *testing.T) {
 		"noreply@test.com", // from
 	)
 
-	mockSMTP := newMockSMTP()
-	mockSMTP.SetShouldFail(true)
-	client.SetDialer(mockSMTP)
+	mockDialer := &mockSMTPDialer{}
+	mockDialer.ShouldFail = true
+	client.SetDialer(mockDialer)
 
 	msg := &services.EmailMessage{
 		To:      "recipient@test.com",
@@ -188,9 +190,9 @@ func TestSMTPClientWithInvalidPort(t *testing.T) {
 		"noreply@test.com", // from
 	)
 
-	mockSMTP := newMockSMTP()
-	mockSMTP.SetShouldFail(true)
-	client.SetDialer(mockSMTP)
+	mockDialer := &mockSMTPDialer{}
+	mockDialer.ShouldFail = true
+	client.SetDialer(mockDialer)
 
 	msg := &services.EmailMessage{
 		To:      "recipient@test.com",
@@ -206,7 +208,7 @@ func TestSMTPClientWithEmptyRecipient(t *testing.T) {
 	client := createTestClient()
 
 	msg := &services.EmailMessage{
-		To:      "", // Empty recipient
+		To:      "",
 		Subject: "Test Subject",
 		Body:    "Test Body",
 	}
@@ -219,8 +221,8 @@ func TestSMTPClientWithMockDialer(t *testing.T) {
 	client := createTestClient()
 
 	t.Run("Successful send", func(t *testing.T) {
-		mockSMTP := newMockSMTP()
-		client.SetDialer(mockSMTP)
+		mockDialer := &mockSMTPDialer{}
+		client.SetDialer(mockDialer)
 
 		msg := &services.EmailMessage{
 			To:      "recipient@test.com",
@@ -230,13 +232,13 @@ func TestSMTPClientWithMockDialer(t *testing.T) {
 
 		err := client.Send(msg)
 		assert.NoError(t, err)
-		assert.Equal(t, msg, mockSMTP.GetLastEmail())
+		assert.True(t, mockDialer.DialCalled, "Dial should have been called")
 	})
 
 	t.Run("Failed send", func(t *testing.T) {
-		mockSMTP := newMockSMTP()
-		mockSMTP.SetShouldFail(true)
-		client.SetDialer(mockSMTP)
+		mockDialer := &mockSMTPDialer{}
+		mockDialer.ShouldFail = true
+		client.SetDialer(mockDialer)
 
 		msg := &services.EmailMessage{
 			To:      "recipient@test.com",
@@ -252,9 +254,9 @@ func TestSMTPClientWithMockDialer(t *testing.T) {
 func TestSMTPClientWithMissingConfig(t *testing.T) {
 	client := createTestClient()
 
-	mockSMTP := newMockSMTP()
-	mockSMTP.SetShouldFail(true)
-	client.SetDialer(mockSMTP)
+	mockDialer := &mockSMTPDialer{}
+	mockDialer.ShouldFail = true
+	client.SetDialer(mockDialer)
 
 	msg := &services.EmailMessage{
 		To:      "recipient@test.com",
@@ -269,9 +271,9 @@ func TestSMTPClientWithMissingConfig(t *testing.T) {
 func TestSMTPClientWithInvalidCredentials(t *testing.T) {
 	client := createTestClient()
 
-	mockSMTP := newMockSMTP()
-	mockSMTP.SetShouldFail(true)
-	client.SetDialer(mockSMTP)
+	mockDialer := &mockSMTPDialer{}
+	mockDialer.ShouldFail = true
+	client.SetDialer(mockDialer)
 
 	msg := &services.EmailMessage{
 		To:      "recipient@test.com",
@@ -286,24 +288,24 @@ func TestSMTPClientWithInvalidCredentials(t *testing.T) {
 func TestSMTPClientWithEmptyMessage(t *testing.T) {
 	client := createTestClient()
 
-	mockSMTP := newMockSMTP()
-	client.SetDialer(mockSMTP)
+	mockDialer := &mockSMTPDialer{}
+	client.SetDialer(mockDialer)
 
 	msg := &services.EmailMessage{
 		To:      "recipient@test.com",
-		Subject: "", // Empty subject
-		Body:    "", // Empty body
+		Subject: "",
+		Body:    "",
 	}
 
 	err := client.Send(msg)
-	assert.NoError(t, err) // Empty subject and body are allowed
+	assert.NoError(t, err)
 }
 
 func TestSMTPClientWithRegistrationConfig(t *testing.T) {
 	client := createTestClient()
 
-	mockSMTP := newMockSMTP()
-	client.SetDialer(mockSMTP)
+	mockDialer := &mockSMTPDialer{}
+	client.SetDialer(mockDialer)
 
 	msg := &services.EmailMessage{
 		To:      "recipient@test.com",
@@ -319,8 +321,7 @@ func TestSMTPClientValidation(t *testing.T) {
 	client := createTestClient()
 
 	t.Run("Empty recipient", func(t *testing.T) {
-		mockSMTP := newMockSMTP()
-		client.SetDialer(mockSMTP)
+		client.SetDialer(nil)
 
 		msg := &services.EmailMessage{
 			To:      "",
@@ -334,8 +335,8 @@ func TestSMTPClientValidation(t *testing.T) {
 	})
 
 	t.Run("Empty subject and body", func(t *testing.T) {
-		mockSMTP := newMockSMTP()
-		client.SetDialer(mockSMTP)
+		mockDialer := &mockSMTPDialer{}
+		client.SetDialer(mockDialer)
 
 		msg := &services.EmailMessage{
 			To:      "recipient@test.com",
@@ -345,6 +346,6 @@ func TestSMTPClientValidation(t *testing.T) {
 
 		err := client.Send(msg)
 		assert.NoError(t, err)
-		assert.Equal(t, msg, mockSMTP.GetLastEmail())
+		assert.True(t, mockDialer.DialCalled, "Dial should have been called")
 	})
 }

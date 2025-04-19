@@ -15,15 +15,6 @@ import (
 
 var RetryDelayFactor = 100 // milliseconden
 
-// SMTPClient interface definieert de methode voor het verzenden van emails
-type SMTPClient interface {
-	Send(msg *EmailMessage) error
-	SendRegistration(msg *EmailMessage) error
-	SendEmail(to, subject, body string) error
-	SendWFC(msg *EmailMessage) error             // Nieuwe methode voor Whisky for Charity
-	SendWFCEmail(to, subject, body string) error // Helper methode voor Whisky for Charity
-}
-
 // EmailService is verantwoordelijk voor het versturen van emails
 type EmailService struct {
 	smtpClient        SMTPClient
@@ -297,7 +288,8 @@ func ValidateTemplate(tmpl *template.Template, data interface{}) error {
 	return nil
 }
 
-func (s *EmailService) SendEmail(to, subject, body string) error {
+// SendEmail stuurt een email met optioneel 'From' adres
+func (s *EmailService) SendEmail(to, subject, body string, fromAddress ...string) error {
 	start := time.Now()
 	defer func() {
 		duration := time.Since(start)
@@ -308,13 +300,32 @@ func (s *EmailService) SendEmail(to, subject, body string) error {
 		return fmt.Errorf("rate limit exceeded")
 	}
 
+	// Bepaal het uiteindelijke 'From' adres
+	finalFromAddress := "" // Standaard: leeg, client gebruikt default (SMTP_FROM)
+	if len(fromAddress) > 0 && fromAddress[0] != "" {
+		finalFromAddress = fromAddress[0] // Gebruik de override indien meegegeven en niet leeg
+	}
+
 	msg := &EmailMessage{
 		To:      to,
 		Subject: subject,
 		Body:    body,
 	}
 
-	err := s.smtpClient.Send(msg)
+	var err error
+	// Roep de juiste methode van de SMTP client aan
+	if finalFromAddress == "" {
+		// Geen specifiek 'From' adres opgegeven, gebruik de standaard Send
+		// die waarschijnlijk de default 'From' van de client configuratie pakt.
+		err = s.smtpClient.Send(msg)
+	} else {
+		// Specifiek 'From' adres opgegeven.
+		// We gaan ervan uit dat de SMTPClient interface een methode SendWithFrom heeft.
+		// Deze moet nog geimplementeerd worden in de interface en concrete client!
+		// Interface aanpassing nodig: SendWithFrom(from string, msg *EmailMessage) error
+		err = s.smtpClient.SendWithFrom(finalFromAddress, msg)
+	}
+
 	if err != nil {
 		if s.metrics != nil {
 			s.metrics.RecordEmailFailed("email_generic")
@@ -376,8 +387,8 @@ func (s *EmailService) sendEmailWithTemplate(templateName, to, subject string, d
 	return s.sendEmail(to, subject, body.String())
 }
 
-// SendTemplateEmail verzendt een email met template (voor batcher)
-func (s *EmailService) SendTemplateEmail(recipient, subject, templateName string, templateData map[string]interface{}) error {
+// SendTemplateEmail verzendt een email met template en optioneel 'From' adres
+func (s *EmailService) SendTemplateEmail(recipient, subject, templateName string, templateData map[string]interface{}, fromAddress ...string) error {
 	template := s.templates[templateName]
 	if template == nil {
 		logger.Error("Template not found", "template", templateName)
@@ -390,14 +401,16 @@ func (s *EmailService) SendTemplateEmail(recipient, subject, templateName string
 		return err
 	}
 
-	// Email verzenden
-	err := s.smtpClient.SendEmail(recipient, subject, body.String())
+	// Email verzenden via SendEmail (die nu het optionele 'from' adres accepteert en doorgeeft)
+	err := s.SendEmail(recipient, subject, body.String(), fromAddress...)
+
 	if err != nil {
 		s.metrics.RecordEmailFailed(templateName)
-		return err
+		return err // SendEmail logt al de prometheus metrics
 	}
 
 	s.metrics.RecordEmailSent(templateName)
+	// Prometheus metrics worden al gelogd door de aangeroepen SendEmail
 	return nil
 }
 

@@ -4,6 +4,8 @@ import (
 	"dklautomationgo/logger"
 	"dklautomationgo/services" // Assuming your service interfaces are here
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/go-playground/validator/v10" // For request validation
 	"github.com/gofiber/fiber/v2"
@@ -20,7 +22,8 @@ type AdminMailHandler struct {
 type SendMailRequest struct {
 	To                string                 `json:"to" validate:"required,email"`
 	Subject           string                 `json:"subject" validate:"required,min=1"`
-	Body              string                 `json:"body,omitempty"` // Body is now optional if template is used
+	From              string                 `json:"from,omitempty" validate:"omitempty,email"` // OPTIONEEL: Gewenst afzenderadres
+	Body              string                 `json:"body,omitempty"`                            // Body is now optional if template is used
 	TemplateName      string                 `json:"template_name,omitempty"`
 	TemplateVariables map[string]interface{} `json:"template_variables,omitempty"`
 }
@@ -90,6 +93,41 @@ func (h *AdminMailHandler) HandleSendMail(c *fiber.Ctx) error {
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"success": false, "error": "Validatie mislukt", "details": errors})
 	}
 
+	// --- AFZENDER VALIDATIE ---
+	var actualFromAddress string                            // Dit wordt doorgegeven aan de service
+	allowedSendersEnv := os.Getenv("ALLOWED_SENDER_EMAILS") // Bv: "info@...,jeffrey@...,marieke@..."
+	allowedSenders := []string{}
+	if allowedSendersEnv != "" {
+		allowedSenders = strings.Split(allowedSendersEnv, ",")
+	}
+	isAllowed := false
+	requestedFrom := strings.TrimSpace(req.From) // Trim spaties
+
+	if requestedFrom != "" {
+		if len(allowedSenders) == 0 {
+			logger.Warn("Requested sender address provided, but ALLOWED_SENDER_EMAILS is not configured. Falling back to default.", "requested_from", requestedFrom)
+		} else {
+			for _, allowed := range allowedSenders {
+				if strings.TrimSpace(allowed) == requestedFrom {
+					isAllowed = true
+					break
+				}
+			}
+		}
+
+		if isAllowed {
+			actualFromAddress = requestedFrom
+			logger.Info("Using requested sender address", "from", actualFromAddress)
+		} else {
+			logger.Warn("Requested sender address not allowed or ALLOWED_SENDER_EMAILS not configured, falling back to default", "requested_from", requestedFrom, "allowed_list", allowedSendersEnv)
+			// Laat actualFromAddress leeg, zodat de service de default pakt
+		}
+	} else {
+		logger.Info("No sender address requested, using default")
+		// Laat actualFromAddress leeg, zodat de service de default pakt
+	}
+	// --- EINDE AFZENDER VALIDATIE ---
+
 	// Log the attempt details (including admin user ID from context)
 	userID, ok := c.Locals("userID").(string)
 	if !ok {
@@ -97,11 +135,11 @@ func (h *AdminMailHandler) HandleSendMail(c *fiber.Ctx) error {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": "Interne serverfout: Gebruikerscontext ontbreekt."})
 	}
 
-	logger.Info("Processing admin mail send request", "adminUserID", userID, "to", req.To, "subject", req.Subject, "template", req.TemplateName, "has_body", req.Body != "", "test_mode", isTestMode, "ip", c.IP())
+	logger.Info("Processing admin mail send request", "adminUserID", userID, "to", req.To, "subject", req.Subject, "from", actualFromAddress, "template", req.TemplateName, "has_body", req.Body != "", "test_mode", isTestMode, "ip", c.IP())
 
 	// --- Test Mode Check ---
 	if isTestMode {
-		logger.Info("[TEST MODE] Admin mail send skipped.", "adminUserID", userID, "to", req.To, "subject", req.Subject, "template", req.TemplateName, "ip", c.IP())
+		logger.Info("[TEST MODE] Admin mail send skipped.", "adminUserID", userID, "to", req.To, "subject", req.Subject, "from", actualFromAddress, "template", req.TemplateName, "ip", c.IP())
 		return c.Status(http.StatusOK).JSON(fiber.Map{
 			"success":   true,
 			"message":   "[TEST MODE] Email verzoek verwerkt, geen echte email verzonden.",
@@ -112,19 +150,19 @@ func (h *AdminMailHandler) HandleSendMail(c *fiber.Ctx) error {
 
 	var err error
 	if req.TemplateName != "" {
-		// Send using template
-		err = h.emailService.SendTemplateEmail(req.To, req.Subject, req.TemplateName, req.TemplateVariables)
+		// Send using template, pass the validated 'from' address (can be empty)
+		err = h.emailService.SendTemplateEmail(req.To, req.Subject, req.TemplateName, req.TemplateVariables, actualFromAddress)
 	} else {
-		// Send using plain body
-		err = h.emailService.SendEmail(req.To, req.Subject, req.Body)
+		// Send using plain body, pass the validated 'from' address (can be empty)
+		err = h.emailService.SendEmail(req.To, req.Subject, req.Body, actualFromAddress)
 	}
 
 	if err != nil {
-		logger.Error("Error sending admin email", "error", err, "to", req.To, "template", req.TemplateName, "adminUserID", userID, "ip", c.IP())
+		logger.Error("Error sending admin email", "error", err, "to", req.To, "from", actualFromAddress, "template", req.TemplateName, "adminUserID", userID, "ip", c.IP())
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": "Kon email niet verzenden: " + err.Error()})
 	}
 
-	logger.Info("Admin mail sent successfully", "adminUserID", userID, "to", req.To, "subject", req.Subject, "template", req.TemplateName, "ip", c.IP())
+	logger.Info("Admin mail sent successfully", "adminUserID", userID, "to", req.To, "from", actualFromAddress, "subject", req.Subject, "template", req.TemplateName, "ip", c.IP())
 	return c.Status(http.StatusOK).JSON(fiber.Map{"success": true, "message": "Email succesvol verzonden."})
 }
 

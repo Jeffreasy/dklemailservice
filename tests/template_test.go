@@ -17,7 +17,7 @@ func TestEmailTemplateRendering(t *testing.T) {
 	}
 
 	// Initialiseer een mock SMTP client
-	smtp := newMockSMTP()
+	smtp := &mockSMTP{}
 
 	// Maak een aangepaste EmailService met de juiste templates
 	metrics := services.NewEmailMetrics(24 * time.Hour)
