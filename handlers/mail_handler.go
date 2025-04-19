@@ -5,17 +5,72 @@ import (
 	"dklautomationgo/models"
 	"dklautomationgo/repository"
 	"dklautomationgo/services"
+	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 )
 
+// MailResponse definieert de structuur voor API responses
+// Dit zorgt ervoor dat de HTML in het 'html' veld zit voor de frontend.
+type MailResponse struct {
+	ID          string     `json:"id"`
+	MessageID   string     `json:"message_id"`
+	From        string     `json:"sender"`
+	To          string     `json:"to"`
+	Subject     string     `json:"subject"`
+	HTML        string     `json:"html"` // Gedecodeerde/gesanitized HTML body
+	ContentType string     `json:"content_type"`
+	ReceivedAt  time.Time  `json:"received_at"`
+	UID         string     `json:"uid"`
+	AccountType string     `json:"account_type"`
+	IsProcessed bool       `json:"read"`
+	ProcessedAt *time.Time `json:"processed_at"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+// Helper functie om IncomingEmail naar MailResponse te mappen
+func mapEmailToResponse(email *models.IncomingEmail) *MailResponse {
+	if email == nil {
+		return nil
+	}
+	return &MailResponse{
+		ID:          email.ID,
+		MessageID:   email.MessageID,
+		From:        email.From,
+		To:          email.To,
+		Subject:     email.Subject,
+		HTML:        email.Body, // Map Body -> HTML
+		ContentType: email.ContentType,
+		ReceivedAt:  email.ReceivedAt,
+		UID:         email.UID,
+		AccountType: email.AccountType,
+		IsProcessed: email.IsProcessed,
+		ProcessedAt: email.ProcessedAt,
+		CreatedAt:   email.CreatedAt,
+		UpdatedAt:   email.UpdatedAt,
+	}
+}
+
+// Helper functie om een slice van IncomingEmail naar MailResponse te mappen
+func mapEmailsToResponse(emails []*models.IncomingEmail) []*MailResponse {
+	responses := make([]*MailResponse, len(emails))
+	for i, email := range emails {
+		responses[i] = mapEmailToResponse(email)
+	}
+	return responses
+}
+
 // PaginatedEmailsResponse definieert de structuur voor gepagineerde email responses
-type PaginatedEmailsResponse struct {
-	Emails     []*models.IncomingEmail `json:"emails"`
-	TotalCount int64                   `json:"totalCount"`
+// Nu met *MailResponse type pointer
+type PaginatedMailResponse struct {
+	Emails     []*MailResponse `json:"emails"`
+	TotalCount int64           `json:"totalCount"`
 }
 
 // MailHandler bevat handlers voor e-mail beheer
@@ -131,7 +186,7 @@ func (h *MailHandler) RegisterRoutes(app *fiber.App) {
 // @Produce json
 // @Param limit query int false "Aantal resultaten per pagina (standaard 10)"
 // @Param offset query int false "Offset voor paginering (standaard 0)"
-// @Success 200 {array} models.IncomingEmail
+// @Success 200 {object} PaginatedMailResponse
 // @Failure 400 {object} map[string]interface{}
 // @Failure 401 {object} map[string]interface{}
 // @Failure 403 {object} map[string]interface{}
@@ -139,35 +194,30 @@ func (h *MailHandler) RegisterRoutes(app *fiber.App) {
 // @Router /api/mail [get]
 // @Security BearerAuth
 func (h *MailHandler) ListEmails(c *fiber.Ctx) error {
-	// Haal query parameters op
 	limit := c.QueryInt("limit", 10)
 	offset := c.QueryInt("offset", 0)
 
-	// Valideer parameters
 	if limit < 1 || limit > 100 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Limit moet tussen 1 en 100 liggen",
-		})
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "Limit moet tussen 1 en 100 liggen"})
 	}
-
 	if offset < 0 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Offset mag niet negatief zijn",
-		})
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "Offset mag niet negatief zijn"})
 	}
 
-	// Haal emails op
 	ctx := c.Context()
-	emails, err := h.incomingEmailRepo.List(ctx, limit, offset)
+	emails, totalCount, err := h.incomingEmailRepo.ListByAccountTypePaginated(ctx, "", limit, offset)
 	if err != nil {
-		logger.Error("Fout bij ophalen emails", "error", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Kon emails niet ophalen",
-		})
+		logger.Error("Fout bij ophalen van gepagineerde e-mails", "error", err, "limit", limit, "offset", offset)
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Kon emails niet ophalen"})
 	}
 
-	// Stuur resultaat terug
-	return c.JSON(emails)
+	responseEmails := mapEmailsToResponse(emails)
+	response := PaginatedMailResponse{
+		Emails:     responseEmails,
+		TotalCount: totalCount,
+	}
+
+	return c.JSON(response)
 }
 
 // GetEmail haalt een specifieke email op
@@ -177,7 +227,7 @@ func (h *MailHandler) ListEmails(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param id path string true "Email ID"
-// @Success 200 {object} models.IncomingEmail
+// @Success 200 {object} MailResponse
 // @Failure 400 {object} map[string]interface{}
 // @Failure 401 {object} map[string]interface{}
 // @Failure 403 {object} map[string]interface{}
@@ -186,32 +236,31 @@ func (h *MailHandler) ListEmails(c *fiber.Ctx) error {
 // @Router /api/mail/{id} [get]
 // @Security BearerAuth
 func (h *MailHandler) GetEmail(c *fiber.Ctx) error {
-	// Haal ID op uit URL
 	id := c.Params("id")
 	if id == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "ID is verplicht",
-		})
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "ID is verplicht"})
 	}
 
-	// Haal email op
 	ctx := c.Context()
 	email, err := h.incomingEmailRepo.GetByID(ctx, id)
 	if err != nil {
-		logger.Error("Fout bij ophalen email", "error", err, "id", id)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Kon email niet ophalen",
-		})
+		if err == gorm.ErrRecordNotFound {
+			logger.Warn("E-mail niet gevonden", "id", id)
+			return c.Status(http.StatusNotFound).JSON(fiber.Map{"error": "E-mail niet gevonden"})
+		}
+		logger.Error("Fout bij ophalen e-mail", "error", err, "id", id)
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Interne serverfout bij ophalen e-mail"})
 	}
-
 	if email == nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "Email niet gevonden",
-		})
+		logger.Warn("E-mail niet gevonden (nil result)", "id", id)
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{"error": "E-mail niet gevonden"})
 	}
 
-	// Stuur resultaat terug
-	return c.JSON(email)
+	response := mapEmailToResponse(email)
+	// Log the response just before sending
+	logger.Info("GetEmail response wordt verzonden", "email_id", id, "response_html_preview", getFirstNChars(response.HTML, 100)) // Log first 100 chars of HTML
+
+	return c.JSON(response)
 }
 
 // MarkAsProcessed markeert een email als verwerkt
@@ -221,7 +270,7 @@ func (h *MailHandler) GetEmail(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param id path string true "Email ID"
-// @Success 200 {object} models.IncomingEmail
+// @Success 200 {object} MailResponse
 // @Failure 400 {object} map[string]interface{}
 // @Failure 401 {object} map[string]interface{}
 // @Failure 403 {object} map[string]interface{}
@@ -230,45 +279,33 @@ func (h *MailHandler) GetEmail(c *fiber.Ctx) error {
 // @Router /api/mail/{id}/processed [put]
 // @Security BearerAuth
 func (h *MailHandler) MarkAsProcessed(c *fiber.Ctx) error {
-	// Haal ID op uit URL
 	id := c.Params("id")
 	if id == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "ID is verplicht",
-		})
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "ID is verplicht"})
 	}
 
-	// Haal email op
 	ctx := c.Context()
 	email, err := h.incomingEmailRepo.GetByID(ctx, id)
 	if err != nil {
-		logger.Error("Fout bij ophalen email", "error", err, "id", id)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Kon email niet ophalen",
-		})
+		logger.Error("Fout bij ophalen email voor markeren", "error", err, "id", id)
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Kon email niet ophalen"})
 	}
-
 	if email == nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "Email niet gevonden",
-		})
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{"error": "Email niet gevonden"})
 	}
 
-	// Markeer als verwerkt
-	email.IsProcessed = true
 	now := time.Now()
+	email.IsProcessed = true
 	email.ProcessedAt = &now
 
-	// Sla wijzigingen op
-	if err := h.incomingEmailRepo.Update(ctx, email); err != nil {
+	err = h.incomingEmailRepo.Update(ctx, email)
+	if err != nil {
 		logger.Error("Fout bij markeren email als verwerkt", "error", err, "id", id)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Kon email niet markeren als verwerkt",
-		})
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Kon email niet bijwerken"})
 	}
 
-	// Stuur bijgewerkte email terug
-	return c.JSON(email)
+	logger.Info("Email gemarkeerd als verwerkt", "id", id)
+	return c.JSON(fiber.Map{"message": fmt.Sprintf("Email %s gemarkeerd als verwerkt", id)})
 }
 
 // DeleteEmail verwijdert een email
@@ -287,43 +324,18 @@ func (h *MailHandler) MarkAsProcessed(c *fiber.Ctx) error {
 // @Router /api/mail/{id} [delete]
 // @Security BearerAuth
 func (h *MailHandler) DeleteEmail(c *fiber.Ctx) error {
-	// Haal ID op uit URL
 	id := c.Params("id")
 	if id == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "ID is verplicht",
-		})
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "ID is verplicht"})
 	}
 
-	// Controleer of email bestaat
 	ctx := c.Context()
-	email, err := h.incomingEmailRepo.GetByID(ctx, id)
-	if err != nil {
-		logger.Error("Fout bij ophalen email", "error", err, "id", id)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Kon email niet ophalen",
-		})
-	}
-
-	if email == nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "Email niet gevonden",
-		})
-	}
-
-	// Verwijder email
 	if err := h.incomingEmailRepo.Delete(ctx, id); err != nil {
 		logger.Error("Fout bij verwijderen email", "error", err, "id", id)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Kon email niet verwijderen",
-		})
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Kon email niet verwijderen"})
 	}
 
-	// Stuur bevestiging terug
-	return c.JSON(fiber.Map{
-		"success": true,
-		"message": "Email succesvol verwijderd",
-	})
+	return c.Status(http.StatusOK).JSON(fiber.Map{"success": true, "message": "Email succesvol verwijderd"})
 }
 
 // FetchEmails haalt nieuwe emails op van de mailserver
@@ -342,44 +354,24 @@ func (h *MailHandler) FetchEmails(c *fiber.Ctx) error {
 	// Haal nieuwe emails op
 	emails, err := h.mailFetcher.FetchMails()
 	if err != nil {
-		logger.Error("Fout bij ophalen nieuwe emails", "error", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Kon nieuwe emails niet ophalen: " + err.Error(),
-		})
+		logger.Error("Fout bij handmatig ophalen mails", "error", err)
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Fout bij ophalen emails: " + err.Error()})
 	}
 
-	// Sla emails op in database (als ze nog niet bestaan)
-	saved := 0
-	ctx := c.Context()
-
+	// Sla opgehaalde emails op in de database
+	var savedCount int
 	for _, email := range emails {
-		// Controleer of email al bestaat (op basis van UID)
-		existing, err := h.incomingEmailRepo.FindByUID(ctx, email.UID)
-		if err != nil {
-			logger.Error("Fout bij zoeken bestaande email", "error", err, "uid", email.UID)
-			continue
-		}
-
-		// Als email nog niet bestaat, sla op
-		if existing == nil {
-			if err := h.incomingEmailRepo.Create(ctx, email); err != nil {
-				logger.Error("Fout bij opslaan nieuwe email", "error", err, "uid", email.UID)
-				continue
-			}
-			saved++
+		if err := h.incomingEmailRepo.Create(c.Context(), email); err != nil {
+			logger.Error("Fout bij opslaan opgehaalde email", "error", err, "messageID", email.MessageID)
+			// Ga door met de volgende email
+		} else {
+			savedCount++
 		}
 	}
 
-	// Bijwerken laatste uitvoering
-	h.lastRun = time.Now()
-
-	// Stuur resultaat terug
 	return c.JSON(fiber.Map{
-		"success":      true,
-		"emails_found": len(emails),
-		"emails_saved": saved,
-		"last_run":     h.lastRun,
-		"message":      "Emails succesvol opgehaald",
+		"message":   fmt.Sprintf("%d emails opgehaald, %d succesvol opgeslagen", len(emails), savedCount),
+		"fetchTime": h.mailFetcher.GetLastFetchTime(),
 	})
 }
 
@@ -389,25 +381,31 @@ func (h *MailHandler) FetchEmails(c *fiber.Ctx) error {
 // @Tags Mail
 // @Accept json
 // @Produce json
-// @Success 200 {array} models.IncomingEmail
+// @Success 200 {object} PaginatedMailResponse
 // @Failure 401 {object} map[string]interface{}
 // @Failure 403 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/mail/unprocessed [get]
 // @Security BearerAuth
 func (h *MailHandler) ListUnprocessedEmails(c *fiber.Ctx) error {
-	// Haal onverwerkte emails op
-	ctx := c.Context()
-	emails, err := h.incomingEmailRepo.FindUnprocessed(ctx)
+	logger.Info("Request ontvangen voor ListUnprocessedEmails")
+
+	// FindUnprocessed haalt alle onverwerkte e-mails op (geen paginering ondersteund door repo methode)
+	emails, err := h.incomingEmailRepo.FindUnprocessed(c.Context())
 	if err != nil {
-		logger.Error("Fout bij ophalen onverwerkte emails", "error", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Kon onverwerkte emails niet ophalen",
-		})
+		logger.Error("Fout bij ophalen onverwerkte e-mails", "error", err)
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Interne serverfout bij ophalen onverwerkte e-mails"})
 	}
 
-	// Stuur resultaat terug
-	return c.JSON(emails)
+	// Map de e-mails naar response DTOs
+	responses := make([]*MailResponse, 0, len(emails)) // Initialize as slice of pointers
+	for _, email := range emails {
+		responses = append(responses, mapEmailToResponse(email)) // Pass the pointer
+	}
+
+	logger.Info("Onverwerkte e-mails opgehaald", "count", len(responses))
+
+	return c.JSON(responses)
 }
 
 // ListEmailsByAccountType haalt een lijst van emails op per account type met paginering
@@ -419,7 +417,7 @@ func (h *MailHandler) ListUnprocessedEmails(c *fiber.Ctx) error {
 // @Param type path string true "Account Type (bv. 'info', 'inschrijving')"
 // @Param limit query int false "Aantal resultaten per pagina (standaard 10)"
 // @Param offset query int false "Offset voor paginering (standaard 0)"
-// @Success 200 {object} PaginatedEmailsResponse
+// @Success 200 {object} PaginatedMailResponse
 // @Failure 400 {object} map[string]interface{}
 // @Failure 401 {object} map[string]interface{}
 // @Failure 403 {object} map[string]interface{}
@@ -427,54 +425,48 @@ func (h *MailHandler) ListUnprocessedEmails(c *fiber.Ctx) error {
 // @Router /api/mail/account/{type} [get]
 // @Security BearerAuth
 func (h *MailHandler) ListEmailsByAccountType(c *fiber.Ctx) error {
-	// Haal account type op uit URL
 	accountType := c.Params("type")
 	if accountType == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Account type is verplicht",
-		})
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "Account type is verplicht"})
 	}
 
-	// Haal query parameters op
 	limit := c.QueryInt("limit", 10)
 	offset := c.QueryInt("offset", 0)
 
-	// Valideer parameters
 	if limit < 1 || limit > 100 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Limit moet tussen 1 en 100 liggen",
-		})
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "Limit moet tussen 1 en 100 liggen"})
 	}
-
 	if offset < 0 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Offset mag niet negatief zijn",
-		})
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "Offset mag niet negatief zijn"})
 	}
 
-	// Haal emails en totaal aantal op
 	ctx := c.Context()
 	emails, totalCount, err := h.incomingEmailRepo.ListByAccountTypePaginated(ctx, accountType, limit, offset)
 	if err != nil {
-		logger.Error("Fout bij ophalen gepagineerde emails per account type", "error", err, "account_type", accountType)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Kon emails niet ophalen",
-		})
+		logger.Error("Fout bij ophalen emails per account type", "error", err, "account_type", accountType, "limit", limit, "offset", offset)
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Interne serverfout bij ophalen e-mails"})
 	}
 
-	// Bouw de response
-	response := PaginatedEmailsResponse{
-		Emails:     emails,
+	responseEmails := mapEmailsToResponse(emails)
+	response := PaginatedMailResponse{
+		Emails:     responseEmails,
 		TotalCount: totalCount,
 	}
 
-	// Stuur resultaat terug
+	// Log the response just before sending
+	logger.Info("ListEmailsByAccountType response wordt verzonden", "account_type", accountType, "count", len(responseEmails), "total_count", totalCount)
+	// Optional: Log HTML preview for the first email if needed
+	// if len(responseEmails) > 0 {
+	//  logger.Info("First email HTML preview", "email_id", responseEmails[0].ID, "response_html_preview", getFirstNChars(responseEmails[0].HTML, 100))
+	// }
+
 	return c.JSON(response)
 }
 
-// GetEmails is verouderd en niet meer gebruikt. Behoud voor mogelijke interne logica, maar niet blootstellen als API endpoint.
-// TODO: Verwijder deze functie als deze nergens meer wordt aangeroepen.
-func (h *MailHandler) GetEmails(c *fiber.Ctx) error {
-	// Implementatie van GetEmails...
-	return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{"message": "Endpoint not implemented"})
+// Helper function to get first N characters of a string
+func getFirstNChars(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
 }

@@ -42,7 +42,7 @@ func ValidateSendMailRequest(sl validator.StructLevel) {
 		sl.ReportError(req.Body, "body", "Body", "excluded_with", "TemplateName")
 	}
 
-	if req.TemplateName != "" && (req.TemplateVariables == nil || len(req.TemplateVariables) == 0) {
+	if req.TemplateName != "" && len(req.TemplateVariables) == 0 {
 		// Optionally require variables if template is used, or allow empty maps
 		// sl.ReportError(req.TemplateVariables, "template_variables", "TemplateVariables", "required_with", "TemplateName")
 	}
