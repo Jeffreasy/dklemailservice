@@ -151,7 +151,10 @@ func (f *MailFetcher) fetchFromAccount(account *MailAccount, since time.Time) ([
 
 	// Zoek berichten van na de laatste keer ophalen
 	criteria := imap.NewSearchCriteria()
-	// criteria.Since = since // Tijdelijk uitgeschakeld voor debuggen - haal ALLE emails op
+	// criteria.Since = since // Weer inschakelen van de SINCE criteria
+	// Introduceer een kleine buffer om timing issues te voorkomen
+	criteria.Since = since.Add(-1 * time.Minute)
+	logger.Debug("Using SINCE criteria with buffer", "effective_since", criteria.Since)
 
 	// Voer zoekopdracht uit
 	uids, err := c.Search(criteria)
