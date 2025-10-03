@@ -6,7 +6,7 @@ import (
 
 // Gebruiker representeert een gebruiker van het systeem
 type Gebruiker struct {
-	ID             string     `json:"id" gorm:"primaryKey;type:uuid;default:uuid_generate_v4()"`
+	ID             string     `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
 	Naam           string     `json:"naam" gorm:"not null"`
 	Email          string     `json:"email" gorm:"not null;uniqueIndex"`
 	WachtwoordHash string     `json:"-" gorm:"not null"` // Niet zichtbaar in JSON
