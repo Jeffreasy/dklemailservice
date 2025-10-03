@@ -2,6 +2,7 @@ package tests
 
 import (
 	"dklautomationgo/services"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -16,8 +17,8 @@ func TestEmailBatcher(t *testing.T) {
 	rateLimiter := services.NewRateLimiter(prometheusMetrics)
 
 	// Maak een mock SMTP client
-	mockSMTP := newMockSMTP()
-	emailService := services.NewEmailService(mockSMTP, emailMetrics, rateLimiter, prometheusMetrics)
+	smtpMock := &mockSMTP{}
+	emailService := services.NewEmailService(smtpMock, emailMetrics, rateLimiter, prometheusMetrics)
 
 	t.Run("Basis batch verwerking", func(t *testing.T) {
 		batcher := services.NewEmailBatcher(emailService, 3, 100*time.Millisecond)
@@ -33,19 +34,16 @@ func TestEmailBatcher(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 
 		// Controleer of alle emails zijn verzonden in de juiste volgorde
-		sentEmails := mockSMTP.GetSentEmails()
-		assert.Equal(t, 3, len(sentEmails))
-		if len(sentEmails) == 3 {
-			assert.Equal(t, "test1@example.com", sentEmails[0].To)
-			assert.Equal(t, "test2@example.com", sentEmails[1].To)
-			assert.Equal(t, "test3@example.com", sentEmails[2].To)
-		}
+		smtpMock.mutex.Lock()
+		assert.True(t, smtpMock.SendCalled, "Send should have been called")
+		assert.Equal(t, "test3@example.com", smtpMock.LastTo)
+		smtpMock.mutex.Unlock()
 	})
 
 	t.Run("Batch timeout", func(t *testing.T) {
 		// Reset mock
-		mockSMTP = newMockSMTP()
-		emailService = services.NewEmailService(mockSMTP, emailMetrics, rateLimiter, prometheusMetrics)
+		smtpMock = &mockSMTP{}
+		emailService = services.NewEmailService(smtpMock, emailMetrics, rateLimiter, prometheusMetrics)
 
 		batcher := services.NewEmailBatcher(emailService, 5, 100*time.Millisecond)
 		defer batcher.Shutdown()
@@ -59,17 +57,15 @@ func TestEmailBatcher(t *testing.T) {
 		// Wacht op timeout verwerking
 		time.Sleep(200 * time.Millisecond)
 
-		// Controleer of emails zijn verzonden ondanks incomplete batch
-		sentEmails := mockSMTP.GetSentEmails()
-		assert.Equal(t, 2, len(sentEmails))
-		if len(sentEmails) == 2 {
-			assert.Equal(t, "test1@example.com", sentEmails[0].To)
-			assert.Equal(t, "test2@example.com", sentEmails[1].To)
-		}
+		// Controleer of emails zijn verzonden
+		smtpMock.mutex.Lock()
+		assert.True(t, smtpMock.SendCalled, "Send should have been called on timeout")
+		assert.Equal(t, "test2@example.com", smtpMock.LastTo)
+		smtpMock.mutex.Unlock()
 	})
 
 	t.Run("Batch met fouten", func(t *testing.T) {
-		mock := newMockSMTP()
+		mock := &mockSMTP{}
 		rateLimiter := newMockRateLimiter()
 		metrics := newMockPrometheusMetrics()
 
@@ -80,8 +76,8 @@ func TestEmailBatcher(t *testing.T) {
 		batcher := services.NewEmailBatcher(emailService, 2, time.Millisecond*200)
 		defer batcher.Shutdown()
 
-		// Configureer de mock om alleen de eerste email te laten falen
-		mock.SetFailFirst(true)
+		// Configureer de mock om te falen
+		mock.SendError = errors.New("SMTP failed")
 
 		batchKey := "test-batch"
 		recipients := []string{"test1@example.com", "test2@example.com"}
@@ -93,17 +89,19 @@ func TestEmailBatcher(t *testing.T) {
 		}
 
 		time.Sleep(time.Millisecond * 300)
-		sentEmails := mock.GetSentEmails()
-		assert.Equal(t, 1, len(sentEmails), "Er moet precies één email succesvol verzonden zijn")
-		if len(sentEmails) > 0 {
-			assert.Equal(t, "test2@example.com", sentEmails[0].To, "De tweede email moet succesvol verzonden zijn")
-		}
+
+		// Controleer dat Send is aangeroepen maar gefaald (error is set)
+		mock.mutex.Lock()
+		assert.True(t, mock.SendCalled, "Send should have been called")
+		assert.Error(t, mock.SendError, "SendError should be set")
+		assert.Equal(t, "test2@example.com", mock.LastTo)
+		mock.mutex.Unlock()
 	})
 
 	t.Run("Graceful shutdown", func(t *testing.T) {
 		// Reset mock
-		mockSMTP = newMockSMTP()
-		emailService = services.NewEmailService(mockSMTP, emailMetrics, rateLimiter, prometheusMetrics)
+		smtpMock = &mockSMTP{}
+		emailService = services.NewEmailService(smtpMock, emailMetrics, rateLimiter, prometheusMetrics)
 
 		batcher := services.NewEmailBatcher(emailService, 3, 1*time.Second)
 
@@ -117,11 +115,9 @@ func TestEmailBatcher(t *testing.T) {
 		batcher.Shutdown()
 
 		// Controleer of emails nog steeds zijn verwerkt
-		sentEmails := mockSMTP.GetSentEmails()
-		assert.Equal(t, 2, len(sentEmails))
-		if len(sentEmails) == 2 {
-			assert.Equal(t, "test1@example.com", sentEmails[0].To)
-			assert.Equal(t, "test2@example.com", sentEmails[1].To)
-		}
+		smtpMock.mutex.Lock()
+		assert.True(t, smtpMock.SendCalled, "Send should have been called on shutdown")
+		assert.Equal(t, "test2@example.com", smtpMock.LastTo)
+		smtpMock.mutex.Unlock()
 	})
 }

@@ -48,6 +48,15 @@ func (m *MockMailFetcher) SetLastFetchTime(t time.Time) {
 // MockIncomingEmailRepository is een mock implementatie van de IncomingEmailRepository
 type MockIncomingEmailRepository struct {
 	mock.Mock
+	CreateFunc                     func(ctx context.Context, email *models.IncomingEmail) error
+	GetByIDFunc                    func(ctx context.Context, id string) (*models.IncomingEmail, error)
+	ListFunc                       func(ctx context.Context, limit, offset int) ([]*models.IncomingEmail, error)
+	UpdateFunc                     func(ctx context.Context, email *models.IncomingEmail) error
+	DeleteFunc                     func(ctx context.Context, id string) error
+	FindByUIDFunc                  func(ctx context.Context, uid string) (*models.IncomingEmail, error)
+	FindUnprocessedFunc            func(ctx context.Context) ([]*models.IncomingEmail, error)
+	FindByAccountTypeFunc          func(ctx context.Context, accountType string) ([]*models.IncomingEmail, error)
+	ListByAccountTypePaginatedFunc func(ctx context.Context, accountType string, limit, offset int) ([]*models.IncomingEmail, int64, error)
 }
 
 func (m *MockIncomingEmailRepository) Create(ctx context.Context, email *models.IncomingEmail) error {
@@ -94,6 +103,15 @@ func (m *MockIncomingEmailRepository) FindUnprocessed(ctx context.Context) ([]*m
 func (m *MockIncomingEmailRepository) FindByAccountType(ctx context.Context, accountType string) ([]*models.IncomingEmail, error) {
 	args := m.Called(ctx, accountType)
 	return args.Get(0).([]*models.IncomingEmail), args.Error(1)
+}
+
+// Implementeer ListByAccountTypePaginated voor de mock
+func (m *MockIncomingEmailRepository) ListByAccountTypePaginated(ctx context.Context, accountType string, limit, offset int) ([]*models.IncomingEmail, int64, error) {
+	if m.ListByAccountTypePaginatedFunc != nil {
+		return m.ListByAccountTypePaginatedFunc(ctx, accountType, limit, offset)
+	}
+	// Standaard implementatie of return een fout indien nodig voor tests
+	return nil, 0, nil
 }
 
 // TestFetchEmails test de FetchEmails functionaliteit direct

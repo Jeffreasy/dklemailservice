@@ -141,3 +141,47 @@ func (r *PostgresIncomingEmailRepository) FindByAccountType(ctx context.Context,
 
 	return emails, nil
 }
+
+// ListByAccountTypePaginated haalt een gepagineerde lijst van inkomende e-mails op basis van account type en retourneert het totaal aantal
+func (r *PostgresIncomingEmailRepository) ListByAccountTypePaginated(ctx context.Context, accountType string, limit, offset int) ([]*models.IncomingEmail, int64, error) {
+	var emails []*models.IncomingEmail
+	var totalCount int64
+
+	// Begin een transactie
+	tx := r.db.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		logger.Error("Fout bij starten transactie voor paginated email fetch", "error", tx.Error)
+		return nil, 0, tx.Error
+	}
+
+	// Query om het totaal aantal te tellen
+	countQuery := tx.Model(&models.IncomingEmail{}).Where("account_type = ?", accountType)
+	if err := countQuery.Count(&totalCount).Error; err != nil {
+		tx.Rollback() // Rollback bij fout
+		logger.Error("Fout bij tellen inkomende e-mails op account type", "error", err, "account_type", accountType)
+		return nil, 0, err
+	}
+
+	// Query om de gepagineerde data op te halen
+	dataQuery := tx.Model(&models.IncomingEmail{}).
+		Where("account_type = ?", accountType).
+		Order("received_at desc").
+		Limit(limit).
+		Offset(offset)
+
+	if err := dataQuery.Find(&emails).Error; err != nil {
+		tx.Rollback() // Rollback bij fout
+		logger.Error("Fout bij ophalen gepagineerde inkomende e-mails op account type", "error", err, "account_type", accountType)
+		return nil, 0, err
+	}
+
+	// Commit de transactie
+	if err := tx.Commit().Error; err != nil {
+		logger.Error("Fout bij commiten transactie voor paginated email fetch", "error", err)
+		// Data is al opgehaald, maar de transactie kon niet worden gecommit.
+		// We retourneren de data toch maar loggen de fout.
+		return emails, totalCount, nil
+	}
+
+	return emails, totalCount, nil
+}

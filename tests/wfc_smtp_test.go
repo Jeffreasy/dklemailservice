@@ -1,54 +1,30 @@
 package tests
 
 import (
+	"context"
 	"os"
 	"testing"
 
+	"dklautomationgo/models"
 	"dklautomationgo/services"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
-// WFCMockSMTPClient is a mock implementation for testing Whisky for Charity functionality
-type WFCMockSMTPClient struct {
-	LastTo      string
-	LastSubject string
-	LastBody    string
-	Error       error
+// MockWFCOrderRepository is a mock implementation of WFCOrderRepository
+//
+//nolint:unused // This mock is kept for future tests
+type MockWFCOrderRepository struct {
+	mock.Mock
 }
 
-func (m *WFCMockSMTPClient) Send(msg *services.EmailMessage) error {
-	m.LastTo = msg.To
-	m.LastSubject = msg.Subject
-	m.LastBody = msg.Body
-	return m.Error
-}
+// --- removed WFCMockSMTPClient struct definition ---
 
-func (m *WFCMockSMTPClient) SendRegistration(msg *services.EmailMessage) error {
-	return m.Send(msg)
-}
-
-func (m *WFCMockSMTPClient) SendEmail(to, subject, body string) error {
-	m.LastTo = to
-	m.LastSubject = subject
-	m.LastBody = body
-	return m.Error
-}
-
-func (m *WFCMockSMTPClient) SendWFC(msg *services.EmailMessage) error {
-	return m.Send(msg)
-}
-
-func (m *WFCMockSMTPClient) SendWFCEmail(to, subject, body string) error {
-	m.LastTo = to
-	m.LastSubject = subject
-	m.LastBody = body
-	return m.Error
-}
-
-// Implement Dial method to satisfy the SMTPDialer interface
-func (m *WFCMockSMTPClient) Dial() error {
-	return m.Error
+//nolint:unused // This mock is kept for future tests
+func (m *MockWFCOrderRepository) Create(ctx context.Context, order *models.WFCOrder) error {
+	args := m.Called(ctx, order)
+	return args.Error(0)
 }
 
 func TestWhiskyForCharitySMTP(t *testing.T) {
@@ -102,7 +78,7 @@ func TestWhiskyForCharitySMTP(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Test the WFC email method
-		err = emailService.SendWhiskyForCharityEmail("test@example.com", "WFC Test", "<p>Testing WFC</p>")
+		err = emailService.SendWFCEmail("test@example.com", "WFC Test", "<p>Testing WFC</p>")
 		assert.NoError(t, err)
 
 		// Verify correct method was called on client

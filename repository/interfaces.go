@@ -201,6 +201,9 @@ type IncomingEmailRepository interface {
 
 	// FindByAccountType zoekt inkomende e-mails op basis van account type
 	FindByAccountType(ctx context.Context, accountType string) ([]*models.IncomingEmail, error)
+
+	// ListByAccountTypePaginated haalt een lijst van inkomende e-mails op basis van account type en paginatie
+	ListByAccountTypePaginated(ctx context.Context, accountType string, limit, offset int) ([]*models.IncomingEmail, int64, error)
 }
 
 // NotificationRepository definieert de interface voor notificaties

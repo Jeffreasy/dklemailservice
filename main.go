@@ -203,7 +203,11 @@ func main() {
 	rateLimiter := serviceFactory.GetRateLimiter()
 
 	// Initialiseer handlers
-	emailHandler := handlers.NewEmailHandler(serviceFactory.EmailService, serviceFactory.NotificationService)
+	emailHandler := handlers.NewEmailHandler(
+		serviceFactory.EmailService,
+		serviceFactory.NotificationService,
+		repoFactory.Aanmelding,
+	)
 	authHandler := handlers.NewAuthHandler(serviceFactory.AuthService, rateLimiter)
 	metricsHandler := handlers.NewMetricsHandler(serviceFactory.EmailMetrics, rateLimiter)
 
@@ -265,14 +269,14 @@ func main() {
 	// Configure CORS
 	allowedOrigins := strings.Split(os.Getenv("ALLOWED_ORIGINS"), ",")
 	if len(allowedOrigins) == 0 || (len(allowedOrigins) == 1 && allowedOrigins[0] == "") {
-		allowedOrigins = []string{"https://www.dekoninklijkeloop.nl", "https://dekoninklijkeloop.nl", "http://localhost:3000", "http://localhost:5173"}
+		allowedOrigins = []string{"https://www.dekoninklijkeloop.nl", "https://dekoninklijkeloop.nl", "https://admin.dekoninklijkeloop.nl", "http://localhost:3000", "http://localhost:5173"}
 	}
 
 	logger.Info("CORS geconfigureerd", "origins", allowedOrigins)
 
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     strings.Join(allowedOrigins, ","),
-		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-Test-Mode",
 		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
 		AllowCredentials: true,
 		ExposeHeaders:    "Content-Length, Content-Type",
@@ -510,6 +514,12 @@ func main() {
 		// Stuur de body terug met de juiste status code
 		return c.Status(recorder.Code).Send(recorder.Body.Bytes())
 	})
+
+	// Initialiseer de nieuwe admin mail handler
+	adminMailHandler := handlers.NewAdminMailHandler(serviceFactory.EmailService, serviceFactory.AuthService)
+
+	// Registreer de admin mail routes
+	adminMailHandler.RegisterRoutes(app)
 
 	// Start server
 	port := os.Getenv("PORT")

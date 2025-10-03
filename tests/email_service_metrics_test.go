@@ -10,7 +10,7 @@ import (
 
 func TestEmailService_WithMetrics(t *testing.T) {
 	// Maak een mock SMTP client
-	mockSMTP := newMockSMTP()
+	mockSMTP := &mockSMTP{}
 
 	// Maak metrics instanties
 	emailMetrics := services.NewEmailMetrics(time.Hour)
@@ -33,10 +33,16 @@ func TestEmailService_WithMetrics(t *testing.T) {
 	assert.Equal(t, 1, mockPrometheus.emailsSent, "Prometheus metrics moet 1 verzonden email registreren")
 	assert.Equal(t, 0, mockPrometheus.emailsFailed, "Prometheus metrics moet 0 gefaalde emails registreren")
 
-	// Controleer of de email is verzonden
-	sentEmails := mockSMTP.GetSentEmails()
-	assert.Equal(t, 1, len(sentEmails))
-	if len(sentEmails) > 0 {
-		assert.Equal(t, "test@example.com", sentEmails[0].To)
-	}
+	// Controleer of de email is verzonden (using direct fields)
+	mockSMTP.mutex.Lock() // Lock mutex before accessing fields
+	assert.Equal(t, "test@example.com", mockSMTP.LastTo, "Last sent email recipient should match")
+	assert.Equal(t, "Test Subject", mockSMTP.LastSubject, "Last sent email subject should match")
+	mockSMTP.mutex.Unlock() // Unlock mutex after accessing fields
+
+	// Originele controle commenten (verwijderen of aanpassen indien nodig):
+	// sentEmails := mockSMTP.GetSentEmails()
+	// assert.Equal(t, 1, len(sentEmails))
+	// if len(sentEmails) > 0 {
+	// 	assert.Equal(t, "test@example.com", sentEmails[0].To)
+	// }
 }

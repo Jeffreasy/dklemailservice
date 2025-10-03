@@ -7,12 +7,14 @@ import (
 )
 
 // IEmailService definieert de interface voor email operaties
+// Deze interface lijkt specifiek voor de EmailHandler te zijn en gebruikt Contact/Aanmelding modellen
+// Het is mogelijk overbodig als EmailSender interface algemener is.
 type IEmailService interface {
 	// SendContactEmail verzendt een email voor een contactformulier
-	SendContactEmail(ctx context.Context, contact *models.ContactFormulier) error
+	// SendContactEmail(ctx context.Context, contact *models.ContactFormulier) error // Mogelijk vervangen door EmailSender?
 
 	// SendAanmeldingEmail verzendt een email voor een aanmelding
-	SendAanmeldingEmail(ctx context.Context, aanmelding *models.Aanmelding) error
+	// SendAanmeldingEmail(ctx context.Context, aanmelding *models.Aanmelding) error // Mogelijk vervangen door EmailSender?
 }
 
 // RateLimiterService definieert de interface voor rate limiting
@@ -25,6 +27,9 @@ type RateLimiterService interface {
 
 	// GetCurrentValues haalt de huidige waarden op
 	GetCurrentValues() map[string]int
+
+	// Shutdown cleans up the rate limiter resources
+	Shutdown()
 }
 
 // EmailMetricsService definieert de interface voor email metrics
@@ -63,8 +68,38 @@ type AuthService interface {
 	ResetPassword(ctx context.Context, email, nieuwWachtwoord string) error
 }
 
+// EmailSender definieert de generieke interface voor het versturen van e-mails.
+// Deze wordt gebruikt door AdminMailHandler.
 type EmailSender interface {
-	SendEmail(to, subject, body string) error
+	// SendEmail verstuurt een platte tekst/HTML e-mail, met optioneel 'From' adres.
+	SendEmail(to, subject, body string, fromAddress ...string) error
+	// SendTemplateEmail stuurt een e-mail met behulp van een template, met optioneel 'From' adres.
+	SendTemplateEmail(recipient, subject, templateName string, templateData map[string]interface{}, fromAddress ...string) error
+
+	// Methoden specifiek gebruikt door EmailHandler (Contact/Aanmelding).
+	// Behoud originele signature als ze altijd de geconfigureerde afzender moeten gebruiken.
+	SendContactEmail(data *models.ContactEmailData) error
+	SendAanmeldingEmail(data *models.AanmeldingEmailData) error
+
+	// Methode specifiek voor WFC
+	SendWFCEmail(to, subject, body string) error
+	SendWFCOrderEmail(data *models.WFCOrderEmailData) error
+}
+
+// SMTPClient definieert de laag-niveau interface voor SMTP interactie.
+type SMTPClient interface {
+	// Send stuurt een bericht via de standaard SMTP configuratie (SMTP_FROM als afzender).
+	Send(msg *EmailMessage) error
+	// SendRegistration stuurt een bericht via de registratie SMTP configuratie (REGISTRATION_SMTP_FROM als afzender).
+	SendRegistration(msg *EmailMessage) error
+	// SendWFC stuurt een bericht via de WFC SMTP configuratie (WFC_SMTP_FROM als afzender).
+	SendWFC(msg *EmailMessage) error
+	// SendWithFrom stuurt een bericht via de standaard SMTP configuratie, maar met een expliciet opgegeven 'From' adres.
+	SendWithFrom(from string, msg *EmailMessage) error
+
+	// Oudere helper methoden, mogelijk overbodig maken of aanpassen?
+	// SendEmail(to, subject, body string, fromAddress ...string) error
+	// SendWFCEmail(to, subject, body string) error
 }
 
 type TemplateRenderer interface {

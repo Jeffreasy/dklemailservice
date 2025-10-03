@@ -4,6 +4,7 @@ import (
 	"context"
 	"dklautomationgo/logger"
 	"dklautomationgo/models"
+	"dklautomationgo/repository"
 	"dklautomationgo/services"
 	"encoding/json"
 	"os"
@@ -23,13 +24,19 @@ type EmailServiceInterface interface {
 type EmailHandler struct {
 	emailService        EmailServiceInterface
 	notificationService services.NotificationService
+	aanmeldingRepo      repository.AanmeldingRepository
 }
 
 // NewEmailHandler maakt een nieuwe EmailHandler
-func NewEmailHandler(emailService EmailServiceInterface, notificationService services.NotificationService) *EmailHandler {
+func NewEmailHandler(
+	emailService EmailServiceInterface,
+	notificationService services.NotificationService,
+	aanmeldingRepo repository.AanmeldingRepository,
+) *EmailHandler {
 	return &EmailHandler{
 		emailService:        emailService,
 		notificationService: notificationService,
+		aanmeldingRepo:      aanmeldingRepo,
 	}
 }
 
@@ -280,6 +287,47 @@ func (h *EmailHandler) HandleAanmeldingEmail(c *fiber.Ctx) error {
 		})
 	}
 
+	// Maak een Aanmelding object aan voor de database
+	// We gebruiken pointers voor optionele velden zoals Bijzonderheden
+	nieuweAanmelding := &models.Aanmelding{
+		Naam:           aanmelding.Naam,
+		Email:          aanmelding.Email,
+		Telefoon:       aanmelding.Telefoon,
+		Rol:            aanmelding.Rol,
+		Afstand:        aanmelding.Afstand,
+		Ondersteuning:  aanmelding.Ondersteuning,
+		Bijzonderheden: aanmelding.Bijzonderheden,
+		Terms:          aanmelding.Terms,
+		Status:         "nieuw",  // Standaard status
+		TestMode:       testMode, // Neem test mode over
+	}
+
+	// Sla de aanmelding op in de database (niet in test modus)
+	if !testMode {
+		logger.Info("Aanmelding opslaan in database",
+			"naam", nieuweAanmelding.Naam,
+			"email", nieuweAanmelding.Email)
+		ctx := c.Context()
+		if err := h.aanmeldingRepo.Create(ctx, nieuweAanmelding); err != nil {
+			logger.Error("Fout bij opslaan aanmelding in database",
+				"error", err,
+				"naam", nieuweAanmelding.Naam,
+				"email", nieuweAanmelding.Email,
+				"elapsed", time.Since(start))
+			// Geef een fout terug als opslaan mislukt
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"success": false,
+				"error":   "Kon aanmelding niet opslaan: " + err.Error(),
+			})
+		}
+		logger.Info("Aanmelding succesvol opgeslagen in database",
+			"id", nieuweAanmelding.ID,
+			"naam", nieuweAanmelding.Naam)
+	} else {
+		logger.Info("Test modus: Aanmelding niet opgeslagen in database",
+			"naam", nieuweAanmelding.Naam)
+	}
+
 	// Send email to admin
 	adminEmail := os.Getenv("REGISTRATION_EMAIL")
 	if adminEmail == "" {
@@ -343,6 +391,22 @@ func (h *EmailHandler) HandleAanmeldingEmail(c *fiber.Ctx) error {
 		logger.Info("Bevestigingsemail verzonden",
 			"user_email", aanmelding.Email,
 			"elapsed", time.Since(start))
+
+		// Werk de aanmelding bij in de database om aan te geven dat emails zijn verzonden
+		now := time.Now()
+		nieuweAanmelding.EmailVerzonden = true
+		nieuweAanmelding.EmailVerzondenOp = &now
+		ctx := c.Context() // Gebruik dezelfde context als voor create
+		if err := h.aanmeldingRepo.Update(ctx, nieuweAanmelding); err != nil {
+			// Log de fout, maar ga door omdat de hoofdactie (aanmelding + emails) al gelukt is.
+			// We willen geen 500 error teruggeven aan de gebruiker op dit punt.
+			logger.Error("Fout bij bijwerken aanmelding na email verzending",
+				"error", err,
+				"aanmelding_id", nieuweAanmelding.ID)
+		} else {
+			logger.Info("Aanmelding bijgewerkt met email verzendstatus",
+				"aanmelding_id", nieuweAanmelding.ID)
+		}
 	}
 
 	// Stuur een notificatie voor een nieuwe aanmelding

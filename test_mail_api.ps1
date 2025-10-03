@@ -1,15 +1,14 @@
 # DKL Email Service Mail API Test Script
 # Dit script test specifiek de mail endpoints van de DKL Email Service API
 
-# Kleuren voor output
-$successColor = "Green"
-$errorColor = "Red"
-$infoColor = "Cyan"
+# Variables
+$normalColor = [System.ConsoleColor]::Gray
+$errorColor = [System.ConsoleColor]::Red
+$successColor = [System.ConsoleColor]::Green
 $promptColor = "Yellow"
-$highlightColor = "Magenta"
 
 # Configuratie
-$baseUrl = "https://dklemailservice.onrender.com"
+# Remove unused: $baseUrl = "https://dklemailservice.onrender.com"
 $localUrl = "http://localhost:8080"
 $currentUrl = $localUrl  # Default lokaal testen
 
@@ -25,14 +24,17 @@ $global:session = $null
 $global:jwtToken = $null
 $global:mailId = $null
 
+# Headers voor geauthenticeerde requests
+# Initial assignment removed/commented out previously
+
 # Functie om een titel te tonen
 function Show-Title {
     param ([string]$Title)
     
-    Write-Host "" -ForegroundColor $infoColor
-    Write-Host "=============================================" -ForegroundColor $infoColor
-    Write-Host " $Title" -ForegroundColor $infoColor
-    Write-Host "=============================================" -ForegroundColor $infoColor
+    Write-Host "" -ForegroundColor $normalColor
+    Write-Host "=============================================" -ForegroundColor $normalColor
+    Write-Host " $Title" -ForegroundColor $normalColor
+    Write-Host "=============================================" -ForegroundColor $normalColor
 }
 
 # Functie om een resultaat te tonen
@@ -43,7 +45,7 @@ function Show-Result {
         [bool]$Success = $true
     )
     
-    Write-Host "" -ForegroundColor $infoColor
+    Write-Host "" -ForegroundColor $normalColor
     if ($Success) {
         Write-Host "[SUCCESS] $Name" -ForegroundColor $successColor
     } else {
@@ -69,8 +71,8 @@ function Invoke-ApiCall {
         [Microsoft.PowerShell.Commands.WebRequestSession]$Session = $null
     )
     
-    Write-Host "" -ForegroundColor $infoColor
-    Write-Host "[TESTING] $Name..." -ForegroundColor $infoColor
+    Write-Host "" -ForegroundColor $normalColor
+    Write-Host "[TESTING] $Name..." -ForegroundColor $normalColor
     
     try {
         $params = @{
@@ -81,7 +83,7 @@ function Invoke-ApiCall {
         
         if ($Body) {
             $jsonBody = $Body | ConvertTo-Json
-            Write-Host "Request Body:" -ForegroundColor $infoColor
+            Write-Host "Request Body:" -ForegroundColor $normalColor
             Write-Host $jsonBody
             $params.Body = $jsonBody
             $params.ContentType = "application/json"
@@ -102,7 +104,7 @@ function Invoke-ApiCall {
         return $response
     }
     catch {
-        Write-Host "" -ForegroundColor $infoColor
+        Write-Host "" -ForegroundColor $normalColor
         Write-Host "[ERROR] $Name failed" -ForegroundColor $errorColor
         
         if ($_.Exception.Response) {
@@ -138,7 +140,7 @@ function Test-AdminLogin {
     if ($response -and $response.token) {
         $global:jwtToken = $response.token
         $global:isLoggedIn = $true
-        Write-Host "JWT Token opgeslagen voor gebruik in requests" -ForegroundColor $infoColor
+        Write-Host "JWT Token opgeslagen voor gebruik in requests" -ForegroundColor $normalColor
     } else {
         $global:isLoggedIn = $false
     }
@@ -160,7 +162,7 @@ function Test-MailList {
     # Sla het eerste mail ID op voor gebruik in andere tests
     if ($response -and $response.Count -gt 0) {
         $global:mailId = $response[0].id
-        Write-Host "Mail ID opgeslagen voor gebruik in andere tests: $($global:mailId)" -ForegroundColor $infoColor
+        Write-Host "Mail ID opgeslagen voor gebruik in andere tests: $($global:mailId)" -ForegroundColor $normalColor
     } else {
         Write-Host "Geen e-mails gevonden om te testen." -ForegroundColor $promptColor
     }
@@ -270,7 +272,7 @@ function Test-DeleteMail {
     if ($response) {
         # Als het verwijderen succesvol was, reset dan de mail ID
         $global:mailId = $null
-        Write-Host "Mail ID gereset na succesvolle verwijdering." -ForegroundColor $infoColor
+        Write-Host "Mail ID gereset na succesvolle verwijdering." -ForegroundColor $normalColor
     }
     
     return $response
@@ -301,36 +303,36 @@ function Test-AllMailEndpoints {
     Show-Title -Title "Alle Mail API Endpoints Testen"
     
     # Stap 1: Login
-    $loginResult = Test-AdminLogin
-    
+    Test-AdminLogin
+
     if (-not $global:isLoggedIn) {
         Write-Host "Login mislukt. Tests worden gestopt." -ForegroundColor $errorColor
         return
     }
     
     # Stap 2: Haal nieuwe e-mails op
-    $fetchResult = Test-FetchMails
+    Test-FetchMails
     
     # Wacht even om zeker te zijn dat de mails zijn opgehaald
-    Write-Host "Even wachten om zeker te zijn dat de e-mails zijn opgehaald..." -ForegroundColor $infoColor
+    Write-Host "Even wachten om zeker te zijn dat de e-mails zijn opgehaald..." -ForegroundColor $normalColor
     Start-Sleep -Seconds 5
     
     # Stap 3: Test alle mail endpoints
-    $mailListResult = Test-MailList
-    $unprocessedMailsResult = Test-UnprocessedMails
-    $mailsByAccountTypeResult = Test-MailsByAccountType
+    Test-MailList
+    Test-UnprocessedMails
+    Test-MailsByAccountType
     
     if ($global:mailId) {
-        $mailDetailsResult = Test-MailDetails
-        $markAsProcessedResult = Test-MarkMailAsProcessed
+        Test-MailDetails
+        Test-MarkMailAsProcessed
         # Test verwijderen als laatste
-        $deleteMailResult = Test-DeleteMail
+        Test-DeleteMail
     } else {
         Write-Host "Geen mail ID gevonden, sla gerelateerde tests over." -ForegroundColor $promptColor
     }
     
     # Stap 4: Logout
-    $logoutResult = Test-Logout
+    Test-Logout
     
     # Toon samenvatting
     Show-Title -Title "Test Samenvatting"
