@@ -27,18 +27,31 @@ func testDB(t *testing.T) interface{} {
 		return mocks.NewMockDB()
 	}
 
-	// Migreer de schema's voor de test
-	err = db.AutoMigrate(
-		&models.ContactFormulier{},
-		&models.ContactAntwoord{},
-		&models.Aanmelding{},
-		&models.AanmeldingAntwoord{},
-		&models.EmailTemplate{},
-		&models.VerzondEmail{},
-		&models.Gebruiker{},
-		&models.Migratie{},
-	)
-	require.NoError(t, err, "Kon schema's niet migreren")
+	// Voor SQLite: gebruik een custom UUID generator omdat gen_random_uuid() niet wordt ondersteund
+	// We voeren handmatig de CREATE TABLE statements uit met SQLite-compatibele UUID defaults
+	err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS contact_formulieren (
+			id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))),
+			created_at DATETIME,
+			updated_at DATETIME,
+			naam TEXT NOT NULL,
+			email TEXT NOT NULL,
+			bericht TEXT NOT NULL,
+			email_verzonden BOOLEAN DEFAULT FALSE,
+			email_verzonden_op DATETIME,
+			privacy_akkoord BOOLEAN NOT NULL,
+			status TEXT DEFAULT 'nieuw',
+			behandeld_door TEXT,
+			behandeld_op DATETIME,
+			notities TEXT,
+			beantwoord BOOLEAN DEFAULT FALSE,
+			antwoord_tekst TEXT,
+			antwoord_datum DATETIME,
+			antwoord_door TEXT,
+			test_mode BOOLEAN NOT NULL DEFAULT FALSE
+		)
+	`).Error
+	require.NoError(t, err, "Kon contact_formulieren tabel niet aanmaken")
 
 	return db
 }
@@ -138,6 +151,11 @@ func TestPostgresContactRepository_List(t *testing.T) {
 	db := testDB(t)
 	repo := getContactRepository(t, db)
 	ctx := context.Background()
+
+	// Voor SQLite: schoon de tabel eerst om conflicten met andere tests te voorkomen
+	if gormDB, ok := db.(*gorm.DB); ok {
+		gormDB.Exec("DELETE FROM contact_formulieren")
+	}
 
 	// Voeg meerdere contactformulieren toe
 	for i := 0; i < 5; i++ {
@@ -280,6 +298,11 @@ func TestPostgresContactRepository_FindByStatus(t *testing.T) {
 	db := testDB(t)
 	repo := getContactRepository(t, db)
 	ctx := context.Background()
+
+	// Voor SQLite: schoon de tabel eerst om conflicten met andere tests te voorkomen
+	if gormDB, ok := db.(*gorm.DB); ok {
+		gormDB.Exec("DELETE FROM contact_formulieren")
+	}
 
 	// Voeg contactformulieren toe met verschillende statussen
 	statussen := []string{"nieuw", "in behandeling", "afgehandeld", "nieuw"}

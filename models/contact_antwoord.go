@@ -6,7 +6,7 @@ import (
 
 // ContactAntwoord representeert een antwoord op een contactformulier
 type ContactAntwoord struct {
-	ID             string    `json:"id" gorm:"primaryKey;type:uuid;default:uuid_generate_v4()"`
+	ID             string    `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
 	ContactID      string    `json:"contact_id" gorm:"not null;index"`
 	Tekst          string    `json:"tekst" gorm:"type:text;not null"`
 	VerzondOp      time.Time `json:"verzonden_op" gorm:"autoCreateTime"`

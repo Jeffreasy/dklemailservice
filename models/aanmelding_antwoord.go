@@ -6,7 +6,7 @@ import (
 
 // AanmeldingAntwoord representeert een antwoord op een aanmeldingsformulier
 type AanmeldingAntwoord struct {
-	ID             string    `json:"id" gorm:"primaryKey;type:uuid;default:uuid_generate_v4()"`
+	ID             string    `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
 	AanmeldingID   string    `json:"aanmelding_id" gorm:"not null;index"`
 	Tekst          string    `json:"tekst" gorm:"type:text;not null"`
 	VerzondOp      time.Time `json:"verzonden_op" gorm:"autoCreateTime"`

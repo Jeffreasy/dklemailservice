@@ -6,7 +6,7 @@ import (
 
 // VerzondEmail representeert een verzonden email
 type VerzondEmail struct {
-	ID          string    `json:"id" gorm:"primaryKey;type:uuid;default:uuid_generate_v4()"`
+	ID          string    `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
 	Ontvanger   string    `json:"ontvanger" gorm:"not null;index"`
 	Onderwerp   string    `json:"onderwerp" gorm:"not null"`
 	Inhoud      string    `json:"inhoud" gorm:"type:text;not null"`

@@ -6,7 +6,7 @@ import (
 
 // EmailTemplate representeert een email template die in de database is opgeslagen
 type EmailTemplate struct {
-	ID           string    `json:"id" gorm:"primaryKey;type:uuid;default:uuid_generate_v4()"`
+	ID           string    `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
 	Naam         string    `json:"naam" gorm:"not null;uniqueIndex"`
 	Onderwerp    string    `json:"onderwerp" gorm:"not null"`
 	Inhoud       string    `json:"inhoud" gorm:"type:text;not null"`
