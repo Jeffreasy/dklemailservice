@@ -61,11 +61,11 @@ CREATE TABLE IF NOT EXISTS chat_user_presence (
 );
 
 -- Indexes
-CREATE INDEX idx_chat_messages_channel_id_created_at ON chat_messages(channel_id, created_at DESC);
-CREATE INDEX idx_chat_messages_user_id ON chat_messages(user_id);
-CREATE INDEX idx_chat_channel_participants_channel_id ON chat_channel_participants(channel_id);
-CREATE INDEX idx_chat_channel_participants_user_id ON chat_channel_participants(user_id);
-CREATE INDEX idx_chat_message_reactions_message_id ON chat_message_reactions(message_id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_channel_id_created_at ON chat_messages(channel_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_user_id ON chat_messages(user_id);
+CREATE INDEX IF NOT EXISTS idx_chat_channel_participants_channel_id ON chat_channel_participants(channel_id);
+CREATE INDEX IF NOT EXISTS idx_chat_channel_participants_user_id ON chat_channel_participants(user_id);
+CREATE INDEX IF NOT EXISTS idx_chat_message_reactions_message_id ON chat_message_reactions(message_id);
 
 -- Registreer de migratie
 INSERT INTO migraties (versie, naam, toegepast) 
