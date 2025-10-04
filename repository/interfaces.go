@@ -229,3 +229,48 @@ type NotificationRepository interface {
 	// ListByPriority haalt alle notificaties op met een bepaalde prioriteit
 	ListByPriority(ctx context.Context, priority models.NotificationPriority) ([]*models.Notification, error)
 }
+
+// ChatChannelRepository defines the interface for chat channel operations
+type ChatChannelRepository interface {
+	Create(ctx context.Context, channel *models.ChatChannel) error
+	GetByID(ctx context.Context, id string) (*models.ChatChannel, error)
+	List(ctx context.Context, limit, offset int) ([]*models.ChatChannel, error)
+	Update(ctx context.Context, channel *models.ChatChannel) error
+	Delete(ctx context.Context, id string) error
+}
+
+// ChatChannelParticipantRepository defines the interface for chat channel participant operations
+type ChatChannelParticipantRepository interface {
+	Create(ctx context.Context, participant *models.ChatChannelParticipant) error
+	GetByID(ctx context.Context, id string) (*models.ChatChannelParticipant, error)
+	List(ctx context.Context, limit, offset int) ([]*models.ChatChannelParticipant, error)
+	Update(ctx context.Context, participant *models.ChatChannelParticipant) error
+	Delete(ctx context.Context, id string) error
+	ListByChannelID(ctx context.Context, channelID string) ([]*models.ChatChannelParticipant, error)
+}
+
+// ChatMessageRepository defines the interface for chat message operations
+type ChatMessageRepository interface {
+	Create(ctx context.Context, message *models.ChatMessage) error
+	GetByID(ctx context.Context, id string) (*models.ChatMessage, error)
+	List(ctx context.Context, limit, offset int) ([]*models.ChatMessage, error)
+	Update(ctx context.Context, message *models.ChatMessage) error
+	Delete(ctx context.Context, id string) error
+	ListByChannelID(ctx context.Context, channelID string, limit, offset int) ([]*models.ChatMessage, error)
+}
+
+// ChatMessageReactionRepository defines the interface for chat message reaction operations
+type ChatMessageReactionRepository interface {
+	Create(ctx context.Context, reaction *models.ChatMessageReaction) error
+	GetByID(ctx context.Context, id string) (*models.ChatMessageReaction, error)
+	List(ctx context.Context, limit, offset int) ([]*models.ChatMessageReaction, error)
+	Delete(ctx context.Context, id string) error
+	ListByMessageID(ctx context.Context, messageID string) ([]*models.ChatMessageReaction, error)
+}
+
+// ChatUserPresenceRepository defines the interface for chat user presence operations
+type ChatUserPresenceRepository interface {
+	Upsert(ctx context.Context, presence *models.ChatUserPresence) error
+	GetByUserID(ctx context.Context, userID string) (*models.ChatUserPresence, error)
+	Delete(ctx context.Context, userID string) error
+}

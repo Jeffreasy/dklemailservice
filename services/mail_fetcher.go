@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime/quotedprintable"
 	"net/mail"
 	"strconv"
@@ -243,7 +242,7 @@ func processMessage(msg *imap.Message, section imap.BodySectionName, accountType
 	}
 
 	// Lees de (mogelijk gedecodeerde) body
-	bodyBytes, err := ioutil.ReadAll(finalBodyReader)
+	bodyBytes, err := io.ReadAll(finalBodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("kan body niet lezen na decoding: %w", err)
 	}

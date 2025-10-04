@@ -7,7 +7,7 @@ import (
 	"dklautomationgo/repository"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -181,7 +181,7 @@ func (s *TelegramBotService) getUpdates() ([]TelegramUpdate, error) {
 	defer resp.Body.Close()
 
 	// Lees de response body
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}

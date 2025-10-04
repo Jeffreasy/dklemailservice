@@ -148,3 +148,41 @@ type NotificationService interface {
 	// IsRunning controleert of de service actief is
 	IsRunning() bool
 }
+
+// ChatService defines the interface for chat operations
+type ChatService interface {
+	// Channel operations
+	CreateChannel(ctx context.Context, channel *models.ChatChannel) error
+	GetChannel(ctx context.Context, id string) (*models.ChatChannel, error)
+	ListChannels(ctx context.Context, limit, offset int) ([]*models.ChatChannel, error)
+	UpdateChannel(ctx context.Context, channel *models.ChatChannel) error
+	DeleteChannel(ctx context.Context, id string) error
+
+	// Participant operations
+	AddParticipant(ctx context.Context, participant *models.ChatChannelParticipant) error
+	GetParticipant(ctx context.Context, id string) (*models.ChatChannelParticipant, error)
+	ListParticipants(ctx context.Context, limit, offset int) ([]*models.ChatChannelParticipant, error)
+	UpdateParticipant(ctx context.Context, participant *models.ChatChannelParticipant) error
+	DeleteParticipant(ctx context.Context, id string) error
+	ListParticipantsByChannel(ctx context.Context, channelID string) ([]*models.ChatChannelParticipant, error)
+
+	// Message operations
+	CreateMessage(ctx context.Context, message *models.ChatMessage) error
+	GetMessage(ctx context.Context, id string) (*models.ChatMessage, error)
+	ListMessages(ctx context.Context, limit, offset int) ([]*models.ChatMessage, error)
+	UpdateMessage(ctx context.Context, message *models.ChatMessage) error
+	DeleteMessage(ctx context.Context, id string) error
+	ListMessagesByChannel(ctx context.Context, channelID string, limit, offset int) ([]*models.ChatMessage, error)
+
+	// Reaction operations
+	AddReaction(ctx context.Context, reaction *models.ChatMessageReaction) error
+	GetReaction(ctx context.Context, id string) (*models.ChatMessageReaction, error)
+	ListReactions(ctx context.Context, limit, offset int) ([]*models.ChatMessageReaction, error)
+	DeleteReaction(ctx context.Context, id string) error
+	ListReactionsByMessage(ctx context.Context, messageID string) ([]*models.ChatMessageReaction, error)
+
+	// Presence operations
+	UpdatePresence(ctx context.Context, presence *models.ChatUserPresence) error
+	GetPresence(ctx context.Context, userID string) (*models.ChatUserPresence, error)
+	DeletePresence(ctx context.Context, userID string) error
+}
