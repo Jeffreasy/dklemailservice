@@ -162,6 +162,7 @@ type ChatService interface {
 	GetChannel(ctx context.Context, id string) (*models.ChatChannel, error)
 	ListChannels(ctx context.Context, limit, offset int) ([]*models.ChatChannel, error)
 	ListChannelsForUser(ctx context.Context, userID string, limit, offset int) ([]*models.ChatChannel, error)
+	ListPublicChannels(ctx context.Context) ([]*models.ChatChannel, error)
 	UpdateChannel(ctx context.Context, channel *models.ChatChannel) error
 	DeleteChannel(ctx context.Context, id string) error
 

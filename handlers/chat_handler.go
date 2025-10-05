@@ -32,6 +32,7 @@ func (h *ChatHandler) RegisterRoutes(app *fiber.App) {
 
 	// Channels
 	api.Get("/channels", h.ListChannels)
+	api.Get("/public-channels", h.ListPublicChannels)
 	api.Post("/channels", h.CreateChannel)
 	api.Post("/channels/:id/join", h.JoinChannel)
 	api.Post("/channels/:id/leave", h.LeaveChannel)
@@ -341,6 +342,14 @@ func (h *ChatHandler) UpdatePresence(c *fiber.Ctx) error {
 }
 
 // ListOnlineUsers lists online users
+func (h *ChatHandler) ListPublicChannels(c *fiber.Ctx) error {
+	channels, err := h.chatService.ListPublicChannels(c.Context())
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(channels)
+}
+
 func (h *ChatHandler) ListOnlineUsers(c *fiber.Ctx) error {
 	users, err := h.chatService.ListOnlineUsers(c.Context())
 	if err != nil {

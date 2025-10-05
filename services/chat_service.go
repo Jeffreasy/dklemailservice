@@ -48,6 +48,10 @@ func (s *ChatServiceImpl) ListChannels(ctx context.Context, limit, offset int) (
 	return s.channelRepo.List(ctx, limit, offset)
 }
 
+func (s *ChatServiceImpl) ListPublicChannels(ctx context.Context) ([]*models.ChatChannel, error) {
+	return s.channelRepo.ListPublicChannels(ctx)
+}
+
 // ListChannelsForUser lists channels for a specific user
 func (s *ChatServiceImpl) ListChannelsForUser(ctx context.Context, userID string, limit, offset int) ([]*models.ChatChannel, error) {
 	return s.channelRepo.ListByUserID(ctx, userID, limit, offset)

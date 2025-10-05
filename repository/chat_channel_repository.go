@@ -85,3 +85,15 @@ func (r *PostgresChatChannelRepository) ListByUserID(ctx context.Context, userID
 	}
 	return channels, nil
 }
+
+// ListPublicChannels lists all public channels
+func (r *PostgresChatChannelRepository) ListPublicChannels(ctx context.Context) ([]*models.ChatChannel, error) {
+	ctx, cancel := r.withTimeout(ctx)
+	defer cancel()
+	var channels []*models.ChatChannel
+	err := r.DB().WithContext(ctx).Where("is_public = ?", true).Find(&channels).Error
+	if err != nil {
+		return nil, r.handleError("ListPublicChannels", err)
+	}
+	return channels, nil
+}
