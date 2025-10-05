@@ -17,7 +17,7 @@ func NewUserHandler(authService services.AuthService) *UserHandler {
 }
 
 func (h *UserHandler) RegisterRoutes(app *fiber.App) {
-	api := app.Group("/api/users", AdminMiddleware(h.authService))
+	api := app.Group("/api/users", AuthMiddleware(h.authService), AdminMiddleware(h.authService))
 
 	api.Get("/", h.ListUsers)
 	api.Post("/", h.CreateUser)
