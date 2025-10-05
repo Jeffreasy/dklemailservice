@@ -50,11 +50,15 @@ func (h *ChatHandler) RegisterRoutes(app *fiber.App) {
 
 	// Channels
 	api.Get("/channels", h.ListChannels)
+	api.Get("/channels/:id/participants", h.ListParticipants)
 	api.Get("/public-channels", h.ListPublicChannels)
 	api.Post("/direct", h.CreateDirectChannel)
 	api.Post("/channels", h.CreateChannel)
 	api.Post("/channels/:id/join", h.JoinChannel)
 	api.Post("/channels/:id/leave", h.LeaveChannel)
+
+	// Users for direct chat
+	api.Get("/users", h.ListUsers)
 
 	// Messages
 	api.Get("/channels/:channel_id/messages", h.GetMessages)
@@ -460,6 +464,36 @@ func (h *ChatHandler) ListPublicChannels(c *fiber.Ctx) error {
 
 func (h *ChatHandler) ListOnlineUsers(c *fiber.Ctx) error {
 	users, err := h.chatService.ListOnlineUsers(c.Context())
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(users)
+}
+
+// ListParticipants lists participants of a channel
+func (h *ChatHandler) ListParticipants(c *fiber.Ctx) error {
+	channelID := c.Params("id")
+	userID := c.Locals("userID").(string)
+
+	// Check if user is participant
+	role, err := h.chatService.GetParticipantRole(c.Context(), channelID, userID)
+	if err != nil || role == "" {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Not a participant"})
+	}
+
+	participants, err := h.chatService.ListParticipantsByChannel(c.Context(), channelID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(participants)
+}
+
+// ListUsers lists users for direct chat selection
+func (h *ChatHandler) ListUsers(c *fiber.Ctx) error {
+	limit, _ := strconv.Atoi(c.Query("limit", "100"))
+	offset, _ := strconv.Atoi(c.Query("offset", "0"))
+
+	users, err := h.authService.ListUsers(c.Context(), limit, offset)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
