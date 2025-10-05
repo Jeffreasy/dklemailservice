@@ -10,6 +10,7 @@ type ChatChannelParticipant struct {
 	Role       string    `gorm:"type:text;default:'member';check:role IN ('owner', 'admin', 'member')" json:"role"`
 	JoinedAt   time.Time `gorm:"default:now()" json:"joined_at"`
 	LastSeenAt time.Time `json:"last_seen_at"`
+	LastReadAt time.Time `json:"last_read_at"`
 	IsActive   bool      `gorm:"default:true" json:"is_active"`
 }
 
