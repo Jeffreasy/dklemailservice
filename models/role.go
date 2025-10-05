@@ -10,4 +10,5 @@ const (
 	RoleDeelnemer    Role = "Deelnemer"
 	RoleBegeleider   Role = "Begeleider"
 	RoleVrijwilliger Role = "Vrijwilliger"
+	RoleAdminPanel   Role = "adminpanel"
 )

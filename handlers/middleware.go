@@ -70,9 +70,9 @@ func AdminMiddleware(authService services.AuthService) fiber.Handler {
 			})
 		}
 
-		// Controleer of gebruiker admin is
-		if gebruiker.Rol != "admin" {
-			logger.Warn("Gebruiker is geen admin", "user_id", gebruiker.ID, "role", gebruiker.Rol)
+		// Controleer of gebruiker admin of adminpanel is
+		if gebruiker.Rol != "admin" && gebruiker.Rol != "adminpanel" {
+			logger.Warn("Gebruiker is geen admin of adminpanel", "user_id", gebruiker.ID, "role", gebruiker.Rol)
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 				"error": "Geen toegang",
 			})
