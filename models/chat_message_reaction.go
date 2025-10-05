@@ -4,11 +4,11 @@ import "time"
 
 // ChatMessageReaction represents a reaction to a chat message
 type ChatMessageReaction struct {
-	ID        string    `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	MessageID string    `gorm:"type:uuid;index;not null"`
-	UserID    string    `gorm:"type:uuid;index;not null"`
-	Emoji     string    `gorm:"type:text;not null"`
-	CreatedAt time.Time `gorm:"default:now()"`
+	ID        string    `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	MessageID string    `gorm:"type:uuid;index;not null" json:"message_id"`
+	UserID    string    `gorm:"type:uuid;index;not null" json:"user_id"`
+	Emoji     string    `gorm:"type:text;not null" json:"emoji"`
+	CreatedAt time.Time `gorm:"default:now()" json:"created_at"`
 }
 
 func (ChatMessageReaction) TableName() string {
