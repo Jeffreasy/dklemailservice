@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"dklautomationgo/logger"
 	"dklautomationgo/models"
 
 	"gorm.io/gorm"
@@ -69,11 +70,14 @@ func (r *PostgresChatChannelParticipantRepository) Delete(ctx context.Context, i
 func (r *PostgresChatChannelParticipantRepository) ListByChannelID(ctx context.Context, channelID string) ([]*models.ChatChannelParticipant, error) {
 	ctx, cancel := r.withTimeout(ctx)
 	defer cancel()
+	logger.Info("ListByChannelID called", "channelID", channelID)
 	var participants []*models.ChatChannelParticipant
 	err := r.DB().WithContext(ctx).Where("channel_id = ?", channelID).Find(&participants).Error
 	if err != nil {
+		logger.Error("ListByChannelID database error", "channelID", channelID, "error", err)
 		return nil, r.handleError("ListByChannelID", err)
 	}
+	logger.Info("ListByChannelID success", "channelID", channelID, "participantsCount", len(participants))
 	return participants, nil
 }
 
