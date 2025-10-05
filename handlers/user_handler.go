@@ -17,13 +17,11 @@ func NewUserHandler(authService services.AuthService) *UserHandler {
 }
 
 func (h *UserHandler) RegisterRoutes(app *fiber.App) {
-	api := app.Group("/api/users", AuthMiddleware(h.authService), AdminMiddleware(h.authService))
-
-	api.Get("/", h.ListUsers)
-	api.Post("/", h.CreateUser)
-	api.Get("/:id", h.GetUser)
-	api.Put("/:id", h.UpdateUser)
-	api.Delete("/:id", h.DeleteUser)
+	app.Get("/api/users", AuthMiddleware(h.authService), StaffMiddleware(h.authService), h.ListUsers)
+	app.Get("/api/users/:id", AuthMiddleware(h.authService), StaffMiddleware(h.authService), h.GetUser)
+	app.Post("/api/users", AuthMiddleware(h.authService), AdminMiddleware(h.authService), h.CreateUser)
+	app.Put("/api/users/:id", AuthMiddleware(h.authService), AdminMiddleware(h.authService), h.UpdateUser)
+	app.Delete("/api/users/:id", AuthMiddleware(h.authService), AdminMiddleware(h.authService), h.DeleteUser)
 }
 
 func (h *UserHandler) ListUsers(c *fiber.Ctx) error {

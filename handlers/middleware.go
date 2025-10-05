@@ -48,8 +48,8 @@ func AuthMiddleware(authService services.AuthService) fiber.Handler {
 	}
 }
 
-// AdminMiddleware is een middleware die controleert of de gebruiker een admin is
-func AdminMiddleware(authService services.AuthService) fiber.Handler {
+/* StaffMiddleware allows "admin" or "staff" roles */
+func StaffMiddleware(authService services.AuthService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		// Haal token op uit context
 		token, ok := c.Locals("token").(string)
@@ -73,6 +73,44 @@ func AdminMiddleware(authService services.AuthService) fiber.Handler {
 		// Controleer of gebruiker admin of staff is
 		if gebruiker.Rol != "admin" && gebruiker.Rol != "staff" {
 			logger.Warn("Gebruiker is geen admin of staff", "user_id", gebruiker.ID, "role", gebruiker.Rol)
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "Geen toegang",
+			})
+		}
+
+		// Sla gebruiker op in context
+		c.Locals("gebruiker", gebruiker)
+
+		// Ga door naar volgende handler
+		return c.Next()
+	}
+}
+
+// AdminMiddleware is een middleware die controleert of de gebruiker een admin is
+func AdminMiddleware(authService services.AuthService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		// Haal token op uit context
+		token, ok := c.Locals("token").(string)
+		if !ok || token == "" {
+			logger.Warn("Geen token gevonden in context")
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "Niet geautoriseerd",
+			})
+		}
+
+		// Haal gebruiker op uit token
+		ctx := c.Context()
+		gebruiker, err := authService.GetUserFromToken(ctx, token)
+		if err != nil {
+			logger.Warn("Kon gebruiker niet ophalen uit token", "error", err)
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "Niet geautoriseerd",
+			})
+		}
+
+		// Controleer of gebruiker admin is
+		if gebruiker.Rol != "admin" {
+			logger.Warn("Gebruiker is geen admin", "user_id", gebruiker.ID, "role", gebruiker.Rol)
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 				"error": "Geen toegang",
 			})
