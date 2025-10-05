@@ -44,6 +44,11 @@ func (h *ChatHandler) getChannelHub(channelID string) *services.Hub {
 	return hub
 }
 
+// SetChannelHubCallback sets the callback for dynamic channel joining in WebSocket
+func (h *ChatHandler) SetChannelHubCallback() {
+	h.hub.GetChannelHub = h.getChannelHub
+}
+
 // RegisterRoutes registers the chat routes
 func (h *ChatHandler) RegisterRoutes(app *fiber.App) {
 	api := app.Group("/api/chat", h.AuthMiddleware)
