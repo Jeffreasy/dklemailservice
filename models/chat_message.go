@@ -12,7 +12,7 @@ type ChatMessage struct {
 	FileURL     string    `gorm:"type:text" json:"file_url"`
 	FileName    string    `gorm:"type:text" json:"file_name"`
 	FileSize    int       `gorm:"type:integer" json:"file_size"`
-	ReplyToID   string    `gorm:"type:uuid" json:"reply_to_id"`
+	ReplyToID   *string   `gorm:"type:uuid" json:"reply_to_id"`
 	EditedAt    time.Time `json:"edited_at"`
 	CreatedAt   time.Time `gorm:"default:now()" json:"created_at"`
 	UpdatedAt   time.Time `gorm:"default:now()" json:"updated_at"`
