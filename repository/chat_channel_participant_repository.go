@@ -76,3 +76,14 @@ func (r *PostgresChatChannelParticipantRepository) ListByChannelID(ctx context.C
 	}
 	return participants, nil
 }
+
+func (r *PostgresChatChannelParticipantRepository) GetByChannelAndUser(ctx context.Context, channelID, userID string) (*models.ChatChannelParticipant, error) {
+	ctx, cancel := r.withTimeout(ctx)
+	defer cancel()
+	var participant models.ChatChannelParticipant
+	err := r.DB().WithContext(ctx).Where("channel_id = ? AND user_id = ?", channelID, userID).First(&participant).Error
+	if err != nil {
+		return nil, r.handleError("GetByChannelAndUser", err)
+	}
+	return &participant, nil
+}

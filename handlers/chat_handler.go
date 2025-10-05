@@ -1,9 +1,12 @@
 package handlers
 
 import (
+	"context"
 	"dklautomationgo/models"
 	"dklautomationgo/services"
+	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -14,7 +17,9 @@ import (
 type ChatHandler struct {
 	chatService services.ChatService
 	authService services.AuthService
-	hub         *services.Hub
+	hub         *services.Hub // global, if needed
+	mutex       sync.Mutex
+	channelHubs map[string]*services.Hub
 }
 
 // NewChatHandler creates a new ChatHandler
@@ -23,7 +28,20 @@ func NewChatHandler(chatService services.ChatService, authService services.AuthS
 		chatService: chatService,
 		authService: authService,
 		hub:         hub,
+		channelHubs: make(map[string]*services.Hub),
 	}
+}
+
+func (h *ChatHandler) getChannelHub(channelID string) *services.Hub {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	if hub, ok := h.channelHubs[channelID]; ok {
+		return hub
+	}
+	hub := services.NewHub(h.chatService)
+	go hub.Run()
+	h.channelHubs[channelID] = hub
+	return hub
 }
 
 // RegisterRoutes registers the chat routes
@@ -58,17 +76,34 @@ func (h *ChatHandler) RegisterRoutes(app *fiber.App) {
 	// Utility
 	api.Post("/channels/:id/read", h.MarkAsRead)
 	api.Get("/unread", h.GetUnreadCount)
-	api.Get("/ws", websocket.New(func(c *websocket.Conn) {
-		client := &services.Client{Hub: h.hub, Conn: c, Send: make(chan []byte, 256)}
-		client.UserID = c.Locals("userID").(string)
-		client.Hub.Register <- client
-
-		go client.WritePump()
-		client.ReadPump()
-	}))
+	api.Get("/ws/:channel_id", websocket.New(h.handleWebsocket))
 }
 
 // AuthMiddleware checks for valid JWT
+func (h *ChatHandler) handleWebsocket(c *websocket.Conn) {
+	channelID := c.Params("channel_id")
+	userID := c.Locals("userID").(string)
+
+	// Check if user is participant
+	role, err := h.chatService.GetParticipantRole(context.Background(), channelID, userID)
+	if err != nil || role == "" {
+		c.Close()
+		return
+	}
+
+	client := &services.Client{
+		Hub:    h.getChannelHub(channelID),
+		Conn:   c,
+		Send:   make(chan []byte, 256),
+		UserID: userID,
+	}
+
+	client.Hub.Register <- client
+
+	go client.WritePump()
+	client.ReadPump()
+}
+
 func (h *ChatHandler) AuthMiddleware(c *fiber.Ctx) error {
 	tokenString := c.Get("Authorization")
 	if tokenString == "" {
@@ -116,9 +151,19 @@ func (h *ChatHandler) CreateDirectChannel(c *fiber.Ctx) error {
 		}
 	}
 
+	// Get user names
+	currentUser, err := h.authService.GetUser(c.Context(), userID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get current user"})
+	}
+	targetUser, err := h.authService.GetUser(c.Context(), req.UserID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get target user"})
+	}
+
 	// Create new
 	channel := &models.ChatChannel{
-		Name:      "Direct chat",
+		Name:      fmt.Sprintf("Chat between %s and %s", currentUser.Naam, targetUser.Naam),
 		Type:      "direct",
 		CreatedBy: userID,
 	}

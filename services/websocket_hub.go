@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"dklautomationgo/models"
+	"encoding/json"
 	"time"
 
 	"github.com/gofiber/websocket/v2"
@@ -104,6 +105,26 @@ func (c *Client) ReadPump() {
 		_, message, err := c.Conn.ReadMessage()
 		if err != nil {
 			break
+		}
+		var msg map[string]interface{}
+		if err := json.Unmarshal(message, &msg); err == nil {
+			if t, ok := msg["type"].(string); ok && t == "typing" {
+				if _, ok := msg["typing"].(bool); ok {
+					msg["user_id"] = c.UserID
+					message, _ = json.Marshal(msg)
+					for client := range c.Hub.Clients {
+						if client != c {
+							select {
+							case client.Send <- message:
+							default:
+								close(client.Send)
+								delete(c.Hub.Clients, client)
+							}
+						}
+					}
+					continue
+				}
+			}
 		}
 		c.Hub.Broadcast <- message
 	}

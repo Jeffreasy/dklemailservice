@@ -249,6 +249,7 @@ type ChatChannelParticipantRepository interface {
 	Update(ctx context.Context, participant *models.ChatChannelParticipant) error
 	Delete(ctx context.Context, id string) error
 	ListByChannelID(ctx context.Context, channelID string) ([]*models.ChatChannelParticipant, error)
+	GetByChannelAndUser(ctx context.Context, channelID, userID string) (*models.ChatChannelParticipant, error)
 }
 
 // ChatMessageRepository defines the interface for chat message operations
