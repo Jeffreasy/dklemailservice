@@ -223,6 +223,12 @@ func (h *ChatHandler) EditMessage(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Message not found"})
 	}
 
+	userID := c.Locals("userID").(string)
+	role, err := h.chatService.GetParticipantRole(c.Context(), message.ChannelID, userID)
+	if err != nil || (role != "owner" && role != "admin" && message.UserID != userID) {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Not authorized to edit this message"})
+	}
+
 	message.Content = update.Content
 	message.EditedAt = time.Now()
 
@@ -237,7 +243,18 @@ func (h *ChatHandler) EditMessage(c *fiber.Ctx) error {
 func (h *ChatHandler) DeleteMessage(c *fiber.Ctx) error {
 	id := c.Params("id")
 
-	err := h.chatService.DeleteMessage(c.Context(), id)
+	message, err := h.chatService.GetMessage(c.Context(), id)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Message not found"})
+	}
+
+	userID := c.Locals("userID").(string)
+	role, err := h.chatService.GetParticipantRole(c.Context(), message.ChannelID, userID)
+	if err != nil || (role != "owner" && role != "admin" && message.UserID != userID) {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Not authorized to delete this message"})
+	}
+
+	err = h.chatService.DeleteMessage(c.Context(), id)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}

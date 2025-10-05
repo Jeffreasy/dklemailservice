@@ -167,6 +167,8 @@ type ChatService interface {
 	DeleteParticipant(ctx context.Context, id string) error
 	ListParticipantsByChannel(ctx context.Context, channelID string) ([]*models.ChatChannelParticipant, error)
 
+	GetParticipantRole(ctx context.Context, channelID, userID string) (string, error)
+
 	// Message operations
 	CreateMessage(ctx context.Context, message *models.ChatMessage) error
 	GetMessage(ctx context.Context, id string) (*models.ChatMessage, error)

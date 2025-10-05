@@ -4,6 +4,7 @@ import (
 	"context"
 	"dklautomationgo/models"
 	"dklautomationgo/repository"
+	"fmt"
 )
 
 // ChatServiceImpl implements the ChatService interface
@@ -90,6 +91,20 @@ func (s *ChatServiceImpl) DeleteParticipant(ctx context.Context, id string) erro
 // ListParticipantsByChannel lists participants by channel ID
 func (s *ChatServiceImpl) ListParticipantsByChannel(ctx context.Context, channelID string) ([]*models.ChatChannelParticipant, error) {
 	return s.participantRepo.ListByChannelID(ctx, channelID)
+}
+
+// GetParticipantRole gets the role of a user in a channel
+func (s *ChatServiceImpl) GetParticipantRole(ctx context.Context, channelID, userID string) (string, error) {
+	participants, err := s.participantRepo.ListByChannelID(ctx, channelID)
+	if err != nil {
+		return "", err
+	}
+	for _, p := range participants {
+		if p.UserID == userID {
+			return p.Role, nil
+		}
+	}
+	return "", fmt.Errorf("participant not found")
 }
 
 // CreateMessage creates a new message
