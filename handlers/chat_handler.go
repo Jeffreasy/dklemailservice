@@ -58,6 +58,7 @@ func (h *ChatHandler) RegisterRoutes(app *fiber.App) {
 	api.Get("/unread", h.GetUnreadCount)
 	api.Get("/ws", websocket.New(func(c *websocket.Conn) {
 		client := &services.Client{Hub: h.hub, Conn: c, Send: make(chan []byte, 256)}
+		client.UserID = c.Locals("userID").(string)
 		client.Hub.Register <- client
 
 		go client.WritePump()
@@ -68,6 +69,9 @@ func (h *ChatHandler) RegisterRoutes(app *fiber.App) {
 // AuthMiddleware checks for valid JWT
 func (h *ChatHandler) AuthMiddleware(c *fiber.Ctx) error {
 	tokenString := c.Get("Authorization")
+	if tokenString == "" {
+		tokenString = c.Query("token")
+	}
 	if tokenString == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Missing authorization token"})
 	}
