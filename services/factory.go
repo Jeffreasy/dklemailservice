@@ -70,7 +70,7 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 
 	chatService := NewChatService(repoFactory.ChatChannel, repoFactory.ChatChannelParticipant, repoFactory.ChatMessage, repoFactory.ChatMessageReaction, repoFactory.ChatUserPresence)
 
-	hub := NewHub()
+	hub := NewHub(chatService)
 	go hub.Run()
 
 	// Maak een EmailAutoFetcher aan

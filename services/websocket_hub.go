@@ -1,6 +1,10 @@
 package services
 
 import (
+	"context"
+	"dklautomationgo/models"
+	"time"
+
 	"github.com/gofiber/websocket/v2"
 )
 
@@ -17,6 +21,8 @@ type Hub struct {
 
 	// Unregister requests from clients.
 	Unregister chan *Client
+
+	ChatService ChatService
 }
 
 // Client is a middleman between the websocket connection and the hub.
@@ -33,12 +39,13 @@ type Client struct {
 }
 
 // NewHub creates a new Hub
-func NewHub() *Hub {
+func NewHub(chatService ChatService) *Hub {
 	return &Hub{
-		Broadcast:  make(chan []byte),
-		Register:   make(chan *Client),
-		Unregister: make(chan *Client),
-		Clients:    make(map[*Client]bool),
+		Broadcast:   make(chan []byte),
+		Register:    make(chan *Client),
+		Unregister:  make(chan *Client),
+		Clients:     make(map[*Client]bool),
+		ChatService: chatService,
 	}
 }
 
@@ -48,10 +55,20 @@ func (h *Hub) Run() {
 		select {
 		case client := <-h.Register:
 			h.Clients[client] = true
+			_ = h.ChatService.UpdatePresence(context.Background(), &models.ChatUserPresence{
+				UserID:   client.UserID,
+				Status:   "online",
+				LastSeen: time.Now(),
+			})
 		case client := <-h.Unregister:
 			if _, ok := h.Clients[client]; ok {
 				delete(h.Clients, client)
 				close(client.Send)
+				_ = h.ChatService.UpdatePresence(context.Background(), &models.ChatUserPresence{
+					UserID:   client.UserID,
+					Status:   "offline",
+					LastSeen: time.Now(),
+				})
 			}
 		case message := <-h.Broadcast:
 			for client := range h.Clients {
