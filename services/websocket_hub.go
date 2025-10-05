@@ -28,6 +28,8 @@ type Client struct {
 
 	// Buffered channel of outbound messages.
 	Send chan []byte
+
+	UserID string
 }
 
 // NewHub creates a new Hub
