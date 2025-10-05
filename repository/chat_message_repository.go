@@ -66,11 +66,19 @@ func (r *PostgresChatMessageRepository) Delete(ctx context.Context, id string) e
 }
 
 // ListByChannelID retrieves messages by channel ID with pagination
-func (r *PostgresChatMessageRepository) ListByChannelID(ctx context.Context, channelID string, limit, offset int) ([]*models.ChatMessage, error) {
+func (r *PostgresChatMessageRepository) ListByChannelID(ctx context.Context, channelID string, limit, offset int) ([]*models.MessageWithUser, error) {
 	ctx, cancel := r.withTimeout(ctx)
 	defer cancel()
-	var messages []*models.ChatMessage
-	err := r.DB().WithContext(ctx).Where("channel_id = ?", channelID).Order("created_at DESC").Limit(limit).Offset(offset).Find(&messages).Error
+	var messages []*models.MessageWithUser
+	err := r.DB().WithContext(ctx).
+		Table("chat_messages").
+		Joins("LEFT JOIN gebruikers g ON chat_messages.user_id = g.id").
+		Select("chat_messages.*, g.naam AS user_name").
+		Where("chat_messages.channel_id = ?", channelID).
+		Order("chat_messages.created_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&messages).Error
 	if err != nil {
 		return nil, r.handleError("ListByChannelID", err)
 	}

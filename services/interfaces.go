@@ -173,7 +173,7 @@ type ChatService interface {
 	ListMessages(ctx context.Context, limit, offset int) ([]*models.ChatMessage, error)
 	UpdateMessage(ctx context.Context, message *models.ChatMessage) error
 	DeleteMessage(ctx context.Context, id string) error
-	ListMessagesByChannel(ctx context.Context, channelID string, limit, offset int) ([]*models.ChatMessage, error)
+	ListMessagesByChannel(ctx context.Context, channelID string, limit, offset int) ([]*models.MessageWithUser, error)
 
 	// Reaction operations
 	AddReaction(ctx context.Context, reaction *models.ChatMessageReaction) error
@@ -186,5 +186,5 @@ type ChatService interface {
 	UpdatePresence(ctx context.Context, presence *models.ChatUserPresence) error
 	GetPresence(ctx context.Context, userID string) (*models.ChatUserPresence, error)
 	DeletePresence(ctx context.Context, userID string) error
-	ListOnlineUsers(ctx context.Context) ([]string, error)
+	ListOnlineUsers(ctx context.Context) ([]*models.OnlineUser, error)
 }

@@ -257,7 +257,7 @@ type ChatMessageRepository interface {
 	List(ctx context.Context, limit, offset int) ([]*models.ChatMessage, error)
 	Update(ctx context.Context, message *models.ChatMessage) error
 	Delete(ctx context.Context, id string) error
-	ListByChannelID(ctx context.Context, channelID string, limit, offset int) ([]*models.ChatMessage, error)
+	ListByChannelID(ctx context.Context, channelID string, limit, offset int) ([]*models.MessageWithUser, error)
 }
 
 // ChatMessageReactionRepository defines the interface for chat message reaction operations
@@ -274,5 +274,5 @@ type ChatUserPresenceRepository interface {
 	Upsert(ctx context.Context, presence *models.ChatUserPresence) error
 	GetByUserID(ctx context.Context, userID string) (*models.ChatUserPresence, error)
 	Delete(ctx context.Context, userID string) error
-	ListOnlineUserIDs(ctx context.Context) ([]string, error)
+	ListOnlineUsers(ctx context.Context) ([]*models.OnlineUser, error)
 }

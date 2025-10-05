@@ -118,7 +118,7 @@ func (s *ChatServiceImpl) DeleteMessage(ctx context.Context, id string) error {
 }
 
 // ListMessagesByChannel lists messages by channel ID with pagination
-func (s *ChatServiceImpl) ListMessagesByChannel(ctx context.Context, channelID string, limit, offset int) ([]*models.ChatMessage, error) {
+func (s *ChatServiceImpl) ListMessagesByChannel(ctx context.Context, channelID string, limit, offset int) ([]*models.MessageWithUser, error) {
 	return s.messageRepo.ListByChannelID(ctx, channelID, limit, offset)
 }
 
@@ -163,6 +163,6 @@ func (s *ChatServiceImpl) DeletePresence(ctx context.Context, userID string) err
 }
 
 // ListOnlineUsers lists online user IDs
-func (s *ChatServiceImpl) ListOnlineUsers(ctx context.Context) ([]string, error) {
-	return s.presenceRepo.ListOnlineUserIDs(ctx)
+func (s *ChatServiceImpl) ListOnlineUsers(ctx context.Context) ([]*models.OnlineUser, error) {
+	return s.presenceRepo.ListOnlineUsers(ctx)
 }
