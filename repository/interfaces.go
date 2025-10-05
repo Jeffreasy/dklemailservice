@@ -238,6 +238,7 @@ type ChatChannelRepository interface {
 	ListByUserID(ctx context.Context, userID string, limit, offset int) ([]*models.ChatChannel, error)
 	Update(ctx context.Context, channel *models.ChatChannel) error
 	Delete(ctx context.Context, id string) error
+	ListPublicChannels(ctx context.Context) ([]*models.ChatChannel, error)
 }
 
 // ChatChannelParticipantRepository defines the interface for chat channel participant operations

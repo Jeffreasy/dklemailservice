@@ -12,6 +12,7 @@ type ChatChannel struct {
 	CreatedAt   time.Time `gorm:"default:now()" json:"created_at"`
 	UpdatedAt   time.Time `gorm:"default:now()" json:"updated_at"`
 	IsActive    bool      `gorm:"default:true" json:"is_active"`
+	IsPublic    bool      `gorm:"default:false" json:"is_public"`
 }
 
 func (ChatChannel) TableName() string {
