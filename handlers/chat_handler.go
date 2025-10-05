@@ -33,6 +33,7 @@ func (h *ChatHandler) RegisterRoutes(app *fiber.App) {
 	// Channels
 	api.Get("/channels", h.ListChannels)
 	api.Get("/public-channels", h.ListPublicChannels)
+	api.Post("/direct", h.CreateDirectChannel)
 	api.Post("/channels", h.CreateChannel)
 	api.Post("/channels/:id/join", h.JoinChannel)
 	api.Post("/channels/:id/leave", h.LeaveChannel)
@@ -84,6 +85,68 @@ func (h *ChatHandler) AuthMiddleware(c *fiber.Ctx) error {
 
 	c.Locals("userID", userID)
 	return c.Next()
+}
+
+// ListChannels lists the user's channels
+func (h *ChatHandler) CreateDirectChannel(c *fiber.Ctx) error {
+	var req struct {
+		UserID string `json:"user_id"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid input"})
+	}
+
+	userID := c.Locals("userID").(string)
+
+	// Check if direct channel already exists
+	channels, err := h.chatService.ListChannelsForUser(c.Context(), userID, 100, 0)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	for _, channel := range channels {
+		if channel.Type == "direct" {
+			participants, err := h.chatService.ListParticipantsByChannel(c.Context(), channel.ID)
+			if err != nil {
+				continue
+			}
+			if len(participants) == 2 && (participants[0].UserID == req.UserID || participants[1].UserID == req.UserID) {
+				return c.JSON(channel)
+			}
+		}
+	}
+
+	// Create new
+	channel := &models.ChatChannel{
+		Name:      "Direct chat",
+		Type:      "direct",
+		CreatedBy: userID,
+	}
+	err = h.chatService.CreateChannel(c.Context(), channel)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	// Add users
+	err = h.chatService.AddParticipant(c.Context(), &models.ChatChannelParticipant{
+		ChannelID: channel.ID,
+		UserID:    userID,
+		Role:      "member",
+	})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	err = h.chatService.AddParticipant(c.Context(), &models.ChatChannelParticipant{
+		ChannelID: channel.ID,
+		UserID:    req.UserID,
+		Role:      "member",
+	})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(channel)
 }
 
 // ListChannels lists the user's channels
