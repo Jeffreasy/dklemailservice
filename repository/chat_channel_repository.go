@@ -68,3 +68,20 @@ func (r *PostgresChatChannelRepository) Delete(ctx context.Context, id string) e
 	defer cancel()
 	return r.handleError("DeleteChatChannel", r.DB().WithContext(ctx).Delete(&models.ChatChannel{}, "id = ?", id).Error)
 }
+
+// ListByUserID lists channels for a specific user
+func (r *PostgresChatChannelRepository) ListByUserID(ctx context.Context, userID string, limit, offset int) ([]*models.ChatChannel, error) {
+	ctx, cancel := r.withTimeout(ctx)
+	defer cancel()
+	var channels []*models.ChatChannel
+	err := r.DB().WithContext(ctx).
+		Joins("JOIN chat_channel_participants ON chat_channel_participants.channel_id = chat_channels.id").
+		Where("chat_channel_participants.user_id = ?", userID).
+		Limit(limit).
+		Offset(offset).
+		Find(&channels).Error
+	if err != nil {
+		return nil, r.handleError("ListChannelsByUserID", err)
+	}
+	return channels, nil
+}

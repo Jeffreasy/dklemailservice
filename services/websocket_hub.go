@@ -1,64 +1,63 @@
 package services
 
 import (
-	"github.com/gorilla/websocket"
+	"github.com/gofiber/websocket/v2"
 )
 
 // Hub maintains the set of active clients and broadcasts messages to the clients.
 type Hub struct {
 	// Registered clients.
-	clients map[*Client]bool
+	Clients map[*Client]bool
 
 	// Inbound messages from the clients.
-	broadcast chan []byte
+	Broadcast chan []byte
 
 	// Register requests from the clients.
-	register chan *Client
+	Register chan *Client
 
 	// Unregister requests from clients.
-	unregister chan *Client
+	Unregister chan *Client
 }
 
 // Client is a middleman between the websocket connection and the hub.
 type Client struct {
-	hub *Hub
+	Hub *Hub
 
 	// The websocket connection.
-	conn *websocket.Conn
+	Conn *websocket.Conn
 
 	// Buffered channel of outbound messages.
-	send chan []byte
+	Send chan []byte
 }
 
 // NewHub creates a new Hub
 func NewHub() *Hub {
 	return &Hub{
-		broadcast:  make(chan []byte),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
-		clients:    make(map[*Client]bool),
+		Broadcast:  make(chan []byte),
+		Register:   make(chan *Client),
+		Unregister: make(chan *Client),
+		Clients:    make(map[*Client]bool),
 	}
 }
 
 // Run starts the hub
 func (h *Hub) Run() {
-	// nolint:S1000
 	for {
 		select {
-		case client := <-h.register:
-			h.clients[client] = true
-		case client := <-h.unregister:
-			if _, ok := h.clients[client]; ok {
-				delete(h.clients, client)
-				close(client.send)
+		case client := <-h.Register:
+			h.Clients[client] = true
+		case client := <-h.Unregister:
+			if _, ok := h.Clients[client]; ok {
+				delete(h.Clients, client)
+				close(client.Send)
 			}
-		case message := <-h.broadcast:
-			for client := range h.clients {
+		case message := <-h.Broadcast:
+			for client := range h.Clients {
 				select {
-				case client.send <- message:
+				case client.Send <- message:
 				default:
-					close(client.send)
-					delete(h.clients, client)
+					close(client.Send)
+					delete(h.Clients, client)
 				}
 			}
 		}
@@ -67,54 +66,41 @@ func (h *Hub) Run() {
 
 // ServeWs handles websocket requests from the peer.
 func (h *Hub) ServeWs(conn *websocket.Conn) {
-	client := &Client{hub: h, conn: conn, send: make(chan []byte, 256)}
-	client.hub.register <- client
+	client := &Client{Hub: h, Conn: conn, Send: make(chan []byte, 256)}
+	client.Hub.Register <- client
 
 	// Allow collection of memory referenced by the caller by doing all work in
 	// new goroutines.
-	go client.writePump()
-	go client.readPump()
+	go client.WritePump()
+	client.ReadPump()
 }
 
-// readPump pumps messages from the websocket connection to the hub.
-func (c *Client) readPump() {
+// ReadPump pumps messages from the websocket connection to the hub.
+func (c *Client) ReadPump() {
 	defer func() {
-		c.hub.unregister <- c
-		c.conn.Close()
+		c.Hub.Unregister <- c
+		c.Conn.Close()
 	}()
 	for {
-		_, message, err := c.conn.ReadMessage()
+		_, message, err := c.Conn.ReadMessage()
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				// log error
-			}
 			break
 		}
-		c.hub.broadcast <- message
+		c.Hub.Broadcast <- message
 	}
 }
 
-// writePump pumps messages from the hub to the websocket connection.
-func (c *Client) writePump() {
+// WritePump pumps messages from the hub to the websocket connection.
+func (c *Client) WritePump() {
 	defer func() {
-		c.conn.Close()
+		c.Conn.Close()
 	}()
-	for {
-		select {
-		case message, ok := <-c.send:
-			if !ok {
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
-				return
-			}
-			w, err := c.conn.NextWriter(websocket.TextMessage)
-			if err != nil {
-				return
-			}
-			w.Write(message)
-
-			if err := w.Close(); err != nil {
-				return
-			}
+	for message := range c.Send {
+		err := c.Conn.WriteMessage(websocket.TextMessage, message)
+		if err != nil {
+			return
 		}
 	}
+	// Channel is nu gesloten (loop gestopt), dus stuur close message
+	c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 }

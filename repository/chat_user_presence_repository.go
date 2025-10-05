@@ -45,3 +45,15 @@ func (r *PostgresChatUserPresenceRepository) Delete(ctx context.Context, userID 
 	defer cancel()
 	return r.handleError("DeleteChatUserPresence", r.DB().WithContext(ctx).Delete(&models.ChatUserPresence{}, "user_id = ?", userID).Error)
 }
+
+// ListOnlineUserIDs lists user IDs of online users
+func (r *PostgresChatUserPresenceRepository) ListOnlineUserIDs(ctx context.Context) ([]string, error) {
+	ctx, cancel := r.withTimeout(ctx)
+	defer cancel()
+	var userIDs []string
+	err := r.DB().WithContext(ctx).Model(&models.ChatUserPresence{}).Where("status = 'online'").Pluck("user_id", &userIDs).Error
+	if err != nil {
+		return nil, r.handleError("ListOnlineUserIDs", err)
+	}
+	return userIDs, nil
+}

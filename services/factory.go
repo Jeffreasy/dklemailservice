@@ -22,6 +22,7 @@ type ServiceFactory struct {
 	NotificationService NotificationService
 	TelegramBotService  *TelegramBotService
 	ChatService         ChatService
+	Hub                 *Hub
 }
 
 // GetRateLimiter retourneert de RateLimiter als het concrete type
@@ -69,6 +70,9 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 
 	chatService := NewChatService(repoFactory.ChatChannel, repoFactory.ChatChannelParticipant, repoFactory.ChatMessage, repoFactory.ChatMessageReaction, repoFactory.ChatUserPresence)
 
+	hub := NewHub()
+	go hub.Run()
+
 	// Maak een EmailAutoFetcher aan
 	// Nog niet geinitialiseerd omdat MailFetcher buiten de ServiceFactory wordt aangemaakt in main.go
 
@@ -83,6 +87,7 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 		NotificationService: notificationService,
 		TelegramBotService:  telegramBotService,
 		ChatService:         chatService,
+		Hub:                 hub,
 	}
 }
 

@@ -235,6 +235,7 @@ type ChatChannelRepository interface {
 	Create(ctx context.Context, channel *models.ChatChannel) error
 	GetByID(ctx context.Context, id string) (*models.ChatChannel, error)
 	List(ctx context.Context, limit, offset int) ([]*models.ChatChannel, error)
+	ListByUserID(ctx context.Context, userID string, limit, offset int) ([]*models.ChatChannel, error)
 	Update(ctx context.Context, channel *models.ChatChannel) error
 	Delete(ctx context.Context, id string) error
 }
@@ -273,4 +274,5 @@ type ChatUserPresenceRepository interface {
 	Upsert(ctx context.Context, presence *models.ChatUserPresence) error
 	GetByUserID(ctx context.Context, userID string) (*models.ChatUserPresence, error)
 	Delete(ctx context.Context, userID string) error
+	ListOnlineUserIDs(ctx context.Context) ([]string, error)
 }

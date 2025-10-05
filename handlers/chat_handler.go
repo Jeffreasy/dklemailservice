@@ -7,19 +7,22 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/websocket/v2"
 )
 
 // ChatHandler handles chat-related HTTP requests
 type ChatHandler struct {
 	chatService services.ChatService
 	authService services.AuthService
+	hub         *services.Hub
 }
 
 // NewChatHandler creates a new ChatHandler
-func NewChatHandler(chatService services.ChatService, authService services.AuthService) *ChatHandler {
+func NewChatHandler(chatService services.ChatService, authService services.AuthService, hub *services.Hub) *ChatHandler {
 	return &ChatHandler{
 		chatService: chatService,
 		authService: authService,
+		hub:         hub,
 	}
 }
 
@@ -53,6 +56,13 @@ func (h *ChatHandler) RegisterRoutes(app *fiber.App) {
 	// Utility
 	api.Post("/channels/:id/read", h.MarkAsRead)
 	api.Get("/unread", h.GetUnreadCount)
+	api.Get("/ws", websocket.New(func(c *websocket.Conn) {
+		client := &services.Client{Hub: h.hub, Conn: c, Send: make(chan []byte, 256)}
+		client.Hub.Register <- client
+
+		go client.WritePump()
+		client.ReadPump()
+	}))
 }
 
 // AuthMiddleware checks for valid JWT
@@ -73,10 +83,11 @@ func (h *ChatHandler) AuthMiddleware(c *fiber.Ctx) error {
 
 // ListChannels lists the user's channels
 func (h *ChatHandler) ListChannels(c *fiber.Ctx) error {
+	userID := c.Locals("userID").(string)
 	limit, _ := strconv.Atoi(c.Query("limit", "50"))
 	offset, _ := strconv.Atoi(c.Query("offset", "0"))
 
-	channels, err := h.chatService.ListChannels(c.Context(), limit, offset)
+	channels, err := h.chatService.ListChannelsForUser(c.Context(), userID, limit, offset)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -97,6 +108,17 @@ func (h *ChatHandler) CreateChannel(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
+
+	participant := &models.ChatChannelParticipant{
+		ChannelID: channel.ID,
+		UserID:    userID,
+		Role:      "owner",
+	}
+	err = h.chatService.AddParticipant(c.Context(), participant)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to add creator as participant: " + err.Error()})
+	}
+
 	return c.JSON(channel)
 }
 
@@ -299,10 +321,11 @@ func (h *ChatHandler) UpdatePresence(c *fiber.Ctx) error {
 
 // ListOnlineUsers lists online users
 func (h *ChatHandler) ListOnlineUsers(c *fiber.Ctx) error {
-	// This requires listing all presences with status 'online'
-	// But the repository doesn't have List method, so add if needed or implement in service
-	// For now, return empty
-	return c.JSON([]string{})
+	users, err := h.chatService.ListOnlineUsers(c.Context())
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(users)
 }
 
 // StartTyping, StopTyping, GetTypingUsers would require additional logic for typing indicators, perhaps using memory or DB

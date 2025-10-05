@@ -521,6 +521,10 @@ func main() {
 	// Registreer de admin mail routes
 	adminMailHandler.RegisterRoutes(app)
 
+	// Initialiseer chat handler
+	chatHandler := handlers.NewChatHandler(serviceFactory.ChatService, serviceFactory.AuthService, serviceFactory.Hub)
+	chatHandler.RegisterRoutes(app)
+
 	// Start server
 	port := os.Getenv("PORT")
 	if port == "" {

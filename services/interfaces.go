@@ -155,6 +155,7 @@ type ChatService interface {
 	CreateChannel(ctx context.Context, channel *models.ChatChannel) error
 	GetChannel(ctx context.Context, id string) (*models.ChatChannel, error)
 	ListChannels(ctx context.Context, limit, offset int) ([]*models.ChatChannel, error)
+	ListChannelsForUser(ctx context.Context, userID string, limit, offset int) ([]*models.ChatChannel, error)
 	UpdateChannel(ctx context.Context, channel *models.ChatChannel) error
 	DeleteChannel(ctx context.Context, id string) error
 
@@ -185,4 +186,5 @@ type ChatService interface {
 	UpdatePresence(ctx context.Context, presence *models.ChatUserPresence) error
 	GetPresence(ctx context.Context, userID string) (*models.ChatUserPresence, error)
 	DeletePresence(ctx context.Context, userID string) error
+	ListOnlineUsers(ctx context.Context) ([]string, error)
 }

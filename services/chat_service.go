@@ -47,6 +47,11 @@ func (s *ChatServiceImpl) ListChannels(ctx context.Context, limit, offset int) (
 	return s.channelRepo.List(ctx, limit, offset)
 }
 
+// ListChannelsForUser lists channels for a specific user
+func (s *ChatServiceImpl) ListChannelsForUser(ctx context.Context, userID string, limit, offset int) ([]*models.ChatChannel, error) {
+	return s.channelRepo.ListByUserID(ctx, userID, limit, offset)
+}
+
 // UpdateChannel updates a chat channel
 func (s *ChatServiceImpl) UpdateChannel(ctx context.Context, channel *models.ChatChannel) error {
 	return s.channelRepo.Update(ctx, channel)
@@ -155,4 +160,9 @@ func (s *ChatServiceImpl) GetPresence(ctx context.Context, userID string) (*mode
 // DeletePresence deletes user presence
 func (s *ChatServiceImpl) DeletePresence(ctx context.Context, userID string) error {
 	return s.presenceRepo.Delete(ctx, userID)
+}
+
+// ListOnlineUsers lists online user IDs
+func (s *ChatServiceImpl) ListOnlineUsers(ctx context.Context) ([]string, error) {
+	return s.presenceRepo.ListOnlineUserIDs(ctx)
 }
