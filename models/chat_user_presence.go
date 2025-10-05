@@ -13,3 +13,9 @@ type ChatUserPresence struct {
 func (ChatUserPresence) TableName() string {
 	return "chat_user_presence"
 }
+
+// OnlineUser represents a simplified user for online list
+type OnlineUser struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
