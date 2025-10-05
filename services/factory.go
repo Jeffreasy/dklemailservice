@@ -248,8 +248,9 @@ func createTelegramBotService(contactRepo repository.ContactRepository, aanmeldi
 
 	// Als de service succesvol is aangemaakt, start polling
 	if telegramBotService != nil {
-		logger.Info("Telegram bot service geïnitialiseerd, polling wordt gestart")
-		telegramBotService.StartPolling()
+		logger.Info("Telegram bot service geïnitialiseerd")
+		// Polling temporarily disabled to avoid conflicts on Render
+		// telegramBotService.StartPolling()
 	}
 
 	return telegramBotService

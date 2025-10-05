@@ -10,6 +10,8 @@ import (
 	"os"
 	"time"
 
+	"strings"
+
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -117,6 +119,7 @@ func (s *AuthServiceImpl) Login(ctx context.Context, email, wachtwoord string) (
 
 // ValidateToken valideert een JWT token en geeft de gebruiker ID terug
 func (s *AuthServiceImpl) ValidateToken(token string) (string, error) {
+	token = strings.TrimPrefix(token, "Bearer ")
 	// Parse token
 	parsedToken, err := jwt.ParseWithClaims(token, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
 		// Controleer signing methode
