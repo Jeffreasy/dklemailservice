@@ -1,0 +1,117 @@
+package handlers
+
+import (
+	"dklautomationgo/models"
+	"dklautomationgo/services"
+	"strconv"
+
+	"github.com/gofiber/fiber/v2"
+)
+
+type UserHandler struct {
+	authService services.AuthService
+}
+
+func NewUserHandler(authService services.AuthService) *UserHandler {
+	return &UserHandler{authService: authService}
+}
+
+func (h *UserHandler) RegisterRoutes(app *fiber.App) {
+	api := app.Group("/api/users", AdminMiddleware(h.authService))
+
+	api.Get("/", h.ListUsers)
+	api.Post("/", h.CreateUser)
+	api.Get("/:id", h.GetUser)
+	api.Put("/:id", h.UpdateUser)
+	api.Delete("/:id", h.DeleteUser)
+}
+
+func (h *UserHandler) ListUsers(c *fiber.Ctx) error {
+	limit, _ := strconv.Atoi(c.Query("limit", "50"))
+	offset, _ := strconv.Atoi(c.Query("offset", "0"))
+
+	users, err := h.authService.ListUsers(c.Context(), limit, offset)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(users)
+}
+
+func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
+	var req struct {
+		Email    string `json:"email"`
+		Naam     string `json:"naam"`
+		Rol      string `json:"rol"`
+		Password string `json:"password"`
+		IsActief bool   `json:"is_actief"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid input"})
+	}
+
+	gebruiker := &models.Gebruiker{
+		Email:    req.Email,
+		Naam:     req.Naam,
+		Rol:      req.Rol,
+		IsActief: req.IsActief,
+	}
+
+	err := h.authService.CreateUser(c.Context(), gebruiker, req.Password)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(gebruiker)
+}
+
+func (h *UserHandler) GetUser(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	user, err := h.authService.GetUser(c.Context(), id)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
+	}
+	return c.JSON(user)
+}
+
+func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	user, err := h.authService.GetUser(c.Context(), id)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
+	}
+
+	var req struct {
+		Email    string  `json:"email"`
+		Naam     string  `json:"naam"`
+		Rol      string  `json:"rol"`
+		IsActief bool    `json:"is_actief"`
+		Password *string `json:"password"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid input"})
+	}
+
+	user.Email = req.Email
+	user.Naam = req.Naam
+	user.Rol = req.Rol
+	user.IsActief = req.IsActief
+
+	err = h.authService.UpdateUser(c.Context(), user, req.Password)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(user)
+}
+
+func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	err := h.authService.DeleteUser(c.Context(), id)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"success": true})
+}

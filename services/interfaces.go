@@ -66,6 +66,12 @@ type AuthService interface {
 
 	// ResetPassword reset het wachtwoord van een gebruiker
 	ResetPassword(ctx context.Context, email, nieuwWachtwoord string) error
+
+	CreateUser(ctx context.Context, gebruiker *models.Gebruiker, password string) error
+	ListUsers(ctx context.Context, limit, offset int) ([]*models.Gebruiker, error)
+	GetUser(ctx context.Context, id string) (*models.Gebruiker, error)
+	UpdateUser(ctx context.Context, gebruiker *models.Gebruiker, password *string) error
+	DeleteUser(ctx context.Context, id string) error
 }
 
 // EmailSender definieert de generieke interface voor het versturen van e-mails.

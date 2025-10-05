@@ -525,6 +525,10 @@ func main() {
 	chatHandler := handlers.NewChatHandler(serviceFactory.ChatService, serviceFactory.AuthService, serviceFactory.Hub)
 	chatHandler.RegisterRoutes(app)
 
+	// Initialiseer user handler
+	userHandler := handlers.NewUserHandler(serviceFactory.AuthService)
+	userHandler.RegisterRoutes(app)
+
 	// Start server
 	port := os.Getenv("PORT")
 	if port == "" {

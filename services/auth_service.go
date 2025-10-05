@@ -274,3 +274,44 @@ func (s *AuthServiceImpl) generateToken(gebruiker *models.Gebruiker) (string, er
 
 	return signedToken, nil
 }
+
+// CreateUser creates a new user with hashed password
+func (s *AuthServiceImpl) CreateUser(ctx context.Context, gebruiker *models.Gebruiker, password string) error {
+	if password != "" {
+		hashed, err := s.HashPassword(password)
+		if err != nil {
+			return err
+		}
+		gebruiker.WachtwoordHash = hashed
+	} else {
+		gebruiker.WachtwoordHash = "not_set"
+	}
+	return s.gebruikerRepo.Create(ctx, gebruiker)
+}
+
+// ListUsers lists users with pagination
+func (s *AuthServiceImpl) ListUsers(ctx context.Context, limit, offset int) ([]*models.Gebruiker, error) {
+	return s.gebruikerRepo.List(ctx, limit, offset)
+}
+
+// GetUser gets a user by ID
+func (s *AuthServiceImpl) GetUser(ctx context.Context, id string) (*models.Gebruiker, error) {
+	return s.gebruikerRepo.GetByID(ctx, id)
+}
+
+// UpdateUser updates a user, optionally changing password
+func (s *AuthServiceImpl) UpdateUser(ctx context.Context, gebruiker *models.Gebruiker, password *string) error {
+	if password != nil {
+		hashed, err := s.HashPassword(*password)
+		if err != nil {
+			return err
+		}
+		gebruiker.WachtwoordHash = hashed
+	}
+	return s.gebruikerRepo.Update(ctx, gebruiker)
+}
+
+// DeleteUser deletes a user by ID
+func (s *AuthServiceImpl) DeleteUser(ctx context.Context, id string) error {
+	return s.gebruikerRepo.Delete(ctx, id)
+}

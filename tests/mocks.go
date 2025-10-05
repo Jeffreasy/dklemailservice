@@ -589,3 +589,63 @@ func (m *mockSMTPDialer) Reset() {
 	m.ShouldFail = false
 	m.DialCalled = false
 }
+
+// MockAuthService is a mock implementation of services.AuthService
+type MockAuthService struct {
+	mock.Mock
+}
+
+func (m *MockAuthService) Login(ctx context.Context, email, wachtwoord string) (string, error) {
+	args := m.Called(ctx, email, wachtwoord)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockAuthService) ValidateToken(token string) (string, error) {
+	args := m.Called(token)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockAuthService) GetUserFromToken(ctx context.Context, token string) (*models.Gebruiker, error) {
+	args := m.Called(ctx, token)
+	return args.Get(0).(*models.Gebruiker), args.Error(1)
+}
+
+func (m *MockAuthService) HashPassword(wachtwoord string) (string, error) {
+	args := m.Called(wachtwoord)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockAuthService) VerifyPassword(hash, wachtwoord string) bool {
+	args := m.Called(hash, wachtwoord)
+	return args.Bool(0)
+}
+
+func (m *MockAuthService) ResetPassword(ctx context.Context, email, nieuwWachtwoord string) error {
+	args := m.Called(ctx, email, nieuwWachtwoord)
+	return args.Error(0)
+}
+
+func (m *MockAuthService) CreateUser(ctx context.Context, gebruiker *models.Gebruiker, password string) error {
+	args := m.Called(ctx, gebruiker, password)
+	return args.Error(0)
+}
+
+func (m *MockAuthService) ListUsers(ctx context.Context, limit, offset int) ([]*models.Gebruiker, error) {
+	args := m.Called(ctx, limit, offset)
+	return args.Get(0).([]*models.Gebruiker), args.Error(1)
+}
+
+func (m *MockAuthService) GetUser(ctx context.Context, id string) (*models.Gebruiker, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(*models.Gebruiker), args.Error(1)
+}
+
+func (m *MockAuthService) UpdateUser(ctx context.Context, gebruiker *models.Gebruiker, password *string) error {
+	args := m.Called(ctx, gebruiker, password)
+	return args.Error(0)
+}
+
+func (m *MockAuthService) DeleteUser(ctx context.Context, id string) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
