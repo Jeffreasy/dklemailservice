@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"dklautomationgo/logger"
 	"dklautomationgo/models"
 	"dklautomationgo/services"
 	"fmt"
@@ -479,16 +480,28 @@ func (h *ChatHandler) ListOnlineUsers(c *fiber.Ctx) error {
 // ListParticipants lists participants of a channel
 func (h *ChatHandler) ListParticipants(c *fiber.Ctx) error {
 	channelID := c.Params("id")
+	if channelID == "" {
+		logger.Info("ListParticipants: empty channelID")
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Channel ID is required"})
+	}
 	userID := c.Locals("userID").(string)
+
+	logger.Info("ListParticipants called", "channelID", channelID, "userID", userID)
 
 	// Check if user is participant
 	role, err := h.chatService.GetParticipantRole(c.Context(), channelID, userID)
-	if err != nil || role == "" {
+	if err != nil {
+		logger.Error("ListParticipants: GetParticipantRole error", "error", err, "channelID", channelID, "userID", userID)
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Not authorized"})
+	}
+	if role == "" {
+		logger.Info("ListParticipants: not a participant", "channelID", channelID, "userID", userID)
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Not a participant"})
 	}
 
 	participants, err := h.chatService.ListParticipantsByChannel(c.Context(), channelID)
 	if err != nil {
+		logger.Error("ListParticipants: ListParticipantsByChannel error", "error", err, "channelID", channelID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.JSON(participants)
