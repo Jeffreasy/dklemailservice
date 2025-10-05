@@ -21,3 +21,9 @@ type ChatMessage struct {
 func (ChatMessage) TableName() string {
 	return "chat_messages"
 }
+
+// MessageWithUser extends ChatMessage with user name for responses
+type MessageWithUser struct {
+	ChatMessage
+	UserName string `json:"user_name"`
+}
