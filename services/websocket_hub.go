@@ -24,6 +24,9 @@ type Hub struct {
 	Unregister chan *Client
 
 	ChatService ChatService
+
+	// GetChannelHub is a callback to get hub for a channel ID
+	GetChannelHub func(channelID string) *Hub
 }
 
 // Client is a middleman between the websocket connection and the hub.
@@ -98,13 +101,33 @@ func (h *Hub) ServeWs(conn *websocket.Conn) {
 // ReadPump pumps messages from the websocket connection to the hub.
 func (c *Client) ReadPump() {
 	defer func() {
-		c.Hub.Unregister <- c
+		if c.Hub != nil {
+			c.Hub.Unregister <- c
+		}
 		c.Conn.Close()
 	}()
 	for {
 		_, message, err := c.Conn.ReadMessage()
 		if err != nil {
 			break
+		}
+		if c.Hub == nil {
+			// Expect first message to be join with channel_id
+			var msg map[string]interface{}
+			if err := json.Unmarshal(message, &msg); err == nil {
+				if t, ok := msg["type"].(string); ok && t == "join" {
+					if channelID, ok := msg["channel_id"].(string); ok {
+						// Use reflection or interface to get hub factory
+						c.Hub = c.Hub.GetChannelHub(channelID)
+					}
+				}
+			}
+			if c.Hub == nil {
+				c.Conn.Close()
+				break
+			}
+			c.Hub.Register <- c
+			continue
 		}
 		var msg map[string]interface{}
 		if err := json.Unmarshal(message, &msg); err == nil {

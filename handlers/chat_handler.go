@@ -81,6 +81,7 @@ func (h *ChatHandler) RegisterRoutes(app *fiber.App) {
 	api.Post("/channels/:id/read", h.MarkAsRead)
 	api.Get("/unread", h.GetUnreadCount)
 	api.Get("/ws/:channel_id", websocket.New(h.handleWebsocket))
+	api.Get("/ws", websocket.New(h.handleWebsocket))
 }
 
 // AuthMiddleware checks for valid JWT
