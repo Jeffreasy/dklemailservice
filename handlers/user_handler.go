@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"dklautomationgo/logger"
 	"dklautomationgo/models"
+	"dklautomationgo/repository"
 	"dklautomationgo/services"
 	"strconv"
 
@@ -11,12 +13,14 @@ import (
 type UserHandler struct {
 	authService       services.AuthService
 	permissionService services.PermissionService
+	userRoleRepo      repository.UserRoleRepository
 }
 
-func NewUserHandler(authService services.AuthService, permissionService services.PermissionService) *UserHandler {
+func NewUserHandler(authService services.AuthService, permissionService services.PermissionService, userRoleRepo repository.UserRoleRepository) *UserHandler {
 	return &UserHandler{
 		authService:       authService,
 		permissionService: permissionService,
+		userRoleRepo:      userRoleRepo,
 	}
 }
 
@@ -25,6 +29,7 @@ func (h *UserHandler) RegisterRoutes(app *fiber.App) {
 	app.Get("/api/users/:id", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "read"), h.GetUser)
 	app.Post("/api/users", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "write"), h.CreateUser)
 	app.Put("/api/users/:id", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "write"), h.UpdateUser)
+	app.Put("/api/users/:id/roles", AuthMiddleware(h.authService), AdminPermissionMiddleware(h.permissionService), h.AssignRolesToUser)
 	app.Delete("/api/users/:id", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "delete"), h.DeleteUser)
 }
 
@@ -130,4 +135,63 @@ func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.JSON(fiber.Map{"success": true})
+}
+
+func (h *UserHandler) AssignRolesToUser(c *fiber.Ctx) error {
+	userID := c.Params("id")
+	if userID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "User ID is verplicht",
+		})
+	}
+
+	var req struct {
+		RoleIDs []string `json:"role_ids"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Ongeldige gegevens",
+		})
+	}
+
+	if len(req.RoleIDs) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Ten minste één role ID is verplicht",
+		})
+	}
+
+	// Haal gebruiker op uit context voor assigned_by
+	gebruiker, ok := c.Locals("gebruiker").(*models.Gebruiker)
+	if !ok || gebruiker == nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon gebruiker niet ophalen uit context",
+		})
+	}
+
+	ctx := c.Context()
+	assignedRoles := 0
+
+	for _, roleID := range req.RoleIDs {
+		ur := &models.UserRole{
+			UserID:     userID,
+			RoleID:     roleID,
+			AssignedBy: &gebruiker.ID,
+			IsActive:   true,
+		}
+
+		if err := h.userRoleRepo.Create(ctx, ur); err != nil {
+			logger.Error("Fout bij toewijzen role aan user", "error", err, "user_id", userID, "role_id", roleID)
+			// Continue with other roles
+			continue
+		}
+		assignedRoles++
+	}
+
+	return c.JSON(fiber.Map{
+		"success":         true,
+		"message":         "Roles toegewezen aan user",
+		"assigned_roles":  assignedRoles,
+		"total_requested": len(req.RoleIDs),
+	})
 }
