@@ -11,9 +11,10 @@ import (
 
 // NewsletterHandler bevat handlers voor nieuwsbrief beheer
 type NewsletterHandler struct {
-	newsletterRepo repository.NewsletterRepository
-	newsletterSvc  *services.NewsletterSender
-	authService    services.AuthService
+	newsletterRepo    repository.NewsletterRepository
+	newsletterSvc     *services.NewsletterSender
+	authService       services.AuthService
+	permissionService services.PermissionService
 }
 
 // NewNewsletterHandler maakt een nieuwe newsletter handler
@@ -21,11 +22,13 @@ func NewNewsletterHandler(
 	newsletterRepo repository.NewsletterRepository,
 	newsletterSvc *services.NewsletterSender,
 	authService services.AuthService,
+	permissionService services.PermissionService,
 ) *NewsletterHandler {
 	return &NewsletterHandler{
-		newsletterRepo: newsletterRepo,
-		newsletterSvc:  newsletterSvc,
-		authService:    authService,
+		newsletterRepo:    newsletterRepo,
+		newsletterSvc:     newsletterSvc,
+		authService:       authService,
+		permissionService: permissionService,
 	}
 }
 
@@ -34,7 +37,7 @@ func (h *NewsletterHandler) RegisterRoutes(app *fiber.App) {
 	// Groep voor newsletter beheer routes (vereist admin rechten)
 	newsletterGroup := app.Group("/api/newsletter")
 	newsletterGroup.Use(AuthMiddleware(h.authService))
-	newsletterGroup.Use(AdminMiddleware(h.authService))
+	newsletterGroup.Use(AdminPermissionMiddleware(h.permissionService))
 
 	// Newsletter beheer routes
 	newsletterGroup.Get("/", h.ListNewsletters)

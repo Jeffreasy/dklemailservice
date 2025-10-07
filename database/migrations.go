@@ -74,6 +74,11 @@ func (m *MigrationManager) createTables() error {
 			&models.EmailTemplate{},
 			&models.VerzondEmail{},
 			&models.Gebruiker{},
+			// RBAC models
+			&models.RBACRole{},
+			&models.Permission{},
+			&models.RolePermission{},
+			&models.UserRole{},
 		); err != nil {
 			return fmt.Errorf("fout bij aanmaken tabellen: %w", err)
 		}

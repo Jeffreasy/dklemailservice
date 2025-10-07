@@ -78,6 +78,7 @@ type MailHandler struct {
 	mailFetcher       *services.MailFetcher
 	incomingEmailRepo repository.IncomingEmailRepository
 	authService       services.AuthService
+	permissionService services.PermissionService
 	lastRun           time.Time
 }
 
@@ -86,11 +87,13 @@ func NewMailHandler(
 	mailFetcher *services.MailFetcher,
 	incomingEmailRepo repository.IncomingEmailRepository,
 	authService services.AuthService,
+	permissionService services.PermissionService,
 ) *MailHandler {
 	return &MailHandler{
 		mailFetcher:       mailFetcher,
 		incomingEmailRepo: incomingEmailRepo,
 		authService:       authService,
+		permissionService: permissionService,
 		lastRun:           time.Now().Add(-24 * time.Hour),
 	}
 }
@@ -143,21 +146,21 @@ func (h *MailHandler) RegisterRoutes(app *fiber.App) {
 		c.Locals("userID", userID)
 		c.Locals("token", token)
 
-		// Controleer nog of gebruiker admin is
+		// Controleer permissies via PermissionService
+		if !h.permissionService.HasPermission(c.Context(), userID, "admin", "access") {
+			logger.Warn("Gebruiker heeft geen admin toegang", "user_id", userID)
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "Geen toegang",
+			})
+		}
+
+		// Haal gebruiker op voor context (voor backward compatibility)
 		ctx := c.Context()
 		gebruiker, err := h.authService.GetUserFromToken(ctx, token)
 		if err != nil {
 			logger.Warn("Kon gebruiker niet ophalen uit token", "error", err)
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "Niet geautoriseerd",
-			})
-		}
-
-		// Controleer of gebruiker admin is
-		if gebruiker.Rol != "admin" {
-			logger.Warn("Gebruiker is geen admin", "user_id", gebruiker.ID, "role", gebruiker.Rol)
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"error": "Geen toegang",
 			})
 		}
 

@@ -44,6 +44,7 @@ func TestContactHandler_ListContactFormulieren(t *testing.T) {
 	mockContactRepo := mocks.NewMockContactRepository(mockDB)
 	mockContactAntwoordRepo := mocks.NewMockContactAntwoordRepository(mockDB)
 	mockAuthService := new(MockAuthService)
+	mockPermissionService := mocks.NewMockPermissionService()
 
 	// Create test contacts
 	testContacts := []*models.ContactFormulier{
@@ -79,7 +80,7 @@ func TestContactHandler_ListContactFormulieren(t *testing.T) {
 
 	// Create handler
 	mockNotificationService := NewMockNotificationService()
-	handler := handlers.NewContactHandler(mockContactRepo, mockContactAntwoordRepo, (*services.EmailService)(nil), mockAuthService, mockNotificationService)
+	handler := handlers.NewContactHandler(mockContactRepo, mockContactAntwoordRepo, (*services.EmailService)(nil), mockAuthService, mockPermissionService, mockNotificationService)
 
 	// Create test admin user
 	adminUser := &models.Gebruiker{
@@ -168,6 +169,7 @@ func TestContactHandler_GetContactFormulier(t *testing.T) {
 	mockContactRepo := mocks.NewMockContactRepository(mockDB)
 	mockContactAntwoordRepo := mocks.NewMockContactAntwoordRepository(mockDB)
 	mockAuthService := new(MockAuthService)
+	mockPermissionService := mocks.NewMockPermissionService()
 
 	// Create test contact
 	testContact := &models.ContactFormulier{
@@ -205,7 +207,7 @@ func TestContactHandler_GetContactFormulier(t *testing.T) {
 
 	// Create handler
 	mockNotificationService := NewMockNotificationService()
-	handler := handlers.NewContactHandler(mockContactRepo, mockContactAntwoordRepo, (*services.EmailService)(nil), mockAuthService, mockNotificationService)
+	handler := handlers.NewContactHandler(mockContactRepo, mockContactAntwoordRepo, (*services.EmailService)(nil), mockAuthService, mockPermissionService, mockNotificationService)
 
 	// Create test admin user
 	adminUser := &models.Gebruiker{
@@ -288,6 +290,7 @@ func TestContactHandler_UpdateContactFormulier(t *testing.T) {
 	mockContactRepo := mocks.NewMockContactRepository(mockDB)
 	mockContactAntwoordRepo := mocks.NewMockContactAntwoordRepository(mockDB)
 	mockAuthService := new(MockAuthService)
+	mockPermissionService := mocks.NewMockPermissionService()
 
 	// Create test contact
 	testContact := &models.ContactFormulier{
@@ -309,7 +312,7 @@ func TestContactHandler_UpdateContactFormulier(t *testing.T) {
 
 	// Create handler
 	mockNotificationService := NewMockNotificationService()
-	handler := handlers.NewContactHandler(mockContactRepo, mockContactAntwoordRepo, (*services.EmailService)(nil), mockAuthService, mockNotificationService)
+	handler := handlers.NewContactHandler(mockContactRepo, mockContactAntwoordRepo, (*services.EmailService)(nil), mockAuthService, mockPermissionService, mockNotificationService)
 
 	// Create test admin user
 	adminUser := &models.Gebruiker{
@@ -409,6 +412,7 @@ func TestContactHandler_DeleteContactFormulier(t *testing.T) {
 	mockContactRepo := mocks.NewMockContactRepository(mockDB)
 	mockContactAntwoordRepo := mocks.NewMockContactAntwoordRepository(mockDB)
 	mockAuthService := new(MockAuthService)
+	mockPermissionService := mocks.NewMockPermissionService()
 
 	// Create test contact
 	testContact := &models.ContactFormulier{
@@ -430,7 +434,7 @@ func TestContactHandler_DeleteContactFormulier(t *testing.T) {
 
 	// Create handler
 	mockNotificationService := NewMockNotificationService()
-	handler := handlers.NewContactHandler(mockContactRepo, mockContactAntwoordRepo, (*services.EmailService)(nil), mockAuthService, mockNotificationService)
+	handler := handlers.NewContactHandler(mockContactRepo, mockContactAntwoordRepo, (*services.EmailService)(nil), mockAuthService, mockPermissionService, mockNotificationService)
 
 	// Create test admin user
 	adminUser := &models.Gebruiker{
@@ -532,6 +536,7 @@ func TestContactHandler_AddContactAntwoord(t *testing.T) {
 	mockContactRepo := mocks.NewMockContactRepository(mockDB)
 	mockContactAntwoordRepo := mocks.NewMockContactAntwoordRepository(mockDB)
 	mockAuthService := new(MockAuthService)
+	mockPermissionService := mocks.NewMockPermissionService()
 
 	// Create test contact
 	testContact := &models.ContactFormulier{
@@ -553,7 +558,7 @@ func TestContactHandler_AddContactAntwoord(t *testing.T) {
 
 	// Create handler
 	mockNotificationService := NewMockNotificationService()
-	handler := handlers.NewContactHandler(mockContactRepo, mockContactAntwoordRepo, (*services.EmailService)(nil), mockAuthService, mockNotificationService)
+	handler := handlers.NewContactHandler(mockContactRepo, mockContactAntwoordRepo, (*services.EmailService)(nil), mockAuthService, mockPermissionService, mockNotificationService)
 
 	// Create test admin user
 	adminUser := &models.Gebruiker{
@@ -658,6 +663,7 @@ func TestContactHandler_GetContactFormulierenByStatus(t *testing.T) {
 	mockContactRepo := mocks.NewMockContactRepository(mockDB)
 	mockContactAntwoordRepo := mocks.NewMockContactAntwoordRepository(mockDB)
 	mockAuthService := new(MockAuthService)
+	mockPermissionService := mocks.NewMockPermissionService()
 
 	// Create test contacts with different statuses
 	testContacts := []*models.ContactFormulier{
@@ -723,7 +729,7 @@ func TestContactHandler_GetContactFormulierenByStatus(t *testing.T) {
 
 	// Create handler
 	mockNotificationService := NewMockNotificationService()
-	handler := handlers.NewContactHandler(mockContactRepo, mockContactAntwoordRepo, (*services.EmailService)(nil), mockAuthService, mockNotificationService)
+	handler := handlers.NewContactHandler(mockContactRepo, mockContactAntwoordRepo, (*services.EmailService)(nil), mockAuthService, mockPermissionService, mockNotificationService)
 
 	// Create test admin user
 	adminUser := &models.Gebruiker{

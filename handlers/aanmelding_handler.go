@@ -17,6 +17,7 @@ type AanmeldingHandler struct {
 	aanmeldingAntwoordRepo repository.AanmeldingAntwoordRepository
 	emailService           *services.EmailService
 	authService            services.AuthService
+	permissionService      services.PermissionService
 }
 
 // NewAanmeldingHandler maakt een nieuwe aanmelding handler
@@ -25,12 +26,14 @@ func NewAanmeldingHandler(
 	aanmeldingAntwoordRepo repository.AanmeldingAntwoordRepository,
 	emailService *services.EmailService,
 	authService services.AuthService,
+	permissionService services.PermissionService,
 ) *AanmeldingHandler {
 	return &AanmeldingHandler{
 		aanmeldingRepo:         aanmeldingRepo,
 		aanmeldingAntwoordRepo: aanmeldingAntwoordRepo,
 		emailService:           emailService,
 		authService:            authService,
+		permissionService:      permissionService,
 	}
 }
 
@@ -39,7 +42,7 @@ func (h *AanmeldingHandler) RegisterRoutes(app *fiber.App) {
 	// Groep voor aanmelding beheer routes (vereist admin rechten)
 	aanmeldingGroup := app.Group("/api/aanmelding")
 	aanmeldingGroup.Use(AuthMiddleware(h.authService))
-	aanmeldingGroup.Use(AdminMiddleware(h.authService))
+	aanmeldingGroup.Use(AdminPermissionMiddleware(h.permissionService))
 
 	// Aanmelding beheer routes
 	aanmeldingGroup.Get("/", h.ListAanmeldingen)

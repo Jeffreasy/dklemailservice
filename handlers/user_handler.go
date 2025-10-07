@@ -9,19 +9,23 @@ import (
 )
 
 type UserHandler struct {
-	authService services.AuthService
+	authService       services.AuthService
+	permissionService services.PermissionService
 }
 
-func NewUserHandler(authService services.AuthService) *UserHandler {
-	return &UserHandler{authService: authService}
+func NewUserHandler(authService services.AuthService, permissionService services.PermissionService) *UserHandler {
+	return &UserHandler{
+		authService:       authService,
+		permissionService: permissionService,
+	}
 }
 
 func (h *UserHandler) RegisterRoutes(app *fiber.App) {
-	app.Get("/api/users", AuthMiddleware(h.authService), StaffMiddleware(h.authService), h.ListUsers)
-	app.Get("/api/users/:id", AuthMiddleware(h.authService), StaffMiddleware(h.authService), h.GetUser)
-	app.Post("/api/users", AuthMiddleware(h.authService), AdminMiddleware(h.authService), h.CreateUser)
-	app.Put("/api/users/:id", AuthMiddleware(h.authService), AdminMiddleware(h.authService), h.UpdateUser)
-	app.Delete("/api/users/:id", AuthMiddleware(h.authService), AdminMiddleware(h.authService), h.DeleteUser)
+	app.Get("/api/users", AuthMiddleware(h.authService), StaffPermissionMiddleware(h.permissionService), h.ListUsers)
+	app.Get("/api/users/:id", AuthMiddleware(h.authService), StaffPermissionMiddleware(h.permissionService), h.GetUser)
+	app.Post("/api/users", AuthMiddleware(h.authService), AdminPermissionMiddleware(h.permissionService), h.CreateUser)
+	app.Put("/api/users/:id", AuthMiddleware(h.authService), AdminPermissionMiddleware(h.permissionService), h.UpdateUser)
+	app.Delete("/api/users/:id", AuthMiddleware(h.authService), AdminPermissionMiddleware(h.permissionService), h.DeleteUser)
 }
 
 func (h *UserHandler) ListUsers(c *fiber.Ctx) error {

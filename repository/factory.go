@@ -22,6 +22,12 @@ type Repository struct {
 	ChatMessageReaction    ChatMessageReactionRepository
 	ChatUserPresence       ChatUserPresenceRepository
 	Newsletter             NewsletterRepository
+
+	// RBAC repositories
+	RBACRole       RBACRoleRepository
+	Permission     PermissionRepository
+	RolePermission RolePermissionRepository
+	UserRole       UserRoleRepository
 }
 
 // NewRepository maakt een nieuwe Repository met concrete implementaties
@@ -45,6 +51,12 @@ func NewRepository(db *gorm.DB) *Repository {
 		ChatMessageReaction:    NewPostgresChatMessageReactionRepository(baseRepo),
 		ChatUserPresence:       NewPostgresChatUserPresenceRepository(baseRepo),
 		Newsletter:             NewPostgresNewsletterRepository(baseRepo),
+
+		// RBAC repositories
+		RBACRole:       NewRBACRoleRepository(db),
+		Permission:     NewPermissionRepository(db),
+		RolePermission: NewRolePermissionRepository(db),
+		UserRole:       NewUserRoleRepository(db),
 	}
 
 	return repo

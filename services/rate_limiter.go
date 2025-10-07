@@ -1,11 +1,15 @@
 package services
 
 import (
+	"context"
 	"dklautomationgo/logger"
 	"fmt"
 	"os"
+	"strconv"
 	"sync"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 // RateLimiterInterface definieert de interface voor rate limiting
@@ -33,6 +37,8 @@ type RateLimiter struct {
 	cleanupTicker     *time.Ticker
 	done              chan bool
 	prometheusMetrics *PrometheusMetrics
+	redisClient       *redis.Client
+	useRedis          bool
 }
 
 type counter struct {
@@ -42,17 +48,38 @@ type counter struct {
 
 // NewRateLimiter creëert een nieuwe rate limiter
 func NewRateLimiter(prometheusMetrics *PrometheusMetrics) *RateLimiter {
+	return NewRateLimiterWithRedis(prometheusMetrics, nil)
+}
+
+// NewRateLimiterWithRedis creëert een nieuwe rate limiter met optionele Redis ondersteuning
+func NewRateLimiterWithRedis(prometheusMetrics *PrometheusMetrics, redisClient *redis.Client) *RateLimiter {
 	rl := &RateLimiter{
 		globalCounts:      make(map[string]*counter),
 		ipCounts:          make(map[string]map[string]*counter),
 		limits:            make(map[string]RateLimit),
 		done:              make(chan bool),
 		prometheusMetrics: prometheusMetrics,
+		redisClient:       redisClient,
+		useRedis:          redisClient != nil,
 	}
 
-	// Start periodieke opschoning van verlopen limieten
-	rl.cleanupTicker = time.NewTicker(10 * time.Minute)
-	go rl.cleanupRoutine()
+	// Test Redis verbinding indien beschikbaar
+	if rl.useRedis {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if _, err := rl.redisClient.Ping(ctx).Result(); err != nil {
+			logger.Warn("Redis connection failed, falling back to in-memory rate limiting", "error", err)
+			rl.useRedis = false
+		} else {
+			logger.Info("Redis rate limiting enabled")
+		}
+	}
+
+	// Start periodieke opschoning van verlopen limieten (alleen voor in-memory)
+	if !rl.useRedis {
+		rl.cleanupTicker = time.NewTicker(10 * time.Minute)
+		go rl.cleanupRoutine()
+	}
 
 	return rl
 }
@@ -71,11 +98,6 @@ func (rl *RateLimiter) AddLimit(operationType string, count int, period time.Dur
 
 // AllowEmail controleert of een email mag worden verzonden
 func (r *RateLimiter) AllowEmail(emailType, userID string) bool {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	now := time.Now()
-
 	// Controleer globale rate limiting
 	if limit, exists := r.limits[emailType]; exists {
 		// Bereken hoeveel requests in deze periode zijn toegestaan
@@ -84,70 +106,135 @@ func (r *RateLimiter) AllowEmail(emailType, userID string) bool {
 			key = fmt.Sprintf("%s:%s", emailType, userID)
 		}
 
-		cnt, exists := r.globalCounts[key]
-		if !exists {
-			// Maak een nieuwe counter aan
-			cnt = &counter{
-				count:     0,
-				resetTime: now,
-			}
-			r.globalCounts[key] = cnt
+		if r.useRedis {
+			return r.allowWithRedis(key, limit, emailType, userID)
+		} else {
+			return r.allowWithMemory(key, limit, emailType, userID)
 		}
-
-		// Reset counter als de periode is verstreken
-		elapsed := now.Sub(cnt.resetTime)
-		if elapsed > limit.Period {
-			cnt.count = 0
-			cnt.resetTime = now
-		}
-
-		// Check tegen de limiet
-		if cnt.count >= limit.Count {
-			// Overschreden
-			logger.Warn("Globale rate limit overschreden",
-				"operation", emailType,
-				"limit", limit.Count,
-				"period", limit.Period)
-
-			// Prometheus metrics registreren
-			limitType := "global"
-			if userID != "" {
-				limitType = "per_user"
-			}
-			if r.prometheusMetrics != nil {
-				r.prometheusMetrics.RecordRateLimitExceeded(emailType, limitType)
-			}
-
-			// Voor tests: voeg een korte vertraging toe als TEST_RATE_LIMITING=true
-			if os.Getenv("TEST_RATE_LIMITING") == "true" {
-				// In test mode gebruiken we een korte vertraging
-				time.Sleep(100 * time.Millisecond)
-			}
-
-			return false
-		}
-
-		// Voor tests: voeg progressieve vertraging toe als TEST_RATE_LIMITING=true
-		// en we al bij meer dan 1 request zijn
-		if os.Getenv("TEST_RATE_LIMITING") == "true" && cnt.count > 0 {
-			// In test mode gebruiken we een korte vertraging afhankelijk van het aantal requests
-			time.Sleep(time.Duration(cnt.count) * 100 * time.Millisecond)
-		}
-
-		// Toegestaan, incrementeer counter
-		cnt.count++
-		return true
 	}
 
 	// Geen rate limiting voor dit type
 	return true
 }
 
-// Allow controleert of een operatie is toegestaan op basis van de rate limit
-func (r *RateLimiter) Allow(key string) bool {
+// allowWithRedis gebruikt Redis voor distributed rate limiting
+func (r *RateLimiter) allowWithRedis(key string, limit RateLimit, emailType, userID string) bool {
+	ctx := context.Background()
+
+	// Gebruik Redis sorted sets voor sliding window rate limiting
+	// Voeg huidige timestamp toe aan de set
+	now := time.Now().Unix()
+	windowStart := now - int64(limit.Period.Seconds())
+
+	// Verwijder oude entries buiten het window
+	r.redisClient.ZRemRangeByScore(ctx, key, "0", strconv.FormatInt(windowStart, 10))
+
+	// Tel huidige entries in het window
+	count, err := r.redisClient.ZCard(ctx, key).Result()
+	if err != nil {
+		logger.Error("Redis ZCard failed, falling back to memory", "error", err, "key", key)
+		return r.allowWithMemory(key, limit, emailType, userID)
+	}
+
+	// Check tegen de limiet
+	if count >= int64(limit.Count) {
+		// Overschreden
+		logger.Warn("Redis rate limit overschreden",
+			"operation", emailType,
+			"limit", limit.Count,
+			"period", limit.Period,
+			"current_count", count)
+
+		// Prometheus metrics registreren
+		limitType := "global"
+		if userID != "" {
+			limitType = "per_user"
+		}
+		if r.prometheusMetrics != nil {
+			r.prometheusMetrics.RecordRateLimitExceeded(emailType, limitType)
+		}
+
+		return false
+	}
+
+	// Voeg nieuwe request toe aan het window
+	err = r.redisClient.ZAdd(ctx, key, redis.Z{
+		Score:  float64(now),
+		Member: strconv.FormatInt(now, 10) + ":" + fmt.Sprintf("%d", time.Now().Nanosecond()),
+	}).Err()
+
+	if err != nil {
+		logger.Error("Redis ZAdd failed, falling back to memory", "error", err, "key", key)
+		return r.allowWithMemory(key, limit, emailType, userID)
+	}
+
+	// Stel TTL in op de limiet periode + buffer
+	r.redisClient.Expire(ctx, key, limit.Period+time.Minute)
+
+	return true
+}
+
+// allowWithMemory gebruikt in-memory rate limiting (originele implementatie)
+func (r *RateLimiter) allowWithMemory(key string, limit RateLimit, emailType, userID string) bool {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
+	now := time.Now()
+
+	cnt, exists := r.globalCounts[key]
+	if !exists {
+		// Maak een nieuwe counter aan
+		cnt = &counter{
+			count:     0,
+			resetTime: now,
+		}
+		r.globalCounts[key] = cnt
+	}
+
+	// Reset counter als de periode is verstreken
+	elapsed := now.Sub(cnt.resetTime)
+	if elapsed > limit.Period {
+		cnt.count = 0
+		cnt.resetTime = now
+	}
+
+	// Check tegen de limiet
+	if cnt.count >= limit.Count {
+		// Overschreden
+		logger.Warn("Memory rate limit overschreden",
+			"operation", emailType,
+			"limit", limit.Count,
+			"period", limit.Period)
+
+		// Prometheus metrics registreren
+		limitType := "global"
+		if userID != "" {
+			limitType = "per_user"
+		}
+		if r.prometheusMetrics != nil {
+			r.prometheusMetrics.RecordRateLimitExceeded(emailType, limitType)
+		}
+
+		// Voor tests: voeg een korte vertraging toe als TEST_RATE_LIMITING=true
+		if os.Getenv("TEST_RATE_LIMITING") == "true" {
+			time.Sleep(100 * time.Millisecond)
+		}
+
+		return false
+	}
+
+	// Voor tests: voeg progressieve vertraging toe als TEST_RATE_LIMITING=true
+	if os.Getenv("TEST_RATE_LIMITING") == "true" && cnt.count > 0 {
+		time.Sleep(time.Duration(cnt.count) * 100 * time.Millisecond)
+	}
+
+	// Toegestaan, incrementeer counter
+	cnt.count++
+	return true
+}
+
+// Allow controleert of een operatie is toegestaan op basis van de rate limit
+func (r *RateLimiter) Allow(key string) bool {
 	// Splits de key in operationType en userID (indien aanwezig)
 	parts := make([]string, 2)
 	if idx := indexOf(key, ":"); idx != -1 {
@@ -162,8 +249,6 @@ func (r *RateLimiter) Allow(key string) bool {
 	operationType := parts[0]
 	userID := parts[1]
 
-	now := time.Now()
-
 	// Controleer globale rate limiting
 	if limit, exists := r.limits[operationType]; exists {
 		// Bereken hoeveel requests in deze periode zijn toegestaan
@@ -172,52 +257,11 @@ func (r *RateLimiter) Allow(key string) bool {
 			limitKey = fmt.Sprintf("%s:%s", operationType, userID)
 		}
 
-		cnt, exists := r.globalCounts[limitKey]
-		if !exists {
-			// Maak een nieuwe counter aan
-			cnt = &counter{
-				count:     0,
-				resetTime: now,
-			}
-			r.globalCounts[limitKey] = cnt
+		if r.useRedis {
+			return r.allowWithRedis(limitKey, limit, operationType, userID)
+		} else {
+			return r.allowWithMemory(limitKey, limit, operationType, userID)
 		}
-
-		// Reset counter als de periode is verstreken
-		elapsed := now.Sub(cnt.resetTime)
-		if elapsed > limit.Period {
-			cnt.count = 0
-			cnt.resetTime = now
-		}
-
-		// Check tegen de limiet
-		if cnt.count >= limit.Count {
-			// Overschreden
-			logger.Warn("Rate limit overschreden",
-				"operation", operationType,
-				"limit", limit.Count,
-				"period", limit.Period)
-
-			// Prometheus metrics registreren
-			limitType := "global"
-			if userID != "" {
-				limitType = "per_user"
-			}
-			if r.prometheusMetrics != nil {
-				r.prometheusMetrics.RecordRateLimitExceeded(operationType, limitType)
-			}
-
-			// Voor tests: voeg een korte vertraging toe als TEST_RATE_LIMITING=true
-			if os.Getenv("TEST_RATE_LIMITING") == "true" {
-				time.Sleep(100 * time.Millisecond)
-			}
-
-			return false
-		}
-
-		// Verhoog de counter
-		cnt.count++
-
-		return true
 	}
 
 	// Als er geen limiet is ingesteld, sta toe
@@ -236,37 +280,57 @@ func indexOf(s string, char string) int {
 
 // GetCurrentCount geeft het huidige aantal voor een operatietype
 func (rl *RateLimiter) GetCurrentCount(operationType string, ipAddress string) int {
-	rl.mutex.Lock()
-	defer rl.mutex.Unlock()
-
 	limit, exists := rl.limits[operationType]
 	if !exists {
 		return 0
 	}
 
-	now := time.Now()
+	if rl.useRedis {
+		ctx := context.Background()
+		key := operationType
+		if limit.PerIP && ipAddress != "" {
+			key = fmt.Sprintf("%s:%s", operationType, ipAddress)
+		}
 
-	if limit.PerIP {
-		ipMap, exists := rl.ipCounts[operationType]
-		if !exists {
+		// Tel entries in het huidige window
+		now := time.Now().Unix()
+		windowStart := now - int64(limit.Period.Seconds())
+
+		count, err := rl.redisClient.ZCount(ctx, key, strconv.FormatInt(windowStart, 10), strconv.FormatInt(now+1, 10)).Result()
+		if err != nil {
+			logger.Error("Redis ZCount failed", "error", err, "key", key)
 			return 0
 		}
 
-		ipCounter, exists := ipMap[ipAddress]
-		if !exists || now.After(ipCounter.resetTime) {
+		return int(count)
+	} else {
+		rl.mutex.Lock()
+		defer rl.mutex.Unlock()
+
+		now := time.Now()
+
+		if limit.PerIP {
+			ipMap, exists := rl.ipCounts[operationType]
+			if !exists {
+				return 0
+			}
+
+			ipCounter, exists := ipMap[ipAddress]
+			if !exists || now.After(ipCounter.resetTime) {
+				return 0
+			}
+
+			return ipCounter.count
+		}
+
+		// Globale teller
+		globalCounter, exists := rl.globalCounts[operationType]
+		if !exists || now.After(globalCounter.resetTime) {
 			return 0
 		}
 
-		return ipCounter.count
+		return globalCounter.count
 	}
-
-	// Globale teller
-	globalCounter, exists := rl.globalCounts[operationType]
-	if !exists || now.After(globalCounter.resetTime) {
-		return 0
-	}
-
-	return globalCounter.count
 }
 
 // cleanupRoutine verwijdert verlopen tellers
@@ -312,8 +376,13 @@ func (rl *RateLimiter) cleanup() {
 
 // Shutdown stopt de rate limiter en opschoning
 func (rl *RateLimiter) Shutdown() {
-	rl.cleanupTicker.Stop()
-	rl.done <- true
+	if !rl.useRedis {
+		rl.cleanupTicker.Stop()
+		rl.done <- true
+	}
+
+	// Redis client wordt afgesloten door de caller
+	logger.Info("Rate limiter shutdown complete", "use_redis", rl.useRedis)
 }
 
 // GetLimits geeft alle geconfigureerde limieten terug
@@ -332,19 +401,26 @@ func (rl *RateLimiter) GetLimits() map[string]RateLimit {
 
 // GetCurrentValues haalt de huidige waarden op
 func (rl *RateLimiter) GetCurrentValues() map[string]int {
-	rl.mutex.Lock()
-	defer rl.mutex.Unlock()
+	if rl.useRedis {
+		// Voor Redis implementatie, geef een lege map terug voor nu
+		// In productie zou je alle Redis keys kunnen scannen, maar dat is duur
+		logger.Debug("GetCurrentValues not implemented for Redis mode")
+		return make(map[string]int)
+	} else {
+		rl.mutex.Lock()
+		defer rl.mutex.Unlock()
 
-	result := make(map[string]int)
-	now := time.Now()
+		result := make(map[string]int)
+		now := time.Now()
 
-	// Verzamel alle actieve tellers
-	for key, counter := range rl.globalCounts {
-		// Controleer of de teller nog geldig is
-		if !now.After(counter.resetTime) {
-			result[key] = counter.count
+		// Verzamel alle actieve tellers
+		for key, counter := range rl.globalCounts {
+			// Controleer of de teller nog geldig is
+			if !now.After(counter.resetTime) {
+				result[key] = counter.count
+			}
 		}
-	}
 
-	return result
+		return result
+	}
 }

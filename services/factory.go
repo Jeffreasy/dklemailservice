@@ -2,12 +2,15 @@
 package services
 
 import (
+	"dklautomationgo/config"
 	"dklautomationgo/logger"
 	"dklautomationgo/models"
 	"dklautomationgo/repository"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 // ServiceFactory bevat alle services
@@ -25,6 +28,8 @@ type ServiceFactory struct {
 	Hub                 *Hub
 	NewsletterService   *NewsletterService
 	NewsletterSender    *NewsletterSender
+	PermissionService   PermissionService
+	RedisClient         *redis.Client
 }
 
 // GetRateLimiter retourneert de RateLimiter als het concrete type
@@ -43,11 +48,20 @@ func (sf *ServiceFactory) GetRateLimiter() *RateLimiter {
 func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 	logger.Info("Initialiseren service factory")
 
+	// Initialiseer Redis client
+	redisConfig := config.LoadRedisConfig()
+	redisClient := config.NewRedisClient(redisConfig)
+	if redisClient != nil {
+		logger.Info("Redis client geïnitialiseerd")
+	} else {
+		logger.Warn("Redis client kon niet worden geïnitialiseerd, sommige features werken mogelijk niet")
+	}
+
 	// Initialiseer Prometheus metrics
 	prometheusMetrics := GetPrometheusMetrics()
 
-	// Initialiseer rate limiter
-	rateLimiter := createRateLimiter(prometheusMetrics)
+	// Initialiseer rate limiter met Redis ondersteuning
+	rateLimiter := createRateLimiter(prometheusMetrics, redisClient)
 
 	// Initialiseer email metrics
 	emailMetrics := createEmailMetrics()
@@ -63,6 +77,15 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 
 	// Initialiseer auth service
 	authService := NewAuthService(repoFactory.Gebruiker)
+
+	// Initialiseer permission service met Redis caching
+	permissionService := NewPermissionServiceWithRedis(
+		repoFactory.RBACRole,
+		repoFactory.Permission,
+		repoFactory.RolePermission,
+		repoFactory.UserRole,
+		redisClient,
+	)
 
 	// Initialiseer notification service
 	notificationService := createNotificationService(repoFactory.Notification)
@@ -102,12 +125,14 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 		Hub:                 hub,
 		NewsletterService:   newsletterSvc,
 		NewsletterSender:    sender,
+		PermissionService:   permissionService,
+		RedisClient:         redisClient,
 	}
 }
 
 // createRateLimiter maakt een nieuwe rate limiter
-func createRateLimiter(prometheusMetrics *PrometheusMetrics) *RateLimiter {
-	rateLimiter := NewRateLimiter(prometheusMetrics)
+func createRateLimiter(prometheusMetrics *PrometheusMetrics, redisClient *redis.Client) *RateLimiter {
+	rateLimiter := NewRateLimiterWithRedis(prometheusMetrics, redisClient)
 
 	// Configureer limieten uit omgevingsvariabelen
 	contactLimitCount, _ := strconv.Atoi(getEnvWithDefault("CONTACT_LIMIT_COUNT", "5"))

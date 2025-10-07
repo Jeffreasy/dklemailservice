@@ -36,6 +36,7 @@ func TestAanmeldingHandler_ListAanmeldingen(t *testing.T) {
 	mockAanmeldingRepo := mocks.NewMockAanmeldingRepository(mockDB)
 	mockAanmeldingAntwoordRepo := mocks.NewMockAanmeldingAntwoordRepository(mockDB)
 	mockAuthService := new(MockAuthService)
+	mockPermissionService := mocks.NewMockPermissionService()
 
 	// Create test aanmeldingen
 	testAanmeldingen := []*models.Aanmelding{
@@ -72,7 +73,7 @@ func TestAanmeldingHandler_ListAanmeldingen(t *testing.T) {
 	}
 
 	// Create handler
-	handler := handlers.NewAanmeldingHandler(mockAanmeldingRepo, mockAanmeldingAntwoordRepo, (*services.EmailService)(nil), mockAuthService)
+	handler := handlers.NewAanmeldingHandler(mockAanmeldingRepo, mockAanmeldingAntwoordRepo, (*services.EmailService)(nil), mockAuthService, mockPermissionService)
 
 	// Create test admin user
 	adminUser := &models.Gebruiker{
@@ -161,6 +162,7 @@ func TestAanmeldingHandler_GetAanmelding(t *testing.T) {
 	mockAanmeldingRepo := mocks.NewMockAanmeldingRepository(mockDB)
 	mockAanmeldingAntwoordRepo := mocks.NewMockAanmeldingAntwoordRepository(mockDB)
 	mockAuthService := new(MockAuthService)
+	mockPermissionService := mocks.NewMockPermissionService()
 
 	// Create test aanmelding
 	testAanmelding := &models.Aanmelding{
@@ -198,7 +200,7 @@ func TestAanmeldingHandler_GetAanmelding(t *testing.T) {
 	}
 
 	// Create handler
-	handler := handlers.NewAanmeldingHandler(mockAanmeldingRepo, mockAanmeldingAntwoordRepo, (*services.EmailService)(nil), mockAuthService)
+	handler := handlers.NewAanmeldingHandler(mockAanmeldingRepo, mockAanmeldingAntwoordRepo, (*services.EmailService)(nil), mockAuthService, mockPermissionService)
 
 	// Create test admin user
 	adminUser := &models.Gebruiker{
@@ -281,6 +283,7 @@ func TestAanmeldingHandler_UpdateAanmelding(t *testing.T) {
 	mockAanmeldingRepo := mocks.NewMockAanmeldingRepository(mockDB)
 	mockAanmeldingAntwoordRepo := mocks.NewMockAanmeldingAntwoordRepository(mockDB)
 	mockAuthService := new(MockAuthService)
+	mockPermissionService := mocks.NewMockPermissionService()
 
 	// Create test aanmelding
 	testAanmelding := &models.Aanmelding{
@@ -302,7 +305,7 @@ func TestAanmeldingHandler_UpdateAanmelding(t *testing.T) {
 	}
 
 	// Create handler
-	handler := handlers.NewAanmeldingHandler(mockAanmeldingRepo, mockAanmeldingAntwoordRepo, (*services.EmailService)(nil), mockAuthService)
+	handler := handlers.NewAanmeldingHandler(mockAanmeldingRepo, mockAanmeldingAntwoordRepo, (*services.EmailService)(nil), mockAuthService, mockPermissionService)
 
 	// Create test admin user
 	adminUser := &models.Gebruiker{
@@ -402,6 +405,7 @@ func TestAanmeldingHandler_DeleteAanmelding(t *testing.T) {
 	mockAanmeldingRepo := mocks.NewMockAanmeldingRepository(mockDB)
 	mockAanmeldingAntwoordRepo := mocks.NewMockAanmeldingAntwoordRepository(mockDB)
 	mockAuthService := new(MockAuthService)
+	mockPermissionService := mocks.NewMockPermissionService()
 
 	// Create test aanmelding
 	testAanmelding := &models.Aanmelding{
@@ -423,7 +427,7 @@ func TestAanmeldingHandler_DeleteAanmelding(t *testing.T) {
 	}
 
 	// Create handler
-	handler := handlers.NewAanmeldingHandler(mockAanmeldingRepo, mockAanmeldingAntwoordRepo, (*services.EmailService)(nil), mockAuthService)
+	handler := handlers.NewAanmeldingHandler(mockAanmeldingRepo, mockAanmeldingAntwoordRepo, (*services.EmailService)(nil), mockAuthService, mockPermissionService)
 
 	// Create test admin user
 	adminUser := &models.Gebruiker{
@@ -527,6 +531,7 @@ func TestAanmeldingHandler_GetAanmeldingenByRol(t *testing.T) {
 	mockAanmeldingRepo := mocks.NewMockAanmeldingRepository(mockDB)
 	mockAanmeldingAntwoordRepo := mocks.NewMockAanmeldingAntwoordRepository(mockDB)
 	mockAuthService := new(MockAuthService)
+	mockPermissionService := mocks.NewMockPermissionService()
 
 	// Create test aanmeldingen with different roles
 	testAanmeldingen := []*models.Aanmelding{
@@ -596,7 +601,7 @@ func TestAanmeldingHandler_GetAanmeldingenByRol(t *testing.T) {
 	}
 
 	// Create handler
-	handler := handlers.NewAanmeldingHandler(mockAanmeldingRepo, mockAanmeldingAntwoordRepo, (*services.EmailService)(nil), mockAuthService)
+	handler := handlers.NewAanmeldingHandler(mockAanmeldingRepo, mockAanmeldingAntwoordRepo, (*services.EmailService)(nil), mockAuthService, mockPermissionService)
 
 	// Create test admin user
 	adminUser := &models.Gebruiker{

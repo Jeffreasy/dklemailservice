@@ -16,20 +16,22 @@ import (
 
 // ChatHandler handles chat-related HTTP requests
 type ChatHandler struct {
-	chatService services.ChatService
-	authService services.AuthService
-	hub         *services.Hub // global, if needed
-	mutex       sync.Mutex
-	channelHubs map[string]*services.Hub
+	chatService       services.ChatService
+	authService       services.AuthService
+	permissionService services.PermissionService
+	hub               *services.Hub // global, if needed
+	mutex             sync.Mutex
+	channelHubs       map[string]*services.Hub
 }
 
 // NewChatHandler creates a new ChatHandler
-func NewChatHandler(chatService services.ChatService, authService services.AuthService, hub *services.Hub) *ChatHandler {
+func NewChatHandler(chatService services.ChatService, authService services.AuthService, permissionService services.PermissionService, hub *services.Hub) *ChatHandler {
 	return &ChatHandler{
-		chatService: chatService,
-		authService: authService,
-		hub:         hub,
-		channelHubs: make(map[string]*services.Hub),
+		chatService:       chatService,
+		authService:       authService,
+		permissionService: permissionService,
+		hub:               hub,
+		channelHubs:       make(map[string]*services.Hub),
 	}
 }
 
@@ -95,9 +97,22 @@ func (h *ChatHandler) handleWebsocket(c *websocket.Conn) {
 	channelID := c.Params("channel_id")
 	userID := c.Locals("userID").(string)
 
-	// Check if user is participant
+	// Check if user is authorized to access this channel
+	isAuthorized := false
+
+	// Check if user is a participant in the channel
 	role, err := h.chatService.GetParticipantRole(context.Background(), channelID, userID)
-	if err != nil || role == "" {
+	if err == nil && role != "" {
+		isAuthorized = true
+	} else {
+		// Check if user has admin RBAC permission (admins can access any channel)
+		if h.permissionService.HasPermission(context.Background(), userID, "admin", "access") {
+			isAuthorized = true
+		}
+	}
+
+	if !isAuthorized {
+		logger.Warn("WebSocket connection denied: user not authorized for channel", "user_id", userID, "channel_id", channelID)
 		c.Close()
 		return
 	}
@@ -344,8 +359,27 @@ func (h *ChatHandler) EditMessage(c *fiber.Ctx) error {
 	}
 
 	userID := c.Locals("userID").(string)
-	role, err := h.chatService.GetParticipantRole(c.Context(), message.ChannelID, userID)
-	if err != nil || (role != "owner" && role != "admin" && message.UserID != userID) {
+
+	// Check permissions: user can edit if they are the author, channel owner/admin, or have admin RBAC permission
+	canEdit := false
+
+	// Check if user is the message author
+	if message.UserID == userID {
+		canEdit = true
+	} else {
+		// Check channel role
+		role, err := h.chatService.GetParticipantRole(c.Context(), message.ChannelID, userID)
+		if err == nil && (role == "owner" || role == "admin") {
+			canEdit = true
+		} else {
+			// Check RBAC admin permission
+			if h.permissionService.HasPermission(c.Context(), userID, "admin", "access") {
+				canEdit = true
+			}
+		}
+	}
+
+	if !canEdit {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Not authorized to edit this message"})
 	}
 
@@ -369,8 +403,27 @@ func (h *ChatHandler) DeleteMessage(c *fiber.Ctx) error {
 	}
 
 	userID := c.Locals("userID").(string)
-	role, err := h.chatService.GetParticipantRole(c.Context(), message.ChannelID, userID)
-	if err != nil || (role != "owner" && role != "admin" && message.UserID != userID) {
+
+	// Check permissions: user can delete if they are the author, channel owner/admin, or have admin RBAC permission
+	canDelete := false
+
+	// Check if user is the message author
+	if message.UserID == userID {
+		canDelete = true
+	} else {
+		// Check channel role
+		role, err := h.chatService.GetParticipantRole(c.Context(), message.ChannelID, userID)
+		if err == nil && (role == "owner" || role == "admin") {
+			canDelete = true
+		} else {
+			// Check RBAC admin permission
+			if h.permissionService.HasPermission(c.Context(), userID, "admin", "access") {
+				canDelete = true
+			}
+		}
+	}
+
+	if !canDelete {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Not authorized to delete this message"})
 	}
 

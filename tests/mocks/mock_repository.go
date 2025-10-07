@@ -646,3 +646,81 @@ func (r *MockGebruikerRepository) GetNewsletterSubscribers(ctx context.Context) 
 
 	return result, nil
 }
+
+// MockPermissionService is een mock implementatie van PermissionService
+type MockPermissionService struct{}
+
+// NewMockPermissionService maakt een nieuwe mock permission service
+func NewMockPermissionService() *MockPermissionService {
+	return &MockPermissionService{}
+}
+
+// HasPermission controleert of een gebruiker een specifieke permissie heeft (altijd true voor tests)
+func (m *MockPermissionService) HasPermission(ctx context.Context, userID, resource, action string) bool {
+	return true
+}
+
+// GetUserPermissions haalt alle permissies op voor een gebruiker
+func (m *MockPermissionService) GetUserPermissions(ctx context.Context, userID string) ([]*models.UserPermission, error) {
+	return []*models.UserPermission{}, nil
+}
+
+// GetUserRoles haalt alle actieve rollen op voor een gebruiker
+func (m *MockPermissionService) GetUserRoles(ctx context.Context, userID string) ([]*models.UserRole, error) {
+	return []*models.UserRole{}, nil
+}
+
+// AssignRole kent een rol toe aan een gebruiker
+func (m *MockPermissionService) AssignRole(ctx context.Context, userID, roleID string, assignedBy *string) error {
+	return nil
+}
+
+// RevokeRole verwijdert een rol van een gebruiker
+func (m *MockPermissionService) RevokeRole(ctx context.Context, userID, roleID string) error {
+	return nil
+}
+
+// CreateRole maakt een nieuwe rol aan
+func (m *MockPermissionService) CreateRole(ctx context.Context, role *models.RBACRole, createdBy *string) error {
+	return nil
+}
+
+// UpdateRole werkt een rol bij
+func (m *MockPermissionService) UpdateRole(ctx context.Context, role *models.RBACRole) error {
+	return nil
+}
+
+// DeleteRole verwijdert een rol
+func (m *MockPermissionService) DeleteRole(ctx context.Context, roleID string) error {
+	return nil
+}
+
+// AssignPermissionToRole kent een permissie toe aan een rol
+func (m *MockPermissionService) AssignPermissionToRole(ctx context.Context, roleID, permissionID string, assignedBy *string) error {
+	return nil
+}
+
+// RevokePermissionFromRole verwijdert een permissie van een rol
+func (m *MockPermissionService) RevokePermissionFromRole(ctx context.Context, roleID, permissionID string) error {
+	return nil
+}
+
+// GetRoles haalt alle rollen op
+func (m *MockPermissionService) GetRoles(ctx context.Context, limit, offset int) ([]*models.RBACRole, error) {
+	return []*models.RBACRole{}, nil
+}
+
+// GetPermissions haalt alle permissies op
+func (m *MockPermissionService) GetPermissions(ctx context.Context, limit, offset int) ([]*models.Permission, error) {
+	return []*models.Permission{}, nil
+}
+
+// InvalidateUserCache wist de cache voor een gebruiker
+func (m *MockPermissionService) InvalidateUserCache(userID string) {
+	// Do nothing in mock
+}
+
+// RefreshCache vernieuwt alle caches
+func (m *MockPermissionService) RefreshCache(ctx context.Context) error {
+	return nil
+}

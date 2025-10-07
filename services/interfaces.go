@@ -155,6 +155,51 @@ type NotificationService interface {
 	IsRunning() bool
 }
 
+// PermissionService definieert de interface voor RBAC permission operaties
+type PermissionService interface {
+	// HasPermission controleert of een gebruiker een specifieke permissie heeft
+	HasPermission(ctx context.Context, userID, resource, action string) bool
+
+	// GetUserPermissions haalt alle permissies op voor een gebruiker
+	GetUserPermissions(ctx context.Context, userID string) ([]*models.UserPermission, error)
+
+	// GetUserRoles haalt alle actieve rollen op voor een gebruiker
+	GetUserRoles(ctx context.Context, userID string) ([]*models.UserRole, error)
+
+	// AssignRole kent een rol toe aan een gebruiker
+	AssignRole(ctx context.Context, userID, roleID string, assignedBy *string) error
+
+	// RevokeRole verwijdert een rol van een gebruiker
+	RevokeRole(ctx context.Context, userID, roleID string) error
+
+	// CreateRole maakt een nieuwe rol aan
+	CreateRole(ctx context.Context, role *models.RBACRole, createdBy *string) error
+
+	// UpdateRole werkt een rol bij
+	UpdateRole(ctx context.Context, role *models.RBACRole) error
+
+	// DeleteRole verwijdert een rol
+	DeleteRole(ctx context.Context, roleID string) error
+
+	// AssignPermissionToRole kent een permissie toe aan een rol
+	AssignPermissionToRole(ctx context.Context, roleID, permissionID string, assignedBy *string) error
+
+	// RevokePermissionFromRole verwijdert een permissie van een rol
+	RevokePermissionFromRole(ctx context.Context, roleID, permissionID string) error
+
+	// GetRoles haalt alle rollen op
+	GetRoles(ctx context.Context, limit, offset int) ([]*models.RBACRole, error)
+
+	// GetPermissions haalt alle permissies op
+	GetPermissions(ctx context.Context, limit, offset int) ([]*models.Permission, error)
+
+	// InvalidateUserCache wist de cache voor een gebruiker
+	InvalidateUserCache(userID string)
+
+	// RefreshCache vernieuwt alle caches
+	RefreshCache(ctx context.Context) error
+}
+
 // ChatService defines the interface for chat operations
 type ChatService interface {
 	// Channel operations

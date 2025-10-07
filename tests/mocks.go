@@ -13,8 +13,6 @@ import (
 )
 
 // mockEmailService implementeert de handlers.EmailServiceInterface
-//
-//nolint:unused // These mocks are kept for future tests
 type mockEmailService struct {
 	mu                    sync.Mutex
 	contactEmailCalled    bool
@@ -23,14 +21,12 @@ type mockEmailService struct {
 	sentEmails            []services.EmailMessage
 }
 
-//nolint:unused // These mocks are kept for future tests
 func newMockEmailService() *mockEmailService {
 	return &mockEmailService{
 		sentEmails: make([]services.EmailMessage, 0),
 	}
 }
 
-//nolint:unused // These mocks are kept for future tests
 func (m *mockEmailService) SendContactEmail(data *models.ContactEmailData) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -53,7 +49,6 @@ func (m *mockEmailService) SendContactEmail(data *models.ContactEmailData) error
 	return nil
 }
 
-//nolint:unused // These mocks are kept for future tests
 func (m *mockEmailService) SendAanmeldingEmail(data *models.AanmeldingEmailData) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -76,7 +71,6 @@ func (m *mockEmailService) SendAanmeldingEmail(data *models.AanmeldingEmailData)
 	return nil
 }
 
-//nolint:unused // These mocks are kept for future tests
 func (m *mockEmailService) SendEmail(recipient, subject, body string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -93,7 +87,6 @@ func (m *mockEmailService) SendEmail(recipient, subject, body string) error {
 	return nil
 }
 
-//nolint:unused // These mocks are kept for future tests
 func (m *mockEmailService) SendBatchEmail(batchKey string, recipients []string, subject, body string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -113,8 +106,6 @@ func (m *mockEmailService) SendBatchEmail(batchKey string, recipients []string, 
 }
 
 // mockSMTP implementeert zowel SMTPClient als SMTPDialer interfaces
-//
-//nolint:unused // These mocks are kept for future tests
 type mockSMTP struct {
 	mock.Mock
 	mutex              sync.Mutex
@@ -131,7 +122,6 @@ type mockSMTP struct {
 	SendError          error
 }
 
-//nolint:unused // These mocks are kept for future tests
 func (m *mockSMTP) Send(msg *services.EmailMessage) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -146,7 +136,6 @@ func (m *mockSMTP) Send(msg *services.EmailMessage) error {
 	return args.Error(0)
 }
 
-//nolint:unused // These mocks are kept for future tests
 func (m *mockSMTP) SendRegistration(msg *services.EmailMessage) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -161,7 +150,6 @@ func (m *mockSMTP) SendRegistration(msg *services.EmailMessage) error {
 	return args.Error(0)
 }
 
-//nolint:unused // These mocks are kept for future tests
 func (m *mockSMTP) SendWFC(msg *services.EmailMessage) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -214,7 +202,6 @@ func (m *mockSMTP) SendEmail(to, subject, body string, fromAddress ...string) er
 	}
 }
 
-//nolint:unused // These mocks are kept for future tests
 func (m *mockSMTP) SendWFCEmail(to, subject, body string) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -243,8 +230,6 @@ func (m *mockSMTP) Reset() {
 }
 
 // Dial implements the SMTPDialer interface
-//
-//nolint:unused // These mocks are kept for future tests
 func (m *mockSMTP) Dial(addr string) (services.SMTPClient, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -263,8 +248,6 @@ func (m *mockSMTP) Dial(addr string) (services.SMTPClient, error) {
 }
 
 // SetShouldFail configures the mock to return an error on the next Send/Dial
-//
-//nolint:unused // These mocks are kept for future tests
 func (m *mockSMTP) SetShouldFail(shouldFail bool) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -276,8 +259,6 @@ func (m *mockSMTP) SetShouldFail(shouldFail bool) {
 }
 
 // GetLastEmail returns the details of the last email sent
-//
-//nolint:unused // These mocks are kept for future tests
 func (m *mockSMTP) GetLastEmail() (to, subject, body string) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -323,18 +304,14 @@ func (m *MockSMTPClient) SendWFCEmail(to, subject, body string) error {
 }
 
 // mockRateLimiter is een mock implementatie van de RateLimiterInterface
-//
-//nolint:unused // These mocks are kept for future tests
 type mockRateLimiter struct {
 	AllowFunc func(key string) bool
 }
 
-//nolint:unused // These mocks are kept for future tests
 func newMockRateLimiter() *mockRateLimiter {
 	return &mockRateLimiter{}
 }
 
-//nolint:unused // These mocks are kept for future tests
 func (m *mockRateLimiter) Allow(key string) bool {
 	if m.AllowFunc != nil {
 		return m.AllowFunc(key)
@@ -342,7 +319,6 @@ func (m *mockRateLimiter) Allow(key string) bool {
 	return true // Default allow
 }
 
-//nolint:unused // These mocks are kept for future tests
 func (m *mockRateLimiter) AllowEmail(emailType, recipient string) bool {
 	// Simple mock: always allow or use AllowFunc if specific logic needed
 	key := fmt.Sprintf("%s:%s", emailType, recipient)
@@ -379,8 +355,6 @@ func (m *mockRateLimiter) GetCurrentValues() map[string]int {
 }
 
 // mockPrometheusMetrics implementeert de PrometheusMetrics interface voor tests
-//
-//nolint:unused // These mocks are kept for future tests
 type mockPrometheusMetrics struct {
 	mock.Mock
 	mutex        sync.Mutex
@@ -389,7 +363,6 @@ type mockPrometheusMetrics struct {
 	emailsFailed map[string]int
 }
 
-//nolint:unused // These mocks are kept for future tests
 func newMockPrometheusMetrics() *mockPrometheusMetrics {
 	return &mockPrometheusMetrics{
 		latencies:    make(map[string]float64),
@@ -398,7 +371,6 @@ func newMockPrometheusMetrics() *mockPrometheusMetrics {
 	}
 }
 
-//nolint:unused // These mocks are kept for future tests
 func (m *mockPrometheusMetrics) RecordEmailSent(emailType, status string) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -409,7 +381,6 @@ func (m *mockPrometheusMetrics) RecordEmailSent(emailType, status string) {
 	m.Called(emailType, status)
 }
 
-//nolint:unused // These mocks are kept for future tests
 func (m *mockPrometheusMetrics) RecordEmailFailed(emailType, reason string) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -420,7 +391,6 @@ func (m *mockPrometheusMetrics) RecordEmailFailed(emailType, reason string) {
 	m.Called(emailType, reason)
 }
 
-//nolint:unused // These mocks are kept for future tests
 func (m *mockPrometheusMetrics) ObserveEmailLatency(emailType string, duration float64) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -432,13 +402,10 @@ func (m *mockPrometheusMetrics) ObserveEmailLatency(emailType string, duration f
 }
 
 // RecordRateLimitExceeded implements the PrometheusMetricsInterface
-//
-//nolint:unused
 func (m *mockPrometheusMetrics) RecordRateLimitExceeded(operationType, limitType string) {
 	m.Called(operationType, limitType)
 }
 
-//nolint:unused // These mocks are kept for future tests
 func (m *mockPrometheusMetrics) Reset() {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()

@@ -18,6 +18,7 @@ type ContactHandler struct {
 	contactAntwoordRepo repository.ContactAntwoordRepository
 	emailService        *services.EmailService
 	authService         services.AuthService
+	permissionService   services.PermissionService
 	notificationService services.NotificationService
 }
 
@@ -27,6 +28,7 @@ func NewContactHandler(
 	contactAntwoordRepo repository.ContactAntwoordRepository,
 	emailService *services.EmailService,
 	authService services.AuthService,
+	permissionService services.PermissionService,
 	notificationService services.NotificationService,
 ) *ContactHandler {
 	return &ContactHandler{
@@ -34,6 +36,7 @@ func NewContactHandler(
 		contactAntwoordRepo: contactAntwoordRepo,
 		emailService:        emailService,
 		authService:         authService,
+		permissionService:   permissionService,
 		notificationService: notificationService,
 	}
 }
@@ -43,7 +46,7 @@ func (h *ContactHandler) RegisterRoutes(app *fiber.App) {
 	// Groep voor contact beheer routes (vereist admin rechten)
 	contactGroup := app.Group("/api/contact")
 	contactGroup.Use(AuthMiddleware(h.authService))
-	contactGroup.Use(AdminMiddleware(h.authService))
+	contactGroup.Use(AdminPermissionMiddleware(h.permissionService))
 
 	// Contact beheer routes
 	contactGroup.Get("/", h.ListContactFormulieren)

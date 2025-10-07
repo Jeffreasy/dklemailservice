@@ -13,9 +13,10 @@ import (
 
 // AdminMailHandler handles requests related to sending emails by admins.
 type AdminMailHandler struct {
-	emailService services.EmailSender // Use the existing EmailSender interface
-	authService  services.AuthService // Use the existing AuthService interface
-	validate     *validator.Validate  // Keep validator instance
+	emailService      services.EmailSender       // Use the existing EmailSender interface
+	authService       services.AuthService       // Use the existing AuthService interface
+	permissionService services.PermissionService // New RBAC permission service
+	validate          *validator.Validate        // Keep validator instance
 }
 
 // SendMailRequest defines the expected JSON body for the send mail endpoint.
@@ -49,15 +50,16 @@ func ValidateSendMailRequest(sl validator.StructLevel) {
 }
 
 // NewAdminMailHandler creates a new AdminMailHandler instance.
-func NewAdminMailHandler(emailSvc services.EmailSender, authSvc services.AuthService) *AdminMailHandler {
+func NewAdminMailHandler(emailSvc services.EmailSender, authSvc services.AuthService, permissionSvc services.PermissionService) *AdminMailHandler {
 	v := validator.New()
 	// Register custom validation
 	v.RegisterStructValidation(ValidateSendMailRequest, SendMailRequest{})
 
 	return &AdminMailHandler{
-		emailService: emailSvc,
-		authService:  authSvc,
-		validate:     v,
+		emailService:      emailSvc,
+		authService:       authSvc,
+		permissionService: permissionSvc,
+		validate:          v,
 	}
 }
 
@@ -168,13 +170,13 @@ func (h *AdminMailHandler) HandleSendMail(c *fiber.Ctx) error {
 
 // RegisterRoutes registers the admin mail routes, protected by authentication and authorization middleware.
 func (h *AdminMailHandler) RegisterRoutes(app *fiber.App) {
-	// Create a group for admin mail actions, protected by AuthMiddleware and AdminMiddleware
-	adminMailGroup := app.Group("/api/admin/mail", AuthMiddleware(h.authService), AdminMiddleware(h.authService))
+	// Create a group for admin mail actions, protected by AuthMiddleware and PermissionMiddleware
+	adminMailGroup := app.Group("/api/admin/mail", AuthMiddleware(h.authService), AdminPermissionMiddleware(h.permissionService))
 
 	// Register the POST route for sending mail
 	adminMailGroup.Post("/send", h.HandleSendMail)
 
-	logger.Info("Admin mail routes registered under /api/admin/mail")
+	logger.Info("Admin mail routes registered under /api/admin/mail with RBAC permissions")
 }
 
 // FormatValidationErrors is a helper to make validation errors more readable (optional but nice).

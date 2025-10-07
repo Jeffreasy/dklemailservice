@@ -214,6 +214,10 @@ func main() {
 	// type terug te krijgen, zonder type assertion
 	rateLimiter := serviceFactory.GetRateLimiter()
 
+	// Stel rate limiter en Redis client in voor health checks
+	handlers.SetRateLimiter(rateLimiter)
+	handlers.SetRedisClient(serviceFactory.RedisClient)
+
 	// Initialiseer handlers
 	emailHandler := handlers.NewEmailHandler(
 		serviceFactory.EmailService,
@@ -236,6 +240,7 @@ func main() {
 		repoFactory.ContactAntwoord,
 		serviceFactory.EmailService,
 		serviceFactory.AuthService,
+		serviceFactory.PermissionService,
 		serviceFactory.NotificationService,
 	)
 
@@ -244,6 +249,7 @@ func main() {
 		repoFactory.AanmeldingAntwoord,
 		serviceFactory.EmailService,
 		serviceFactory.AuthService,
+		serviceFactory.PermissionService,
 	)
 
 	// Initialiseer newsletter handler
@@ -251,11 +257,12 @@ func main() {
 		repoFactory.Newsletter,
 		serviceFactory.NewsletterSender,
 		serviceFactory.AuthService,
+		serviceFactory.PermissionService,
 	)
 
 	// Configureer en initialiseer de mail fetcher service
 	mailFetcher := initializeMailFetcher(serviceFactory.EmailMetrics)
-	mailHandler := handlers.NewMailHandler(mailFetcher, repoFactory.IncomingEmail, serviceFactory.AuthService)
+	mailHandler := handlers.NewMailHandler(mailFetcher, repoFactory.IncomingEmail, serviceFactory.AuthService, serviceFactory.PermissionService)
 
 	// Maak een EmailAutoFetcher aan voor automatisch ophalen van emails
 	emailAutoFetcher := services.NewEmailAutoFetcher(mailFetcher, repoFactory.IncomingEmail)
@@ -538,20 +545,20 @@ func main() {
 	})
 
 	// Initialiseer de nieuwe admin mail handler
-	adminMailHandler := handlers.NewAdminMailHandler(serviceFactory.EmailService, serviceFactory.AuthService)
+	adminMailHandler := handlers.NewAdminMailHandler(serviceFactory.EmailService, serviceFactory.AuthService, serviceFactory.PermissionService)
 
 	// Registreer de admin mail routes
 	adminMailHandler.RegisterRoutes(app)
 
 	// Initialiseer chat handler
-	chatHandler := handlers.NewChatHandler(serviceFactory.ChatService, serviceFactory.AuthService, serviceFactory.Hub)
+	chatHandler := handlers.NewChatHandler(serviceFactory.ChatService, serviceFactory.AuthService, serviceFactory.PermissionService, serviceFactory.Hub)
 	chatHandler.RegisterRoutes(app)
 
 	// Set WebSocket channel callback
 	chatHandler.SetChannelHubCallback()
 
 	// Initialiseer user handler
-	userHandler := handlers.NewUserHandler(serviceFactory.AuthService)
+	userHandler := handlers.NewUserHandler(serviceFactory.AuthService, serviceFactory.PermissionService)
 	userHandler.RegisterRoutes(app)
 
 	// Start server

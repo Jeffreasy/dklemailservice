@@ -13,6 +13,7 @@ import (
 	"dklautomationgo/services"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/redis/go-redis/v9"
 	"gopkg.in/gomail.v2"
 )
 
@@ -63,6 +64,10 @@ type ComponentChecks struct {
 		Status bool             `json:"status"`
 		Limits map[string]Limit `json:"limits"`
 	} `json:"rate_limiter"`
+	Redis struct {
+		Status    bool   `json:"status"`
+		LastError string `json:"last_error,omitempty"`
+	} `json:"redis"`
 	Templates struct {
 		Status    bool              `json:"status"`
 		Available []string          `json:"available"`
@@ -83,11 +88,17 @@ var (
 	Version     = "1.1.0" // Deze zou uit buildinfo moeten komen
 	Environment = "development"
 	rateLimiter services.RateLimiterInterface // Wordt gezet via SetRateLimiter
+	redisClient interface{}                   // Wordt gezet via SetRedisClient
 )
 
 // SetRateLimiter stelt de rate limiter in voor health checks
 func SetRateLimiter(rl services.RateLimiterInterface) {
 	rateLimiter = rl
+}
+
+// SetRedisClient stelt de Redis client in voor health checks
+func SetRedisClient(client interface{}) {
+	redisClient = client
 }
 
 // HealthHandler biedt een uitgebreide health check endpoint
@@ -149,6 +160,11 @@ func checkComponents() ComponentChecks {
 	// Check rate limiter
 	checks.RateLimiter.Status = rateLimiter != nil
 	checks.RateLimiter.Limits = getRateLimits()
+
+	// Check Redis
+	redisStatus, redisError := checkRedisConnection()
+	checks.Redis.Status = redisStatus
+	checks.Redis.LastError = redisError
 
 	// Check templates
 	templateStatus, available, errors := checkTemplates()
@@ -242,8 +258,13 @@ func determineOverallStatus(checks ComponentChecks) ServiceStatus {
 		return StatusDegraded
 	}
 
-	// Als templates of rate limiter issues hebben, is de service degraded
+	// Als templates, rate limiter of Redis issues hebben, is de service degraded
 	if !checks.Templates.Status || !checks.RateLimiter.Status {
+		return StatusDegraded
+	}
+
+	// Redis is optioneel, dus alleen degraded als het geconfigureerd is maar niet werkt
+	if redisClient != nil && !checks.Redis.Status {
 		return StatusDegraded
 	}
 
@@ -277,6 +298,30 @@ func checkSMTPConnections() (defaultOK bool, registrationOK bool, lastError stri
 	}
 
 	return
+}
+
+// checkRedisConnection test de Redis verbinding
+func checkRedisConnection() (bool, string) {
+	if redisClient == nil {
+		return false, "Redis client not configured"
+	}
+
+	// Type assertion naar Redis client
+	client, ok := redisClient.(*redis.Client)
+	if !ok {
+		return false, "Invalid Redis client type"
+	}
+
+	// Test verbinding met PING
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	_, err := client.Ping(ctx).Result()
+	if err != nil {
+		return false, "Redis ping failed: " + err.Error()
+	}
+
+	return true, ""
 }
 
 // checkSMTPConnection test een enkele SMTP verbinding
