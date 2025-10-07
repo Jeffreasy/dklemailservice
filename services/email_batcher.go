@@ -13,6 +13,7 @@ type EmailBatch struct {
 	Subject      string
 	TemplateData map[string]interface{}
 	TemplateName string
+	FromAddress  string // Optional custom from address
 	BatchID      string
 	CreatedAt    time.Time
 }
@@ -48,10 +49,16 @@ func NewEmailBatcher(emailSvc *EmailService, batchSize int, batchWindow time.Dur
 
 // AddToBatch voegt een email toe aan een batch
 func (b *EmailBatcher) AddToBatch(batchKey, recipient, subject string,
-	templateName string, templateData map[string]interface{}) {
+	templateName string, templateData map[string]interface{}, fromAddress ...string) {
 
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
+
+	// Extract from address if provided
+	var fromAddr string
+	if len(fromAddress) > 0 {
+		fromAddr = fromAddress[0]
+	}
 
 	// Maak een nieuwe batch als deze niet bestaat
 	batch, exists := b.batchMap[batchKey]
@@ -62,10 +69,16 @@ func (b *EmailBatcher) AddToBatch(batchKey, recipient, subject string,
 			Subject:      subject,
 			TemplateData: templateData,
 			TemplateName: templateName,
+			FromAddress:  fromAddr,
 			BatchID:      "batch-" + time.Now().Format("20060102-150405"),
 			CreatedAt:    time.Now(),
 		}
 		b.batchMap[batchKey] = batch
+	} else {
+		// Update from address if batch already exists and fromAddress is provided
+		if fromAddr != "" && batch.FromAddress == "" {
+			batch.FromAddress = fromAddr
+		}
 	}
 
 	// Voeg ontvanger toe
@@ -123,7 +136,12 @@ func (b *EmailBatcher) processBatch(batchKey string, batch *EmailBatch) {
 
 	// Verwerk elke email sequentieel
 	for _, recipient := range batch.Recipients {
-		err := b.emailSvc.SendTemplateEmail(recipient, batch.Subject, batch.TemplateName, batch.TemplateData)
+		var err error
+		if batch.FromAddress != "" {
+			err = b.emailSvc.SendTemplateEmail(recipient, batch.Subject, batch.TemplateName, batch.TemplateData, batch.FromAddress)
+		} else {
+			err = b.emailSvc.SendTemplateEmail(recipient, batch.Subject, batch.TemplateName, batch.TemplateData)
+		}
 
 		if err != nil {
 			logger.Error("Fout bij verzenden batch email",
