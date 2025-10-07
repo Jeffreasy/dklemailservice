@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"dklautomationgo/models"
+	"time"
 )
 
 // ContactRepository definieert de interface voor contact formulier operaties
@@ -159,6 +160,9 @@ type GebruikerRepository interface {
 
 	// UpdateLastLogin werkt de laatste login tijd van een gebruiker bij
 	UpdateLastLogin(ctx context.Context, id string) error
+
+	// GetNewsletterSubscribers haalt actieve subscribers op
+	GetNewsletterSubscribers(ctx context.Context) ([]*models.Gebruiker, error)
 }
 
 // MigratieRepository definieert de interface voor migratie operaties
@@ -204,6 +208,30 @@ type IncomingEmailRepository interface {
 
 	// ListByAccountTypePaginated haalt een lijst van inkomende e-mails op basis van account type en paginatie
 	ListByAccountTypePaginated(ctx context.Context, accountType string, limit, offset int) ([]*models.IncomingEmail, int64, error)
+}
+
+// NewsletterRepository definieert de interface voor nieuwsbrief operaties
+type NewsletterRepository interface {
+	// Create slaat een nieuwe nieuwsbrief op
+	Create(ctx context.Context, nl *models.Newsletter) error
+
+	// GetByID haalt een nieuwsbrief op basis van ID
+	GetByID(ctx context.Context, id string) (*models.Newsletter, error)
+
+	// List haalt een lijst van nieuwsbrieven op
+	List(ctx context.Context, limit, offset int) ([]*models.Newsletter, error)
+
+	// Update werkt een bestaande nieuwsbrief bij
+	Update(ctx context.Context, nl *models.Newsletter) error
+
+	// Delete verwijdert een nieuwsbrief
+	Delete(ctx context.Context, id string) error
+
+	// UpdateBatchID werkt de batch ID bij na batching
+	UpdateBatchID(ctx context.Context, id, batchID string) error
+
+	// MarkSent markeert een nieuwsbrief als verzonden
+	MarkSent(ctx context.Context, id string, sentAt time.Time) error
 }
 
 // NotificationRepository definieert de interface voor notificaties

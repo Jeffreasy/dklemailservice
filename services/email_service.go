@@ -76,6 +76,7 @@ func NewEmailServiceWithTemplatesDir(smtpClient SMTPClient, metrics *EmailMetric
 		"aanmelding_email",
 		"wfc_order_confirmation",
 		"wfc_order_admin",
+		"newsletter",
 	}
 
 	for _, name := range templateFiles {

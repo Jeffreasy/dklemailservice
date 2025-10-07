@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wekelijkse Nieuwsbrief</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f7f7f7; margin: 0; padding: 0; }
+        .container { max-width: 700px; margin: 0 auto; padding: 20px; }
+        .card { background: #ffffff; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); overflow: hidden; }
+        .header { background: #004aad; color: #ffffff; padding: 16px 24px; }
+        .content { padding: 24px; }
+        .item { margin-bottom: 20px; }
+        .item h2 { margin: 0 0 8px 0; font-size: 18px; color: #222; }
+        .item p { margin: 0 0 8px 0; color: #333; }
+        .item a { color: #004aad; text-decoration: none; }
+        .footer { background: #f0f0f0; color: #666; padding: 16px 24px; font-size: 12px; }
+    </style>
+    <!-- Year: {{currentYear}} -->
+    <!-- Summary: {{.Summary}} -->
+  </head>
+  <body>
+    <div class="container">
+      <div class="card">
+        <div class="header">
+          <h1>Wekelijkse Nieuwsbrief</h1>
+        </div>
+        <div class="content">
+          <p>Hier is de samenvatting: {{.Summary}}</p>
+          {{range .Items}}
+          <div class="item">
+            <h2>{{.Title}}</h2>
+            <p>{{.Description}}</p>
+            <a href="{{.Link}}">Lees meer</a>
+          </div>
+          {{end}}
+        </div>
+        <div class="footer">
+            &copy; {{currentYear}} De Koninklijke Loop
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
+
+

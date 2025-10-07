@@ -95,6 +95,14 @@ func ValidateEnv() error {
 		logger.Info("Whisky for Charity SMTP configuratie niet gevonden, deze functionaliteit is uitgeschakeld")
 	}
 
+	// Newsletter configuratie (optioneel)
+	enableNewsletter := os.Getenv("ENABLE_NEWSLETTER") == "true"
+	if enableNewsletter {
+		if os.Getenv("NEWSLETTER_SOURCES") == "" {
+			logger.Warn("ENABLE_NEWSLETTER is true maar NEWSLETTER_SOURCES is leeg")
+		}
+	}
+
 	return nil
 }
 
@@ -197,6 +205,10 @@ func main() {
 
 	// Initialiseer service factory
 	serviceFactory := services.NewServiceFactory(repoFactory)
+	// Start Newsletter service indien geconfigureerd
+	if serviceFactory.NewsletterService != nil {
+		serviceFactory.NewsletterService.Start()
+	}
 
 	// Gebruik de GetRateLimiter methode in de ServiceFactory om direct het concrete
 	// type terug te krijgen, zonder type assertion
@@ -231,6 +243,13 @@ func main() {
 		repoFactory.Aanmelding,
 		repoFactory.AanmeldingAntwoord,
 		serviceFactory.EmailService,
+		serviceFactory.AuthService,
+	)
+
+	// Initialiseer newsletter handler
+	newsletterHandler := handlers.NewNewsletterHandler(
+		repoFactory.Newsletter,
+		serviceFactory.NewsletterSender,
 		serviceFactory.AuthService,
 	)
 
@@ -374,6 +393,9 @@ func main() {
 	// Registreer routes voor contact en aanmelding beheer
 	contactHandler.RegisterRoutes(app)
 	aanmeldingHandler.RegisterRoutes(app)
+
+	// Registreer routes voor newsletter beheer
+	newsletterHandler.RegisterRoutes(app)
 
 	// Registreer routes voor notificaties
 	notificationHandler.RegisterRoutes(app)
@@ -562,6 +584,11 @@ func main() {
 		logger.Info("Email auto fetcher stoppen...")
 		serviceFactory.EmailAutoFetcher.Stop()
 		logger.Info("Email auto fetcher gestopt")
+	}
+
+	// Stop de Newsletter service
+	if serviceFactory.NewsletterService != nil {
+		serviceFactory.NewsletterService.Stop()
 	}
 
 	// Sluit rate limiter af

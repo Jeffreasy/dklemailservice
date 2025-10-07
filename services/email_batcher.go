@@ -123,7 +123,7 @@ func (b *EmailBatcher) processBatch(batchKey string, batch *EmailBatch) {
 
 	// Verwerk elke email sequentieel
 	for _, recipient := range batch.Recipients {
-		err := b.emailSvc.SendEmail(recipient, batch.Subject, "Test Body")
+		err := b.emailSvc.SendTemplateEmail(recipient, batch.Subject, batch.TemplateName, batch.TemplateData)
 
 		if err != nil {
 			logger.Error("Fout bij verzenden batch email",

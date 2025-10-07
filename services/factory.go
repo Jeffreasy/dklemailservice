@@ -23,6 +23,8 @@ type ServiceFactory struct {
 	TelegramBotService  *TelegramBotService
 	ChatService         ChatService
 	Hub                 *Hub
+	NewsletterService   *NewsletterService
+	NewsletterSender    *NewsletterSender
 }
 
 // GetRateLimiter retourneert de RateLimiter als het concrete type
@@ -76,6 +78,16 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 	// Maak een EmailAutoFetcher aan
 	// Nog niet geinitialiseerd omdat MailFetcher buiten de ServiceFactory wordt aangemaakt in main.go
 
+	// Newsletter components
+	fetcher := NewNewsletterFetcher()
+	processor := NewNewsletterProcessor()
+	formatter := NewNewsletterFormatter(emailService)
+	sender := NewNewsletterSender(emailService, emailBatcher, repoFactory.Gebruiker, repoFactory.Newsletter, notificationService)
+	var newsletterSvc *NewsletterService
+	if getEnvWithDefault("ENABLE_NEWSLETTER", "false") == "true" {
+		newsletterSvc = NewNewsletterService(fetcher, processor, formatter, sender)
+	}
+
 	return &ServiceFactory{
 		EmailService:        emailService,
 		SMTPClient:          smtpClient,
@@ -88,6 +100,8 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 		TelegramBotService:  telegramBotService,
 		ChatService:         chatService,
 		Hub:                 hub,
+		NewsletterService:   newsletterSvc,
+		NewsletterSender:    sender,
 	}
 }
 

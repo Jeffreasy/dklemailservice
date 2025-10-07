@@ -113,3 +113,19 @@ func (r *PostgresGebruikerRepository) UpdateLastLogin(ctx context.Context, id st
 
 	return r.handleError("UpdateLastLogin", result.Error)
 }
+
+// GetNewsletterSubscribers haalt actieve subscribers op
+func (r *PostgresGebruikerRepository) GetNewsletterSubscribers(ctx context.Context) ([]*models.Gebruiker, error) {
+	ctx, cancel := r.withTimeout(ctx)
+	defer cancel()
+
+	var users []*models.Gebruiker
+	result := r.DB().WithContext(ctx).
+		Where("is_actief = ? AND newsletter_subscribed = ?", true, true).
+		Order("naam ASC").
+		Find(&users)
+	if err := r.handleError("GetNewsletterSubscribers", result.Error); err != nil {
+		return nil, err
+	}
+	return users, nil
+}

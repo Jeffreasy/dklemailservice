@@ -21,6 +21,7 @@ type Repository struct {
 	ChatMessage            ChatMessageRepository
 	ChatMessageReaction    ChatMessageReactionRepository
 	ChatUserPresence       ChatUserPresenceRepository
+	Newsletter             NewsletterRepository
 }
 
 // NewRepository maakt een nieuwe Repository met concrete implementaties
@@ -43,6 +44,7 @@ func NewRepository(db *gorm.DB) *Repository {
 		ChatMessage:            NewPostgresChatMessageRepository(baseRepo),
 		ChatMessageReaction:    NewPostgresChatMessageReactionRepository(baseRepo),
 		ChatUserPresence:       NewPostgresChatUserPresenceRepository(baseRepo),
+		Newsletter:             NewPostgresNewsletterRepository(baseRepo),
 	}
 
 	return repo

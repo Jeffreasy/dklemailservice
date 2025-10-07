@@ -631,3 +631,18 @@ func (r *MockGebruikerRepository) UpdateLastLogin(ctx context.Context, id string
 	r.db.gebruikers[id] = gebruiker
 	return nil
 }
+
+// GetNewsletterSubscribers haalt actieve subscribers op
+func (r *MockGebruikerRepository) GetNewsletterSubscribers(ctx context.Context) ([]*models.Gebruiker, error) {
+	r.db.mu.RLock()
+	defer r.db.mu.RUnlock()
+
+	var result []*models.Gebruiker
+	for _, gebruiker := range r.db.gebruikers {
+		if gebruiker.IsActief && gebruiker.NewsletterSubscribed {
+			result = append(result, gebruiker)
+		}
+	}
+
+	return result, nil
+}
