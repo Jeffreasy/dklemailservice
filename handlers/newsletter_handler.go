@@ -239,20 +239,27 @@ func (h *NewsletterHandler) DeleteNewsletter(c *fiber.Ctx) error {
 
 // SendNewsletter verzendt een nieuwsbrief naar subscribers
 func (h *NewsletterHandler) SendNewsletter(c *fiber.Ctx) error {
+	logger.Info("SendNewsletter handler called", "path", c.Path(), "method", c.Method())
+
 	id := c.Params("id")
 	if id == "" {
+		logger.Warn("SendNewsletter: ID is verplicht")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "ID is verplicht",
 		})
 	}
 
+	logger.Info("SendNewsletter: Starting send for newsletter", "id", id)
+
 	ctx := c.Context()
 	if err := h.newsletterSvc.SendManual(ctx, id); err != nil {
-		logger.Error("Fout bij verzenden nieuwsbrief", "error", err, "id", id)
+		logger.Error("SendNewsletter: Fout bij verzenden nieuwsbrief", "error", err, "id", id)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon nieuwsbrief niet verzenden",
 		})
 	}
+
+	logger.Info("SendNewsletter: Successfully initiated newsletter send", "id", id)
 
 	return c.JSON(fiber.Map{
 		"success": true,

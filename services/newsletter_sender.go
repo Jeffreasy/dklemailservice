@@ -65,14 +65,20 @@ func (s *NewsletterSender) Send(ctx context.Context, content, subject string) er
 }
 
 func (s *NewsletterSender) SendManual(ctx context.Context, newsletterID string) error {
+	logger.Info("SendManual: Getting newsletter", "newsletter_id", newsletterID)
+
 	// Get the newsletter
 	nl, err := s.nlRepo.GetByID(ctx, newsletterID)
 	if err != nil {
+		logger.Error("SendManual: Error getting newsletter", "error", err, "newsletter_id", newsletterID)
 		return err
 	}
 	if nl == nil {
+		logger.Warn("SendManual: Newsletter not found", "newsletter_id", newsletterID)
 		return fmt.Errorf("newsletter not found: %s", newsletterID)
 	}
+
+	logger.Info("SendManual: Newsletter found", "newsletter_id", newsletterID, "subject", nl.Subject)
 
 	// Check if already sent
 	if nl.SentAt != nil {
@@ -80,14 +86,18 @@ func (s *NewsletterSender) SendManual(ctx context.Context, newsletterID string) 
 	}
 
 	// Get subscribers
+	logger.Info("SendManual: Getting newsletter subscribers")
 	subs, err := s.gebruikerRepo.GetNewsletterSubscribers(ctx)
 	if err != nil {
+		logger.Error("SendManual: Error getting subscribers", "error", err)
 		return err
 	}
 	if len(subs) == 0 {
-		logger.Info("Geen subscribers voor nieuwsbrief")
+		logger.Info("SendManual: Geen subscribers voor nieuwsbrief")
 		return nil
 	}
+
+	logger.Info("SendManual: Found subscribers", "count", len(subs))
 
 	// Update batch ID
 	batchKey := "newsletter_manual_" + newsletterID
@@ -102,6 +112,8 @@ func (s *NewsletterSender) SendManual(ctx context.Context, newsletterID string) 
 
 	// Queue in batcher with specific from address
 	newsletterFromAddress := "nieuwsbrief@dekoninklijkeloop.nl"
+	logger.Info("SendManual: Queueing emails in batcher", "batch_key", batchKey, "from_address", newsletterFromAddress)
+
 	for _, sub := range subs {
 		s.batcher.AddToBatch(batchKey, sub.Email, nl.Subject, "newsletter", data, newsletterFromAddress)
 	}
