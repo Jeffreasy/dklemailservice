@@ -11,15 +11,17 @@ import (
 
 // AuthHandler bevat handlers voor authenticatie
 type AuthHandler struct {
-	authService services.AuthService
-	rateLimiter services.RateLimiterService
+	authService       services.AuthService
+	permissionService services.PermissionService
+	rateLimiter       services.RateLimiterService
 }
 
 // NewAuthHandler maakt een nieuwe AuthHandler
-func NewAuthHandler(authService services.AuthService, rateLimiter services.RateLimiterService) *AuthHandler {
+func NewAuthHandler(authService services.AuthService, permissionService services.PermissionService, rateLimiter services.RateLimiterService) *AuthHandler {
 	return &AuthHandler{
-		authService: authService,
-		rateLimiter: rateLimiter,
+		authService:       authService,
+		permissionService: permissionService,
+		rateLimiter:       rateLimiter,
 	}
 }
 
@@ -166,30 +168,75 @@ func (h *AuthHandler) HandleResetPassword(c *fiber.Ctx) error {
 
 // HandleGetProfile handelt verzoeken af om het gebruikersprofiel op te halen
 func (h *AuthHandler) HandleGetProfile(c *fiber.Ctx) error {
-	// Haal token op uit context
-	token, ok := c.Locals("token").(string)
-	if !ok || token == "" {
-		logger.Warn("Geen token gevonden in context")
+	// Haal user ID op uit context (gezet door AuthMiddleware)
+	userID, ok := c.Locals("userID").(string)
+	if !ok || userID == "" {
+		logger.Warn("Geen user ID gevonden in context")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Niet geautoriseerd",
 		})
 	}
 
-	// Haal gebruiker op uit token
-	gebruiker, err := h.authService.GetUserFromToken(c.Context(), token)
+	// Haal gebruiker op
+	gebruiker, err := h.authService.GetUser(c.Context(), userID)
 	if err != nil {
-		logger.Error("Fout bij ophalen gebruiker uit token", "error", err)
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Niet geautoriseerd",
+		logger.Error("Fout bij ophalen gebruiker", "user_id", userID, "error", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon gebruiker niet ophalen",
 		})
 	}
 
-	// Stuur gebruikersprofiel terug
+	if gebruiker == nil {
+		logger.Warn("Gebruiker niet gevonden", "user_id", userID)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Gebruiker niet gevonden",
+		})
+	}
+
+	// Haal permissies op via RBAC systeem
+	permissions, err := h.permissionService.GetUserPermissions(c.Context(), userID)
+	if err != nil {
+		logger.Error("Fout bij ophalen permissies", "user_id", userID, "error", err)
+		// Fallback naar lege array als permissies niet opgehaald kunnen worden
+		permissions = []*models.UserPermission{}
+	}
+
+	// Converteer permissies naar frontend format
+	permissionList := make([]map[string]string, len(permissions))
+	for i, perm := range permissions {
+		permissionList[i] = map[string]string{
+			"resource": perm.Resource,
+			"action":   perm.Action,
+		}
+	}
+
+	// Haal rollen op
+	userRoles, err := h.permissionService.GetUserRoles(c.Context(), userID)
+	if err != nil {
+		logger.Error("Fout bij ophalen rollen", "user_id", userID, "error", err)
+		userRoles = []*models.UserRole{}
+	}
+
+	// Converteer rollen naar frontend format
+	roleList := make([]map[string]interface{}, len(userRoles))
+	for i, userRole := range userRoles {
+		roleList[i] = map[string]interface{}{
+			"id":          userRole.Role.ID,
+			"name":        userRole.Role.Name,
+			"description": userRole.Role.Description,
+			"assigned_at": userRole.AssignedAt,
+			"is_active":   userRole.IsActive,
+		}
+	}
+
+	// Stuur gebruikersprofiel terug met permissies en rollen
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"id":            gebruiker.ID,
 		"naam":          gebruiker.Naam,
 		"email":         gebruiker.Email,
-		"rol":           gebruiker.Rol,
+		"rol":           gebruiker.Rol, // Legacy field voor backward compatibility
+		"permissions":   permissionList,
+		"roles":         roleList,
 		"is_actief":     gebruiker.IsActief,
 		"laatste_login": gebruiker.LaatsteLogin,
 		"created_at":    gebruiker.CreatedAt,

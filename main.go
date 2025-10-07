@@ -224,7 +224,7 @@ func main() {
 		serviceFactory.NotificationService,
 		repoFactory.Aanmelding,
 	)
-	authHandler := handlers.NewAuthHandler(serviceFactory.AuthService, rateLimiter)
+	authHandler := handlers.NewAuthHandler(serviceFactory.AuthService, serviceFactory.PermissionService, rateLimiter)
 	metricsHandler := handlers.NewMetricsHandler(serviceFactory.EmailMetrics, rateLimiter)
 
 	// Initialiseer NotificationHandler
