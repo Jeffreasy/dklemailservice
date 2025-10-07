@@ -90,6 +90,31 @@ func (s *PermissionServiceImpl) HasPermission(ctx context.Context, userID, resou
 
 	hasPermission := s.checkPermissionInList(permissions, resource, action)
 
+	// Debug logging voor alle permissie checks
+	logger.Info("Permission check result",
+		"user_id", userID,
+		"resource", resource,
+		"action", action,
+		"has_permission", hasPermission,
+		"permissions_count", len(permissions))
+
+	// Gedetailleerde logging voor admin user of bij permission denied
+	if userID == "7157f3f6-da85-4058-9d38-19133ec93b03" || !hasPermission {
+		logger.Info("Detailed permission analysis",
+			"user_id", userID,
+			"resource", resource,
+			"action", action,
+			"permissions_found", len(permissions))
+
+		for _, perm := range permissions {
+			logger.Info("User permission",
+				"user_id", userID,
+				"resource", perm.Resource,
+				"action", perm.Action,
+				"role_name", perm.RoleName)
+		}
+	}
+
 	// Cache het resultaat
 	if s.cacheEnabled {
 		s.cachePermission(userID, resource, action, hasPermission)
