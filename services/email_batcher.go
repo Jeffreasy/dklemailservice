@@ -156,6 +156,19 @@ func (b *EmailBatcher) processBatch(batchKey string, batch *EmailBatch) {
 	b.updateBatchCount()
 }
 
+// FlushBatch forces immediate sending of a specific batch
+func (b *EmailBatcher) FlushBatch(batchKey string) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	if batch, exists := b.batchMap[batchKey]; exists && len(batch.Recipients) > 0 {
+		logger.Info("Force flushing batch", "batch_key", batchKey, "recipients", len(batch.Recipients))
+		go b.processBatch(batchKey, batch)
+		delete(b.batchMap, batchKey)
+		b.updateBatchCount()
+	}
+}
+
 // Shutdown stopt de batcher en verwerkt eventueel resterende batches
 func (b *EmailBatcher) Shutdown() {
 	b.ticker.Stop()

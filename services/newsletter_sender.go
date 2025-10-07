@@ -48,9 +48,11 @@ func (s *NewsletterSender) Send(ctx context.Context, content, subject string) er
 		s.batcher.AddToBatch(batchKey, sub.Email, subject, "newsletter", data, newsletterFromAddress)
 	}
 
-	// Force flush if small batch
+	// Force immediate sending for small newsletter batches
 	if len(subs) < s.batcher.batchSize {
-		time.Sleep(s.batcher.batchWindow)
+		logger.Info("SendManual: Small batch detected, forcing immediate send", "subscriber_count", len(subs), "batch_size", s.batcher.batchSize)
+		// Force immediate flush of this specific batch
+		s.batcher.FlushBatch(batchKey)
 	}
 
 	// Mark newsletter as sent
@@ -118,9 +120,11 @@ func (s *NewsletterSender) SendManual(ctx context.Context, newsletterID string) 
 		s.batcher.AddToBatch(batchKey, sub.Email, nl.Subject, "newsletter", data, newsletterFromAddress)
 	}
 
-	// Force flush if small batch
+	// Force immediate sending for small newsletter batches
 	if len(subs) < s.batcher.batchSize {
-		time.Sleep(s.batcher.batchWindow)
+		logger.Info("Send: Small batch detected, forcing immediate send", "subscriber_count", len(subs), "batch_size", s.batcher.batchSize)
+		// Force immediate flush of this specific batch
+		s.batcher.FlushBatch(batchKey)
 	}
 
 	// Mark newsletter as sent
