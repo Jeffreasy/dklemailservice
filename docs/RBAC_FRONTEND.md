@@ -235,6 +235,10 @@ const login = async (email, password) => {
   if (response.ok) {
     // Sla token op
     localStorage.setItem('jwtToken', data.token);
+    // Sla refresh token op indien beschikbaar
+    if (data.refresh_token) {
+      localStorage.setItem('refreshToken', data.refresh_token);
+    }
     // Haal gebruikersinfo op inclusief permissies
     await loadUserProfile();
   }
@@ -253,13 +257,381 @@ const loadUserProfile = async () => {
 
   if (response.ok) {
     const user = await response.json();
-    // user bevat nu ook permissions array
+    // user object bevat:
+    // {
+    //   id: "user-uuid",
+    //   email: "user@example.com",
+    //   naam: "Gebruikersnaam",
+    //   permissions: [
+    //     { resource: "contact", action: "read" },
+    //     { resource: "contact", action: "write" },
+    //     { resource: "user", action: "read" },
+    //     // ... meer permissies
+    //   ],
+    //   roles: [
+    //     { id: "role-uuid", name: "admin", description: "..." }
+    //   ]
+    // }
     setUser(user);
     return user;
   }
 
   throw new Error('Failed to load profile');
 };
+```
+
+### Login Systeem Integratie met RBAC
+
+#### Complete Login Flow
+
+```javascript
+// AuthContext.js
+import React, { createContext, useContext, useState, useEffect } from 'react';
+
+const AuthContext = createContext();
+
+export const useAuth = () => useContext(AuthContext);
+
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Controleer bij app start of gebruiker ingelogd is
+  useEffect(() => {
+    const token = localStorage.getItem('jwtToken');
+    if (token) {
+      // Controleer token geldigheid en laad user data
+      loadUserProfile().catch(() => {
+        // Token ongeldig, logout
+        logout();
+      });
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  const login = async (email, password) => {
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Sla tokens op
+        localStorage.setItem('jwtToken', data.token);
+        if (data.refresh_token) {
+          localStorage.setItem('refreshToken', data.refresh_token);
+        }
+
+        // Laad user profile met permissies
+        await loadUserProfile();
+        return { success: true };
+      } else {
+        return { success: false, error: data.error };
+      }
+    } catch (error) {
+      return { success: false, error: 'Netwerk fout' };
+    }
+  };
+
+  const loadUserProfile = async () => {
+    const token = localStorage.getItem('jwtToken');
+    const response = await fetch('/api/auth/profile', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (response.ok) {
+      const userData = await response.json();
+      setUser(userData);
+      setLoading(false);
+      return userData;
+    } else if (response.status === 401) {
+      // Token verlopen, probeer refresh
+      await refreshToken();
+    } else {
+      throw new Error('Failed to load profile');
+    }
+  };
+
+  const refreshToken = async () => {
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (!refreshToken) {
+      logout();
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/auth/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        localStorage.setItem('jwtToken', data.token);
+        await loadUserProfile();
+      } else {
+        logout();
+      }
+    } catch {
+      logout();
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('jwtToken');
+    localStorage.removeItem('refreshToken');
+    setUser(null);
+    setLoading(false);
+  };
+
+  const isAuthenticated = () => {
+    return user !== null && localStorage.getItem('jwtToken');
+  };
+
+  return (
+    <AuthContext.Provider value={{
+      user,
+      login,
+      logout,
+      isAuthenticated,
+      loading
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+```
+
+#### Login Component met RBAC
+
+```javascript
+// Login.js
+import React, { useState } from 'react';
+import { useAuth } from './AuthContext';
+import { useNavigate } from 'react-router-dom';
+
+const Login = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    const result = await login(email, password);
+
+    if (result.success) {
+      // Redirect naar dashboard of home
+      navigate('/dashboard');
+    } else {
+      setError(result.error);
+    }
+
+    setLoading(false);
+  };
+
+  return (
+    <div className="login-form">
+      <h2>Inloggen</h2>
+      <form onSubmit={handleSubmit}>
+        <div>
+          <label>Email:</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </div>
+        <div>
+          <label>Wachtwoord:</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </div>
+        {error && <div className="error">{error}</div>}
+        <button type="submit" disabled={loading}>
+          {loading ? 'Bezig met inloggen...' : 'Inloggen'}
+        </button>
+      </form>
+    </div>
+  );
+};
+
+export default Login;
+```
+
+#### Permission-Based Navigation
+
+```javascript
+// App.js
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './AuthContext';
+import { usePermissions } from './usePermissions';
+import Login from './Login';
+import Dashboard from './Dashboard';
+import AdminPanel from './AdminPanel';
+import ContactManager from './ContactManager';
+import UserManager from './UserManager';
+
+const ProtectedRoute = ({ children, requiredPermission }) => {
+  const { isAuthenticated, loading } = useAuth();
+  const { hasPermission } = usePermissions();
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!isAuthenticated()) {
+    return <Navigate to="/login" />;
+  }
+
+  if (requiredPermission && !hasPermission(...requiredPermission.split(':'))) {
+    return <Navigate to="/access-denied" />;
+  }
+
+  return children;
+};
+
+const AppRoutes = () => {
+  const { isAuthenticated } = useAuth();
+
+  return (
+    <Routes>
+      <Route path="/login" element={
+        isAuthenticated() ? <Navigate to="/dashboard" /> : <Login />
+      } />
+
+      <Route path="/dashboard" element={
+        <ProtectedRoute>
+          <Dashboard />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/contacts" element={
+        <ProtectedRoute requiredPermission="contact:read">
+          <ContactManager />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/users" element={
+        <ProtectedRoute requiredPermission="user:read">
+          <UserManager />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin" element={
+        <ProtectedRoute requiredPermission="admin:access">
+          <AdminPanel />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/" element={<Navigate to="/dashboard" />} />
+    </Routes>
+  );
+};
+
+const App = () => {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </AuthProvider>
+  );
+};
+
+export default App;
+```
+
+#### Dashboard met Permission-Based UI
+
+```javascript
+// Dashboard.js
+import React from 'react';
+import { useAuth } from './AuthContext';
+import { usePermissions } from './usePermissions';
+
+const Dashboard = () => {
+  const { user, logout } = useAuth();
+  const { hasPermission, hasAnyPermission } = usePermissions();
+
+  return (
+    <div className="dashboard">
+      <header>
+        <h1>Welkom, {user.naam}!</h1>
+        <button onClick={logout}>Uitloggen</button>
+      </header>
+
+      <div className="dashboard-grid">
+        {/* Contact sectie - alleen zichtbaar als gebruiker contact permissies heeft */}
+        {hasPermission('contact', 'read') && (
+          <div className="card">
+            <h3>Contacten</h3>
+            <p>Beheer contactformulieren</p>
+            <a href="/contacts">Bekijken</a>
+            {hasPermission('contact', 'write') && (
+              <span className="badge">Bewerk rechten</span>
+            )}
+          </div>
+        )}
+
+        {/* Gebruikers sectie - alleen voor staff/admin */}
+        {hasPermission('user', 'read') && (
+          <div className="card">
+            <h3>Gebruikers</h3>
+            <p>Beheer gebruikersaccounts</p>
+            <a href="/users">Beheren</a>
+          </div>
+        )}
+
+        {/* Admin sectie - alleen voor admin */}
+        {hasPermission('admin', 'access') && (
+          <div className="card admin-card">
+            <h3>Admin Panel</h3>
+            <p>Systeembeheer</p>
+            <a href="/admin">Toegang</a>
+          </div>
+        )}
+
+        {/* Nieuwsbrief sectie */}
+        {hasAnyPermission('newsletter:read', 'newsletter:write') && (
+          <div className="card">
+            <h3>Nieuwsbrieven</h3>
+            <p>Beheer nieuwsbrief verzending</p>
+            <a href="/newsletters">Beheren</a>
+          </div>
+        )}
+      </div>
+
+      {/* Debug info voor development */}
+      {process.env.NODE_ENV === 'development' && (
+        <details className="debug-info">
+          <summary>Debug Info</summary>
+          <pre>{JSON.stringify(user, null, 2)}</pre>
+        </details>
+      )}
+    </div>
+  );
+};
+
+export default Dashboard;
 ```
 
 ### Beveiligde Endpoints met Permissie Controle
