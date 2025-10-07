@@ -21,11 +21,11 @@ func NewUserHandler(authService services.AuthService, permissionService services
 }
 
 func (h *UserHandler) RegisterRoutes(app *fiber.App) {
-	app.Get("/api/users", AuthMiddleware(h.authService), StaffPermissionMiddleware(h.permissionService), h.ListUsers)
-	app.Get("/api/users/:id", AuthMiddleware(h.authService), StaffPermissionMiddleware(h.permissionService), h.GetUser)
-	app.Post("/api/users", AuthMiddleware(h.authService), AdminPermissionMiddleware(h.permissionService), h.CreateUser)
-	app.Put("/api/users/:id", AuthMiddleware(h.authService), AdminPermissionMiddleware(h.permissionService), h.UpdateUser)
-	app.Delete("/api/users/:id", AuthMiddleware(h.authService), AdminPermissionMiddleware(h.permissionService), h.DeleteUser)
+	app.Get("/api/users", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "read"), h.ListUsers)
+	app.Get("/api/users/:id", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "read"), h.GetUser)
+	app.Post("/api/users", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "write"), h.CreateUser)
+	app.Put("/api/users/:id", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "write"), h.UpdateUser)
+	app.Delete("/api/users/:id", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "delete"), h.DeleteUser)
 }
 
 func (h *UserHandler) ListUsers(c *fiber.Ctx) error {

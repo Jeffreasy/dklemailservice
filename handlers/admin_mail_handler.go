@@ -171,7 +171,7 @@ func (h *AdminMailHandler) HandleSendMail(c *fiber.Ctx) error {
 // RegisterRoutes registers the admin mail routes, protected by authentication and authorization middleware.
 func (h *AdminMailHandler) RegisterRoutes(app *fiber.App) {
 	// Create a group for admin mail actions, protected by AuthMiddleware and PermissionMiddleware
-	adminMailGroup := app.Group("/api/admin/mail", AuthMiddleware(h.authService), AdminPermissionMiddleware(h.permissionService))
+	adminMailGroup := app.Group("/api/admin/mail", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "admin_email", "send"))
 
 	// Register the POST route for sending mail
 	adminMailGroup.Post("/send", h.HandleSendMail)

@@ -43,18 +43,24 @@ func NewContactHandler(
 
 // RegisterRoutes registreert de routes voor contact beheer
 func (h *ContactHandler) RegisterRoutes(app *fiber.App) {
-	// Groep voor contact beheer routes (vereist admin rechten)
+	// Groep voor contact beheer routes
 	contactGroup := app.Group("/api/contact")
 	contactGroup.Use(AuthMiddleware(h.authService))
-	contactGroup.Use(AdminPermissionMiddleware(h.permissionService))
 
-	// Contact beheer routes
-	contactGroup.Get("/", h.ListContactFormulieren)
-	contactGroup.Get("/:id", h.GetContactFormulier)
-	contactGroup.Put("/:id", h.UpdateContactFormulier)
-	contactGroup.Delete("/:id", h.DeleteContactFormulier)
-	contactGroup.Post("/:id/antwoord", h.AddContactAntwoord)
-	contactGroup.Get("/status/:status", h.GetContactFormulierenByStatus)
+	// Read-only routes (require contact read)
+	readGroup := contactGroup.Group("", PermissionMiddleware(h.permissionService, "contact", "read"))
+	readGroup.Get("/", h.ListContactFormulieren)
+	readGroup.Get("/:id", h.GetContactFormulier)
+	readGroup.Get("/status/:status", h.GetContactFormulierenByStatus)
+
+	// Write routes (require contact write)
+	writeGroup := contactGroup.Group("", PermissionMiddleware(h.permissionService, "contact", "write"))
+	writeGroup.Put("/:id", h.UpdateContactFormulier)
+	writeGroup.Post("/:id/antwoord", h.AddContactAntwoord)
+
+	// Delete routes (require contact delete)
+	deleteGroup := contactGroup.Group("", PermissionMiddleware(h.permissionService, "contact", "delete"))
+	deleteGroup.Delete("/:id", h.DeleteContactFormulier)
 }
 
 // ListContactFormulieren haalt een lijst van contactformulieren op
