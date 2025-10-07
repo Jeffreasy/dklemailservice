@@ -15,7 +15,7 @@ type RBACRole struct {
 	CreatedBy    *string   `gorm:"type:uuid" json:"created_by,omitempty"`
 
 	// Relations
-	Permissions []Permission `gorm:"many2many:role_permissions;" json:"permissions,omitempty"`
+	Permissions []Permission `gorm:"many2many:role_permissions;foreignKey:id;references:id;joinForeignKey:role_id;joinReferences:permission_id" json:"permissions,omitempty"`
 	Users       []Gebruiker  `gorm:"many2many:user_roles;" json:"users,omitempty"`
 }
 
