@@ -30,6 +30,38 @@ Een robuuste en schaalbare email service voor De Koninklijke Loop, geschreven in
   - Status tracking van contactformulieren en aanmeldingen
   - Notities toevoegen voor interne communicatie
 
+- **Chat Systeem** (Geïmplementeerd)
+  - Real-time messaging met WebSocket ondersteuning
+  - Publieke, private en directe chat kanalen
+  - Channel beheer met rollen (owner, admin, member)
+  - Bericht reacties en bewerkingen
+  - Gebruikers aanwezigheid en online status
+  - Typing indicators en read receipts
+  - Channel deelnemers beheer
+
+- **Role-Based Access Control (RBAC)** (Geïmplementeerd)
+  - Granulaire permissie systeem gebaseerd op rollen
+  - Redis-gebaseerde caching voor optimale performance
+  - Dynamische rol- en permissie toewijzing
+  - Resource-based toegang controle (contact, aanmelding, newsletter, etc.)
+  - Permission inheritance via rol hiërarchie
+  - Audit logging van permissie wijzigingen
+
+- **Nieuwsbrief Beheer** (Geïmplementeerd)
+  - Automatische nieuwsbrief generatie van RSS feeds
+  - HTML template ondersteuning voor professionele layouts
+  - Batch verzending met rate limiting
+  - Subscriber beheer met opt-in/opt-out functionaliteit
+  - Verzendgeschiedenis en statistieken
+  - Meerdere nieuwsbronnen ondersteuning
+
+- **Gebruikersbeheer** (Geïmplementeerd)
+  - Uitgebreide gebruikersprofielen
+  - Rol en permissie beheer
+  - Wachtwoord reset en account recovery
+  - Gebruikersactiviteit monitoring
+  - Bulk operaties voor gebruikersbeheer
+
 - **Beveiliging & Stabiliteit**
   - Rate limiting per IP en globaal voor spam preventie
   - CORS beveiliging met configureerbare origins
@@ -69,6 +101,10 @@ Een robuuste en schaalbare email service voor De Koninklijke Loop, geschreven in
   - Gebruiker met CREATE/ALTER/INSERT/UPDATE/DELETE rechten
   - Voldoende opslagruimte voor verwacht datavolume
 - (Optioneel) SQLite voor lokale ontwikkeling en tests (vereist CGO)
+- (Optioneel) Redis voor caching en real-time features
+  - Redis 6.x of hoger
+  - Vereist voor RBAC permissie caching en chat presence
+  - Verbeterd performance voor rate limiting
 - (Optioneel) ELK stack voor logging
   - Elasticsearch 7.x of hoger
   - Logstash voor log processing
@@ -158,6 +194,13 @@ EMAIL_BATCH_SIZE=50
 EMAIL_BATCH_INTERVAL=15m
 TEMPLATE_RELOAD_INTERVAL=1h
 MAX_CONCURRENT_SENDS=10
+
+# Redis Configuratie (Vereist voor RBAC en Chat features)
+REDIS_ENABLED=true
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=your_redis_password
+REDIS_DB=0
 
 # Automatische Email Ophaling
 EMAIL_FETCH_INTERVAL=15
@@ -286,6 +329,41 @@ go test ./tests/... -v
 - `GET /api/mail/unprocessed` - Lijst van onverwerkte emails ophalen
 - `GET /api/mail/account/:type` - Emails filteren op account type (info, inschrijving)
 
+#### Chat Systeem (Geïmplementeerd)
+- `GET /api/chat/channels` - Lijst van gebruikers kanalen ophalen
+- `GET /api/chat/channels/:id/participants` - Deelnemers van een kanaal ophalen
+- `GET /api/chat/public-channels` - Publieke kanalen ophalen
+- `POST /api/chat/direct` - Direct kanaal aanmaken tussen gebruikers
+- `POST /api/chat/channels` - Nieuw kanaal aanmaken
+- `POST /api/chat/channels/:id/join` - Deelnemen aan kanaal
+- `POST /api/chat/channels/:id/leave` - Kanaal verlaten
+- `GET /api/chat/channels/:channel_id/messages` - Berichten van kanaal ophalen
+- `POST /api/chat/channels/:channel_id/messages` - Bericht verzenden
+- `PUT /api/chat/messages/:id` - Bericht bewerken
+- `DELETE /api/chat/messages/:id` - Bericht verwijderen
+- `POST /api/chat/messages/:id/reactions` - Reactie toevoegen aan bericht
+- `DELETE /api/chat/messages/:id/reactions/:emoji` - Reactie verwijderen
+- `PUT /api/chat/presence` - Aanwezigheid status bijwerken
+- `GET /api/chat/online-users` - Online gebruikers ophalen
+- `GET /api/chat/users` - Gebruikers lijst voor direct chat
+- `GET /api/chat/ws/:channel_id` - WebSocket verbinding voor real-time chat
+
+#### Nieuwsbrief Beheer (Geïmplementeerd)
+- `GET /api/newsletter` - Lijst van nieuwsbrieven ophalen
+- `POST /api/newsletter` - Nieuwe nieuwsbrief aanmaken
+- `GET /api/newsletter/:id` - Specifieke nieuwsbrief ophalen
+- `PUT /api/newsletter/:id` - Nieuwsbrief bijwerken
+- `DELETE /api/newsletter/:id` - Nieuwsbrief verwijderen
+- `POST /api/newsletter/:id/send` - Nieuwsbrief verzenden
+
+#### Gebruikersbeheer (Geïmplementeerd)
+- `GET /api/users` - Lijst van gebruikers ophalen
+- `GET /api/users/:id` - Gebruikersdetails ophalen
+- `PUT /api/users/:id` - Gebruiker bijwerken
+- `DELETE /api/users/:id` - Gebruiker verwijderen
+- `POST /api/users/:id/roles` - Rol toewijzen aan gebruiker
+- `DELETE /api/users/:id/roles/:role_id` - Rol verwijderen van gebruiker
+
 ### Docker
 
 Build de Docker image:
@@ -316,11 +394,25 @@ services:
       - "8080:8080"
     env_file: .env
     restart: always
+    depends_on:
+      - redis
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass your_redis_password
+    volumes:
+      - redis_data:/data
+    restart: always
+
+volumes:
+  redis_data:
 ```
 
 ## 📊 Monitoring
@@ -539,6 +631,10 @@ De service volgt een modulaire architectuur met de volgende componenten:
   - `contact_handler.go` - Contact formulier beheer endpoints
   - `aanmelding_handler.go` - Aanmelding beheer endpoints
   - `auth_handler.go` - Authenticatie endpoints
+  - `chat_handler.go` - Chat systeem endpoints met WebSocket ondersteuning
+  - `newsletter_handler.go` - Nieuwsbrief beheer endpoints
+  - `user_handler.go` - Gebruikersbeheer endpoints
+  - `mail_handler.go` - Inkomende email beheer endpoints
 
 - `services/` - Business logic
   - `email_service.go` - Email verzending logica
@@ -549,11 +645,26 @@ De service volgt een modulaire architectuur met de volgende componenten:
   - `prometheus_metrics.go` - Prometheus integratie
   - `email_auto_fetcher.go` - Automatische email ophaling
   - `mail_fetcher.go` - IMAP communicatie voor inkomende emails
+  - `chat_service.go` - Chat kanaal en bericht beheer
+  - `websocket_hub.go` - WebSocket hub voor real-time messaging
+  - `auth_service.go` - Gebruikersauthenticatie en autorisatie
+  - `permission_service.go` - RBAC permissie controle
+  - `newsletter_service.go` - Nieuwsbrief generatie en verzending
+  - `newsletter_sender.go` - Batch nieuwsbrief verzending
+  - `telegram_bot_service.go` - Telegram bot integratie
 
 - `models/` - Data structuren
   - `email.go` - Email gerelateerde structs
   - `contact.go` - Contact formulier model
   - `aanmelding.go` - Aanmelding formulier model
+  - `chat_channel.go` - Chat kanaal model
+  - `chat_message.go` - Chat bericht model
+  - `chat_channel_participant.go` - Chat deelnemer model
+  - `chat_message_reaction.go` - Bericht reactie model
+  - `chat_user_presence.go` - Gebruikers aanwezigheid model
+  - `newsletter.go` - Nieuwsbrief model
+  - `role_rbac.go` - RBAC rol en permissie modellen
+  - `gebruiker.go` - Gebruikersmodel
 
 - `logger/` - Logging configuratie
   - `logger.go` - Logger setup
@@ -654,6 +765,476 @@ Voor tests is een mock database implementatie beschikbaar die geen externe datab
 - Volledige implementatie van repository interfaces
 - Automatische fallback naar mock database als SQLite niet beschikbaar is (CGO uitgeschakeld)
 
+## 🔐 Role-Based Access Control (RBAC) Systeem
+
+De DKL Email Service gebruikt een geavanceerd Role-Based Access Control (RBAC) systeem voor gedetailleerde toegangscontrole. Het systeem is opgebouwd uit rollen, permissies en gebruikersrelaties.
+
+### 🔑 Kernconcepten
+
+#### Rollen
+Rollen definiëren de verantwoordelijkheden van gebruikers in het systeem:
+
+- **admin**: Volledige systeemtoegang
+- **staff**: Ondersteunend personeel met beperkte beheerrechten
+- **user**: Standaard gebruiker met basis chat permissies
+- **owner**: Chat kanaal eigenaar met volledig kanaalbeheer
+- **chat_admin**: Chat moderator met moderatierechten
+- **member**: Chat lid met basis toegang
+- **deelnemer**: Evenement deelnemer (geen speciale permissies)
+- **begeleider**: Evenement begeleider (geen speciale permissies)
+- **vrijwilliger**: Evenement vrijwilliger (geen speciale permissies)
+
+#### Permissies
+Permissies volgen het patroon `resource:action`:
+
+**Contact Management:**
+- `contact:read` - Contactformulieren bekijken
+- `contact:write` - Contactformulieren bewerken
+- `contact:delete` - Contactformulieren verwijderen
+
+**Aanmeldingen:**
+- `aanmelding:read` - Aanmeldingen bekijken
+- `aanmelding:write` - Aanmeldingen bewerken
+- `aanmelding:delete` - Aanmeldingen verwijderen
+
+**Nieuwsbrieven:**
+- `newsletter:read` - Nieuwsbrieven bekijken
+- `newsletter:write` - Nieuwsbrieven aanmaken/bewerken
+- `newsletter:send` - Nieuwsbrieven verzenden
+- `newsletter:delete` - Nieuwsbrieven verwijderen
+
+**Email Management:**
+- `email:read` - Inkomende emails bekijken
+- `email:write` - Emails bewerken
+- `email:delete` - Emails verwijderen
+- `email:fetch` - Nieuwe emails ophalen
+
+**Gebruikersbeheer:**
+- `user:read` - Gebruikers bekijken
+- `user:write` - Gebruikers aanmaken/bewerken
+- `user:delete` - Gebruikers verwijderen
+- `user:manage_roles` - Gebruikersrollen beheren
+
+**Chat:**
+- `chat:read` - Chat kanalen bekijken
+- `chat:write` - Berichten verzenden
+- `chat:manage_channel` - Kanalen beheren
+- `chat:moderate` - Berichten modereren
+
+**Admin Email:**
+- `admin_email:send` - Emails verzenden namens admin
+
+### 🗄️ Database Structuur
+
+Het RBAC systeem gebruikt de volgende tabellen:
+
+- **`roles`**: Systeemrollen met beschrijvingen
+- **`permissions`**: Granulaire permissies (resource:action)
+- **`role_permissions`**: Koppeling tussen rollen en permissies
+- **`user_roles`**: Koppeling tussen gebruikers en rollen
+- **`gebruikers`**: Uitgebreide gebruikersinformatie
+
+### ⚡ Performance Optimalisatie
+
+- **Redis Caching**: Permissies worden gecached voor snelle toegang (vereist Redis)
+- **Database Views**: `user_permissions` view voor efficiënte queries
+- **Indexed Queries**: Geoptimaliseerde indexen voor snelle lookups
+
+**⚠️ Belangrijk**: Redis is vereist voor optimale RBAC performance. Zonder Redis werken permissie controles nog steeds maar langzamer via database queries.
+
+### 🔧 Beheer API
+
+#### Rollen Beheer
+```http
+GET /api/rbac/roles          # Lijst van alle rollen
+POST /api/rbac/roles         # Nieuwe rol aanmaken
+PUT /api/rbac/roles/:id      # Rol bijwerken
+DELETE /api/rbac/roles/:id   # Rol verwijderen
+```
+
+#### Permissies Beheer
+```http
+GET /api/rbac/permissions           # Lijst van alle permissies
+POST /api/rbac/roles/:id/permissions # Permissie toewijzen aan rol
+DELETE /api/rbac/roles/:id/permissions/:pid # Permissie verwijderen
+```
+
+#### Gebruikersrollen Beheer
+```http
+GET /api/users/:id/roles      # Gebruikersrollen ophalen
+POST /api/users/:id/roles     # Rol toewijzen aan gebruiker
+DELETE /api/users/:id/roles/:rid # Rol verwijderen van gebruiker
+```
+
+### 🔍 Permissie Controle
+
+Het systeem controleert permissies op meerdere niveaus:
+
+1. **JWT Token Validatie**: Basis authenticatie
+2. **Rol Controle**: Gebruiker heeft juiste rol
+3. **Permissie Controle**: Specifieke resource:action permissie
+4. **Context Controle**: Additionele context (eigenaar, etc.)
+
+### 📊 Audit Logging
+
+Alle RBAC operaties worden gelogd voor audit doeleinden:
+
+- Rol toewijzingen/verwijderingen
+- Permissie wijzigingen
+- Gebruiker acties
+- Systeem configuratie wijzigingen
+
+## 💬 Chat Systeem
+
+De DKL Email Service bevat een volledig geïntegreerd real-time chat systeem voor interne communicatie tussen beheerders en gebruikers.
+
+### ✨ Functionaliteiten
+
+#### Real-time Messaging
+- **WebSocket Gebaseerd**: Directe berichtenuitwisseling zonder polling
+- **Multi-channel Ondersteuning**: Publieke, private en directe kanalen
+- **Typing Indicators**: Zie wanneer anderen typen
+- **Read Receipts**: Bevestiging dat berichten zijn gelezen
+- **Message Reactions**: Emoji reacties op berichten
+- **Message Editing**: Berichten bewerken na verzending
+- **Presence Status**: Online/offline/away/busy status
+
+#### Channel Types
+- **Publieke Kanalen**: Voor algemene communicatie
+- **Private Kanalen**: Beperkte toegang gebaseerd op rollen
+- **Direct Messages**: Persoonlijke gesprekken tussen gebruikers
+
+#### Gebruikersbeheer
+- **Channel Rollen**: Owner, Admin, Member met verschillende permissies
+- **Participant Management**: Gebruikers toevoegen/verwijderen
+- **Moderatie Tools**: Berichten verwijderen, gebruikers muten
+
+### 🏗️ Architectuur
+
+#### Core Componenten
+- **`ChatHandler`**: HTTP endpoints voor chat beheer
+- **`ChatService`**: Business logic voor chat operaties
+- **`WebSocketHub`**: Real-time bericht distributie
+- **Database Models**: Chat kanalen, berichten, deelnemers, reacties
+
+#### Database Structuur
+- **`chat_channels`**: Kanaal informatie en instellingen
+- **`chat_channel_participants`**: Deelnemers en hun rollen
+- **`chat_messages`**: Berichten met metadata
+- **`chat_message_reactions`**: Emoji reacties op berichten
+- **`chat_user_presence`**: Online status van gebruikers
+
+### 🔌 WebSocket API
+
+#### Verbinding
+```javascript
+const ws = new WebSocket('ws://localhost:8080/api/chat/ws/channel_id');
+```
+
+#### Bericht Format
+```json
+{
+  "type": "message",
+  "channel_id": "channel-uuid",
+  "user_id": "user-uuid",
+  "content": "Hallo allemaal!",
+  "timestamp": "2024-03-20T10:30:00Z"
+}
+```
+
+#### Event Types
+- `message`: Nieuw bericht
+- `user_joined`: Gebruiker joint kanaal
+- `user_left`: Gebruiker verlaat kanaal
+- `typing_start`: Gebruiker begint te typen
+- `typing_stop`: Gebruiker stopt met typen
+- `presence_update`: Aanwezigheid status wijziging
+- `reaction_added`: Reactie toegevoegd
+- `message_edited`: Bericht bewerkt
+
+### 🔒 Beveiliging
+
+#### Authenticatie
+- JWT token vereist voor WebSocket verbinding
+- Channel-specifieke toegang controle
+- RBAC integratie voor kanaal permissies
+
+#### Autorisatie
+- Channel deelnemers controle
+- Message ownership verificatie
+- Moderatie permissies controle
+
+### 📊 Performance
+
+#### Optimalisaties
+- **Connection Pooling**: Efficiënt WebSocket beheer
+- **Message Batching**: Bulk bericht verzending
+- **Database Indexing**: Snelle queries op kanalen en berichten
+- **Redis Caching**: Gebruiker presence en session data (vereist Redis)
+
+**⚠️ Belangrijk**: Redis is vereist voor chat presence, typing indicators en optimale performance. Zonder Redis werken basis chat functies maar ontbreken real-time presence features.
+
+#### Schaalbaarheid
+- Horizontale scaling met Redis pub/sub
+- Load balancing ondersteuning
+- Connection limits per gebruiker
+
+### 🛠️ Beheer API
+
+#### Channel Management
+```http
+GET /api/chat/channels              # Gebruikers kanalen
+POST /api/chat/channels             # Nieuw kanaal aanmaken
+POST /api/chat/channels/:id/join    # Deelnemen aan kanaal
+POST /api/chat/channels/:id/leave   # Kanaal verlaten
+```
+
+#### Message Management
+```http
+GET /api/chat/channels/:id/messages     # Berichten ophalen
+POST /api/chat/channels/:id/messages    # Bericht verzenden
+PUT /api/chat/messages/:id              # Bericht bewerken
+DELETE /api/chat/messages/:id           # Bericht verwijderen
+```
+
+#### Presence & Status
+```http
+PUT /api/chat/presence              # Status bijwerken
+GET /api/chat/online-users          # Online gebruikers
+```
+
+### 📱 Frontend Integratie
+
+#### React Hook Voorbeeld
+```javascript
+const useChat = (channelId) => {
+  const [messages, setMessages] = useState([]);
+  const [ws, setWs] = useState(null);
+
+  useEffect(() => {
+    const websocket = new WebSocket(`/api/chat/ws/${channelId}`);
+
+    websocket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'message') {
+        setMessages(prev => [...prev, data]);
+      }
+    };
+
+    setWs(websocket);
+    return () => websocket.close();
+  }, [channelId]);
+
+  const sendMessage = (content) => {
+    ws.send(JSON.stringify({
+      type: 'message',
+      content: content
+    }));
+  };
+
+  return { messages, sendMessage };
+};
+```
+
+### 🔧 Configuratie
+
+#### Omgevingsvariabelen
+```env
+# Chat systeem configuratie
+CHAT_MAX_CONNECTIONS_PER_USER=5
+CHAT_MESSAGE_HISTORY_LIMIT=1000
+CHAT_PRESENCE_TIMEOUT=300
+CHAT_TYPING_TIMEOUT=10
+```
+
+### 📈 Monitoring
+
+#### Metrics
+- Actieve WebSocket verbindingen
+- Berichten per seconde
+- Channel gebruik statistieken
+- Gebruikers presence data
+- Connection errors en timeouts
+
+## 📰 Nieuwsbrief Systeem
+
+De DKL Email Service bevat een geautomatiseerd nieuwsbrief systeem dat nieuws verzamelt van RSS feeds en professioneel opgemaakte emails verstuurt naar subscribers.
+
+### ✨ Functionaliteiten
+
+#### Automatische Content Generatie
+- **RSS Feed Integratie**: Automatische verzameling van nieuws van geconfigureerde bronnen
+- **Content Filtering**: Intelligente filtering op relevantie en categorie
+- **Deduplicatie**: Voorkoming van dubbele content
+- **Content Summarization**: Automatische samenvatting van lange artikelen
+
+#### Email Templates
+- **Responsive Design**: Professionele HTML templates die werken op alle apparaten
+- **Brand Consistentie**: Gebruik van DKL huisstijl en kleuren
+- **Dynamic Content**: Personalisatie gebaseerd op subscriber gegevens
+- **Fallback Plaintext**: Automatische generatie van tekstversies
+
+#### Subscriber Management
+- **Opt-in/Oopt-out**: GDPR compliant subscriber beheer
+- **Segmentatie**: Groepering van subscribers op interesses
+- **Bounce Handling**: Automatische verwijdering van ongeldige email adressen
+- **Analytics**: Open rates, click rates en engagement metrics
+
+### 🏗️ Architectuur
+
+#### Core Componenten
+- **`NewsletterService`**: Hoofd service voor nieuwsbrief generatie
+- **`NewsletterSender`**: Batch verzending van nieuwsbrieven
+- **`NewsletterFetcher`**: RSS feed processing
+- **`NewsletterFormatter`**: HTML template rendering
+- **`NewsletterProcessor`**: Content filtering en verwerking
+
+#### Database Structuur
+- **`newsletters`**: Opgeslagen nieuwsbrieven met verzendstatus
+- **`gebruikers.newsletter_subscribed`**: Subscriber status per gebruiker
+
+### 🔄 Workflow
+
+#### Automatische Generatie
+1. **Feed Monitoring**: Periodieke controle van RSS feeds
+2. **Content Extraction**: Relevant nieuws ophalen en filteren
+3. **Template Rendering**: HTML email genereren
+4. **Batch Queue**: Nieuwsbrief toevoegen aan verzend queue
+
+#### Handmatige Beheer
+1. **Draft Aanmaken**: Admin maakt concept nieuwsbrief
+2. **Content Review**: Controle van content en formatting
+3. **Test Verzending**: Preview naar test subscribers
+4. **Bulk Verzending**: Productie verzending naar alle subscribers
+
+### 📧 Email Templates
+
+#### Template Structuur
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{.Subject}}</title>
+</head>
+<body>
+  <div class="header">
+    <img src="{{.LogoUrl}}" alt="DKL Logo">
+    <h1>{{.Title}}</h1>
+  </div>
+
+  <div class="content">
+    {{range .Items}}
+    <article class="news-item">
+      <h2>{{.Title}}</h2>
+      <p class="summary">{{.Description}}</p>
+      <a href="{{.Link}}" class="read-more">Lees meer</a>
+    </article>
+    {{end}}
+  </div>
+
+  <div class="footer">
+    <p>Ontvang je deze email niet graag? <a href="{{.UnsubscribeUrl}}">Afmelden</a></p>
+  </div>
+</body>
+</html>
+```
+
+#### Template Variabelen
+- `{{.Subject}}`: Email onderwerp
+- `{{.Title}}`: Hoofdtitel van de nieuwsbrief
+- `{{.Items}}`: Array van nieuws items
+- `{{.LogoUrl}}`: URL naar logo
+- `{{.UnsubscribeUrl}}`: Afmeld link
+
+### 🔧 Configuratie
+
+#### RSS Feed Configuratie
+```env
+# Nieuwsbrief configuratie
+ENABLE_NEWSLETTER=true
+NEWSLETTER_SOURCES=https://example.com/feed1.xml,https://example.com/feed2.xml
+NEWSLETTER_CHECK_INTERVAL=1h
+NEWSLETTER_MAX_ITEMS_PER_EMAIL=10
+NEWSLETTER_TEMPLATE_PATH=./templates/newsletter.html
+```
+
+#### SMTP Configuratie
+```env
+# Nieuwsbrief SMTP (kan anders zijn dan reguliere emails)
+NEWSLETTER_SMTP_HOST=smtp.newsletter-provider.com
+NEWSLETTER_SMTP_PORT=587
+NEWSLETTER_SMTP_USER=newsletter@dkl.nl
+NEWSLETTER_SMTP_PASSWORD=secure_password
+```
+
+### 📊 Analytics & Monitoring
+
+#### Verzend Metrics
+- **Delivery Rate**: Percentage succesvol bezorgde emails
+- **Open Rate**: Percentage geopende emails
+- **Click Rate**: Percentage aangeklikte links
+- **Bounce Rate**: Percentage bounced emails
+- **Unsubscribe Rate**: Percentage afmeldingen
+
+#### Content Metrics
+- **Engagement Score**: Gecombineerde metric van opens/clicks
+- **Popular Topics**: Meest gelezen onderwerpen
+- **Optimal Send Time**: Beste verzendtijd gebaseerd op opens
+
+### 🔒 Beveiliging & Compliance
+
+#### GDPR Compliance
+- **Explicit Consent**: Alleen verzending naar expliciete subscribers
+- **Easy Unsubscribe**: Directe afmeld links in elke email
+- **Data Minimization**: Alleen noodzakelijke gegevens opslaan
+- **Audit Logging**: Alle subscriber acties loggen
+
+#### Email Best Practices
+- **SPF/DKIM/DMARC**: Email authenticatie setup
+- **List Cleaning**: Regelmatige verwijdering van inactieve subscribers
+- **Rate Limiting**: Gecontroleerde verzend snelheid
+- **Monitoring**: Bounce en complaint monitoring
+
+### 🛠️ Beheer API
+
+#### Nieuwsbrief Beheer
+```http
+GET /api/newsletter              # Lijst van nieuwsbrieven
+POST /api/newsletter             # Nieuwe nieuwsbrief aanmaken
+GET /api/newsletter/:id          # Specifieke nieuwsbrief ophalen
+PUT /api/newsletter/:id          # Nieuwsbrief bijwerken
+DELETE /api/newsletter/:id       # Nieuwsbrief verwijderen
+POST /api/newsletter/:id/send    # Nieuwsbrief verzenden
+```
+
+#### Subscriber Beheer
+```http
+GET /api/newsletter/subscribers         # Subscriber lijst
+POST /api/newsletter/subscribers        # Subscriber toevoegen
+DELETE /api/newsletter/subscribers/:id  # Subscriber verwijderen
+```
+
+#### Analytics
+```http
+GET /api/newsletter/:id/stats    # Verzend statistieken
+GET /api/newsletter/analytics    # Algemene analytics
+```
+
+### 📈 Performance Optimalisatie
+
+#### Batch Processing
+- **Queue-based Sending**: Asynchrone verwerking van grote lijsten
+- **Rate Limiting**: SMTP provider limits respecteren
+- **Retry Logic**: Automatische retry bij tijdelijke fouten
+- **Progress Tracking**: Realtime verzend voortgang
+
+#### Content Caching
+- **Template Caching**: Voorverwerkte templates
+- **Feed Caching**: Vermindering van externe API calls
+- **Image Optimization**: Geoptimaliseerde afbeeldingen voor email
+
 ## 🐳 Docker Multi-stage Builds
 
 De Dockerfile is verbeterd met multi-stage builds die twee versies van de applicatie produceren:
@@ -716,15 +1297,16 @@ Deze software is eigendom van De Koninklijke Loop en mag niet worden gebruikt, g
 ## 📚 Documentatie
 
 Uitgebreide documentatie is beschikbaar in de `/docs` directory:
-- `API.md` - API documentatie (Bijgewerkt met Contact en Aanmelding Beheer endpoints)
+- `API.md` - API documentatie (Bijgewerkt met Contact, Aanmelding, Chat en Nieuwsbrief endpoints)
 - `DEPLOYMENT.md` - Deployment instructies
 - `DEVELOPMENT.md` - Development guidelines
 - `MONITORING.md` - Monitoring setup
 - `SECURITY.md` - Security best practices
 - `TEMPLATES.md` - Template documentatie
 - `TESTING.md` - Test procedures
-- `AUTH.md` - Authenticatie documentatie (Nieuw)
-- `CONTACT_AANMELDING.md` - Contact en Aanmelding Beheer documentatie (Nieuw)
+- `AUTH.md` - Authenticatie documentatie
+- `RBAC_FRONTEND.md` - RBAC frontend integratie documentatie
+- `WFC_INTEGRATION.md` - Whisky for Charity integratie documentatie
 
 ## 📮 Telegram Bot Service
 
@@ -998,6 +1580,18 @@ curl -X POST http://localhost:8080/api/wfc/order-email \
 ```
 
 ## 🔄 Recente Updates
+
+### Oktober 2025
+- Toegevoegd: Uitgebreide README documentatie met alle nieuwe features
+- Toegevoegd: Chat systeem met real-time WebSocket messaging
+- Toegevoegd: Role-Based Access Control (RBAC) systeem met granulaire permissies
+- Toegevoegd: Automatisch nieuwsbrief systeem met RSS feed integratie
+- Toegevoegd: Uitgebreid gebruikersbeheer met rol- en permissiebeheer
+- Verbeterd: Database architectuur met nieuwe tabellen voor chat, RBAC en nieuwsbrieven
+- Toegevoegd: WebSocket ondersteuning voor real-time chat functionaliteit
+- Verbeterd: API endpoints voor chat, gebruikersbeheer en nieuwsbrief beheer
+- Toegevoegd: Redis caching voor RBAC permissies en chat presence
+- Verbeterd: Service architectuur met nieuwe services voor chat en RBAC
 
 ### Maart 2025
 - Toegevoegd: Whisky for Charity (WFC) integratie met API endpoints, modellen en email templates
