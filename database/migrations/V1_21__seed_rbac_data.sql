@@ -60,7 +60,8 @@ INSERT INTO permissions (resource, action, description, is_system_permission) VA
 ('notification', 'delete', 'Notificaties verwijderen', true),
 
 -- System permissions
-('system', 'admin', 'Volledige systeemtoegang', true)
+('system', 'admin', 'Volledige systeemtoegang', true),
+('staff', 'access', 'Toegang tot staff functies', true)
 ON CONFLICT (resource, action) DO NOTHING;
 
 -- Assign permissions to roles based on current middleware usage
@@ -77,8 +78,9 @@ INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r, permissions p
 WHERE r.name = 'staff' AND r.is_system_role = true
-  AND p.resource IN ('user', 'contact', 'aanmelding', 'newsletter', 'email', 'chat', 'notification')
-  AND p.action = 'read'
+  AND ((p.resource IN ('user', 'contact', 'aanmelding', 'newsletter', 'email', 'chat', 'notification')
+        AND p.action = 'read')
+       OR (p.resource = 'staff' AND p.action = 'access'))
 ON CONFLICT (role_id, permission_id) DO NOTHING;
 
 -- Chat owner gets full chat permissions
