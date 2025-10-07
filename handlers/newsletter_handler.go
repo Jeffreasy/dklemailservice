@@ -34,18 +34,27 @@ func NewNewsletterHandler(
 
 // RegisterRoutes registreert de routes voor newsletter beheer
 func (h *NewsletterHandler) RegisterRoutes(app *fiber.App) {
-	// Groep voor newsletter beheer routes (vereist admin rechten)
+	// Groep voor newsletter beheer routes
 	newsletterGroup := app.Group("/api/newsletter")
 	newsletterGroup.Use(AuthMiddleware(h.authService))
-	newsletterGroup.Use(AdminPermissionMiddleware(h.permissionService))
 
-	// Newsletter beheer routes
-	newsletterGroup.Get("/", h.ListNewsletters)
-	newsletterGroup.Post("/", h.CreateNewsletter)
-	newsletterGroup.Get("/:id", h.GetNewsletter)
-	newsletterGroup.Put("/:id", h.UpdateNewsletter)
-	newsletterGroup.Delete("/:id", h.DeleteNewsletter)
-	newsletterGroup.Post("/:id/send", h.SendNewsletter)
+	// Read-only routes (require newsletter read)
+	readGroup := newsletterGroup.Group("", PermissionMiddleware(h.permissionService, "newsletter", "read"))
+	readGroup.Get("/", h.ListNewsletters)
+	readGroup.Get("/:id", h.GetNewsletter)
+
+	// Write routes (require newsletter write)
+	writeGroup := newsletterGroup.Group("", PermissionMiddleware(h.permissionService, "newsletter", "write"))
+	writeGroup.Post("/", h.CreateNewsletter)
+	writeGroup.Put("/:id", h.UpdateNewsletter)
+
+	// Delete routes (require newsletter delete)
+	deleteGroup := newsletterGroup.Group("", PermissionMiddleware(h.permissionService, "newsletter", "delete"))
+	deleteGroup.Delete("/:id", h.DeleteNewsletter)
+
+	// Send routes (require newsletter send)
+	sendGroup := newsletterGroup.Group("", PermissionMiddleware(h.permissionService, "newsletter", "send"))
+	sendGroup.Post("/:id/send", h.SendNewsletter)
 }
 
 // ListNewsletters haalt een lijst van nieuwsbrieven op
