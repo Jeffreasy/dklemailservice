@@ -37,11 +37,12 @@ func (h *UserHandler) ListUsers(c *fiber.Ctx) error {
 
 func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 	var req struct {
-		Email    string `json:"email"`
-		Naam     string `json:"naam"`
-		Rol      string `json:"rol"`
-		Password string `json:"password"`
-		IsActief bool   `json:"is_actief"`
+		Email                string `json:"email"`
+		Naam                 string `json:"naam"`
+		Rol                  string `json:"rol"`
+		Password             string `json:"password"`
+		IsActief             bool   `json:"is_actief"`
+		NewsletterSubscribed bool   `json:"newsletter_subscribed"`
 	}
 
 	if err := c.BodyParser(&req); err != nil {
@@ -49,10 +50,11 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 	}
 
 	gebruiker := &models.Gebruiker{
-		Email:    req.Email,
-		Naam:     req.Naam,
-		Rol:      req.Rol,
-		IsActief: req.IsActief,
+		Email:                req.Email,
+		Naam:                 req.Naam,
+		Rol:                  req.Rol,
+		IsActief:             req.IsActief,
+		NewsletterSubscribed: req.NewsletterSubscribed,
 	}
 
 	err := h.authService.CreateUser(c.Context(), gebruiker, req.Password)
@@ -81,21 +83,33 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	}
 
 	var req struct {
-		Email    string  `json:"email"`
-		Naam     string  `json:"naam"`
-		Rol      string  `json:"rol"`
-		IsActief bool    `json:"is_actief"`
-		Password *string `json:"password"`
+		Email                *string `json:"email,omitempty"`
+		Naam                 *string `json:"naam,omitempty"`
+		Rol                  *string `json:"rol,omitempty"`
+		IsActief             *bool   `json:"is_actief,omitempty"`
+		NewsletterSubscribed *bool   `json:"newsletter_subscribed,omitempty"`
+		Password             *string `json:"password,omitempty"`
 	}
 
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid input"})
 	}
 
-	user.Email = req.Email
-	user.Naam = req.Naam
-	user.Rol = req.Rol
-	user.IsActief = req.IsActief
+	if req.Email != nil {
+		user.Email = *req.Email
+	}
+	if req.Naam != nil {
+		user.Naam = *req.Naam
+	}
+	if req.Rol != nil {
+		user.Rol = *req.Rol
+	}
+	if req.IsActief != nil {
+		user.IsActief = *req.IsActief
+	}
+	if req.NewsletterSubscribed != nil {
+		user.NewsletterSubscribed = *req.NewsletterSubscribed
+	}
 
 	err = h.authService.UpdateUser(c.Context(), user, req.Password)
 	if err != nil {
