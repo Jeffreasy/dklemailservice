@@ -19,6 +19,9 @@ type RBACRoleRepository interface {
 	// List retrieves all roles with pagination
 	List(ctx context.Context, limit, offset int) ([]*models.RBACRole, error)
 
+	// ListWithPermissions retrieves all roles with their permissions preloaded
+	ListWithPermissions(ctx context.Context, limit, offset int) ([]*models.RBACRole, error)
+
 	// Update updates an existing role
 	Update(ctx context.Context, role *models.RBACRole) error
 

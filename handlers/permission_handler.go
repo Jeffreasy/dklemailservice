@@ -129,7 +129,7 @@ func (h *PermissionHandler) CreatePermission(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(permission)
 }
 
-// ListRoles haalt een lijst van roles op
+// ListRoles haalt een lijst van roles op met hun permissions
 func (h *PermissionHandler) ListRoles(c *fiber.Ctx) error {
 	limit := c.QueryInt("limit", 50)
 	offset := c.QueryInt("offset", 0)
@@ -147,7 +147,7 @@ func (h *PermissionHandler) ListRoles(c *fiber.Ctx) error {
 	}
 
 	ctx := c.Context()
-	roles, err := h.roleRepo.List(ctx, limit, offset)
+	roles, err := h.roleRepo.ListWithPermissions(ctx, limit, offset)
 	if err != nil {
 		logger.Error("Fout bij ophalen roles", "error", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

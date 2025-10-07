@@ -58,6 +58,22 @@ func (r *RBACRoleRepositoryImpl) List(ctx context.Context, limit, offset int) ([
 	return roles, err
 }
 
+// ListWithPermissions retrieves all roles with their permissions preloaded
+func (r *RBACRoleRepositoryImpl) ListWithPermissions(ctx context.Context, limit, offset int) ([]*models.RBACRole, error) {
+	var roles []*models.RBACRole
+	query := r.db.WithContext(ctx).Preload("Permissions").Order("name ASC")
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+
+	err := query.Find(&roles).Error
+	return roles, err
+}
+
 // Update updates an existing role
 func (r *RBACRoleRepositoryImpl) Update(ctx context.Context, role *models.RBACRole) error {
 	return r.db.WithContext(ctx).Save(role).Error
