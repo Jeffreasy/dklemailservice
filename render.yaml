@@ -56,4 +56,10 @@ services:
       - key: POSTGRES_PASSWORD
         generateValue: true
       - key: POSTGRES_DB
-        value: dklemailservice 
+        value: dklemailservice
+
+  - type: redis
+    name: dklautomatie-redis
+    ipAllowList: []
+    plan: free
+    autoDeploy: true
