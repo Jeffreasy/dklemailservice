@@ -53,7 +53,14 @@ func (s *NewsletterSender) Send(ctx context.Context, content, subject string) er
 		time.Sleep(s.batcher.batchWindow)
 	}
 
-	logger.Info("Nieuwsbrief gequeued", "recipients", len(subs), "batch_id", nl.BatchID)
+	// Mark newsletter as sent
+	sentAt := time.Now()
+	if err := s.nlRepo.MarkSent(ctx, nl.ID, sentAt); err != nil {
+		logger.Error("Fout bij markeren nieuwsbrief als verzonden", "error", err, "newsletter_id", nl.ID)
+		return err
+	}
+
+	logger.Info("Nieuwsbrief verzonden", "newsletter_id", nl.ID, "recipients", len(subs), "batch_id", nl.BatchID, "sent_at", sentAt)
 	return nil
 }
 
@@ -104,6 +111,13 @@ func (s *NewsletterSender) SendManual(ctx context.Context, newsletterID string) 
 		time.Sleep(s.batcher.batchWindow)
 	}
 
-	logger.Info("Manual nieuwsbrief gequeued", "newsletter_id", newsletterID, "recipients", len(subs), "batch_id", batchKey)
+	// Mark newsletter as sent
+	sentAt := time.Now()
+	if err := s.nlRepo.MarkSent(ctx, newsletterID, sentAt); err != nil {
+		logger.Error("Fout bij markeren nieuwsbrief als verzonden", "error", err, "newsletter_id", newsletterID)
+		return err
+	}
+
+	logger.Info("Manual nieuwsbrief verzonden", "newsletter_id", newsletterID, "recipients", len(subs), "batch_id", batchKey, "sent_at", sentAt)
 	return nil
 }
