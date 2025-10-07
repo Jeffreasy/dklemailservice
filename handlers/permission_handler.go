@@ -34,19 +34,18 @@ func NewPermissionHandler(
 
 // RegisterRoutes registreert de routes voor permission en role beheer
 func (h *PermissionHandler) RegisterRoutes(app *fiber.App) {
-	// Permission routes (vereist admin rechten)
-	permissionGroup := app.Group("/api/permissions")
-	permissionGroup.Use(AuthMiddleware(h.authService))
-	permissionGroup.Use(AdminPermissionMiddleware(h.permissionService))
-	permissionGroup.Get("/", h.ListPermissions)
-	permissionGroup.Post("/", h.CreatePermission)
+	// RBAC routes (vereist admin rechten)
+	rbacGroup := app.Group("/api/rbac")
+	rbacGroup.Use(AuthMiddleware(h.authService))
+	rbacGroup.Use(AdminPermissionMiddleware(h.permissionService))
 
-	// Role routes (vereist admin rechten)
-	roleGroup := app.Group("/api/roles")
-	roleGroup.Use(AuthMiddleware(h.authService))
-	roleGroup.Use(AdminPermissionMiddleware(h.permissionService))
-	roleGroup.Get("/", h.ListRoles)
-	roleGroup.Post("/", h.CreateRole)
+	// Permission routes
+	rbacGroup.Get("/permissions", h.ListPermissions)
+	rbacGroup.Post("/permissions", h.CreatePermission)
+
+	// Role routes
+	rbacGroup.Get("/roles", h.ListRoles)
+	rbacGroup.Post("/roles", h.CreateRole)
 }
 
 // ListPermissions haalt een lijst van permissions op
