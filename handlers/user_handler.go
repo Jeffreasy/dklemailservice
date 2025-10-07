@@ -161,11 +161,11 @@ func (h *UserHandler) AssignRolesToUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// Haal gebruiker op uit context voor assigned_by
-	gebruiker, ok := c.Locals("gebruiker").(*models.Gebruiker)
-	if !ok || gebruiker == nil {
+	// Haal userID op uit context voor assigned_by
+	userID, ok := c.Locals("userID").(string)
+	if !ok || userID == "" {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Kon gebruiker niet ophalen uit context",
+			"error": "Kon userID niet ophalen uit context",
 		})
 	}
 
@@ -176,7 +176,7 @@ func (h *UserHandler) AssignRolesToUser(c *fiber.Ctx) error {
 		ur := &models.UserRole{
 			UserID:     userID,
 			RoleID:     roleID,
-			AssignedBy: &gebruiker.ID,
+			AssignedBy: &userID,
 			IsActive:   true,
 		}
 
