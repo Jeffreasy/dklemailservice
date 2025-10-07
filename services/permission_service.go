@@ -80,6 +80,14 @@ func (s *PermissionServiceImpl) HasPermission(ctx context.Context, userID, resou
 		return false
 	}
 
+	// Debug logging voor admin user
+	if userID == "7157f3f6-da85-4058-9d38-19133ec93b03" { // admin user ID from logs
+		logger.Info("Admin user permissions check", "user_id", userID, "resource", resource, "action", action, "permissions_count", len(permissions))
+		for _, perm := range permissions {
+			logger.Info("Admin user permission", "resource", perm.Resource, "action", perm.Action, "role", perm.RoleName)
+		}
+	}
+
 	hasPermission := s.checkPermissionInList(permissions, resource, action)
 
 	// Cache het resultaat
