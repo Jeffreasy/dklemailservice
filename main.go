@@ -557,8 +557,24 @@ func main() {
 	// Set WebSocket channel callback
 	chatHandler.SetChannelHubCallback()
 
+	// Initialiseer permission en role handlers
+	permissionHandler := handlers.NewPermissionHandler(
+		repoFactory.Permission,
+		repoFactory.RBACRole,
+		serviceFactory.AuthService,
+		serviceFactory.PermissionService,
+	)
+	permissionHandler.RegisterRoutes(app)
+
+	roleHandler := handlers.NewRoleHandler(
+		repoFactory.RolePermission,
+		serviceFactory.AuthService,
+		serviceFactory.PermissionService,
+	)
+	roleHandler.RegisterRoutes(app)
+
 	// Initialiseer user handler
-	userHandler := handlers.NewUserHandler(serviceFactory.AuthService, serviceFactory.PermissionService)
+	userHandler := handlers.NewUserHandler(serviceFactory.AuthService, serviceFactory.PermissionService, repoFactory.UserRole)
 	userHandler.RegisterRoutes(app)
 
 	// Start server
