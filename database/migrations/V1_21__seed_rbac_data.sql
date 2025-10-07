@@ -61,6 +61,7 @@ INSERT INTO permissions (resource, action, description, is_system_permission) VA
 
 -- System permissions
 ('system', 'admin', 'Volledige systeemtoegang', true),
+('admin', 'access', 'Volledige admin toegang', true),
 ('staff', 'access', 'Toegang tot staff functies', true)
 ON CONFLICT (resource, action) DO NOTHING;
 
