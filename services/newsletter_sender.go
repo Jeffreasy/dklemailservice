@@ -42,10 +42,9 @@ func (s *NewsletterSender) Send(ctx context.Context, content, subject string) er
 	data := map[string]interface{}{"Summary": "", "Items": []models.NewsItem{}}
 	data["Content"] = content
 
-	// Queue in batcher with specific from address
-	newsletterFromAddress := "nieuwsbrief@dekoninklijkeloop.nl"
+	// Queue in batcher (use default SMTP_FROM address)
 	for _, sub := range subs {
-		s.batcher.AddToBatch(batchKey, sub.Email, subject, "newsletter", data, newsletterFromAddress)
+		s.batcher.AddToBatch(batchKey, sub.Email, subject, "newsletter", data)
 	}
 
 	// Force immediate sending for small newsletter batches
@@ -112,12 +111,11 @@ func (s *NewsletterSender) SendManual(ctx context.Context, newsletterID string) 
 		"Content": nl.Content,
 	}
 
-	// Queue in batcher with specific from address
-	newsletterFromAddress := "nieuwsbrief@dekoninklijkeloop.nl"
-	logger.Info("SendManual: Queueing emails in batcher", "batch_key", batchKey, "from_address", newsletterFromAddress)
+	// Queue in batcher (use default SMTP_FROM address)
+	logger.Info("SendManual: Queueing emails in batcher", "batch_key", batchKey)
 
 	for _, sub := range subs {
-		s.batcher.AddToBatch(batchKey, sub.Email, nl.Subject, "newsletter", data, newsletterFromAddress)
+		s.batcher.AddToBatch(batchKey, sub.Email, nl.Subject, "newsletter", data)
 	}
 
 	// Force immediate sending for small newsletter batches
