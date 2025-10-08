@@ -49,8 +49,9 @@ func (h *PermissionHandler) RegisterRoutes(app *fiber.App) {
 	// Role routes
 	rbacGroup.Get("/roles", h.ListRoles)
 	rbacGroup.Post("/roles", h.CreateRole)
-	rbacGroup.Post("/roles/:id/permissions/:permissionId", h.AddPermissionToRole)
-	rbacGroup.Delete("/roles/:id/permissions/:permissionId", h.RemovePermissionFromRole)
+	rbacGroup.Put("/roles/:id/permissions", h.UpdateRolePermissions)                     // Voor bulk updates (frontend compatibiliteit)
+	rbacGroup.Post("/roles/:id/permissions/:permissionId", h.AddPermissionToRole)        // Voor individuele toevoeging
+	rbacGroup.Delete("/roles/:id/permissions/:permissionId", h.RemovePermissionFromRole) // Voor individuele verwijdering
 }
 
 // ListPermissions haalt een lijst van permissions op
@@ -291,5 +292,107 @@ func (h *PermissionHandler) RemovePermissionFromRole(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"success": true,
 		"message": "Permission verwijderd van role",
+	})
+}
+
+// UpdateRolePermissions werkt permissions bij voor een role (bulk update voor frontend compatibiliteit)
+func (h *PermissionHandler) UpdateRolePermissions(c *fiber.Ctx) error {
+	roleID := c.Params("id")
+	if roleID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Role ID is verplicht",
+		})
+	}
+
+	var req struct {
+		PermissionIDs []string `json:"permission_ids"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Ongeldige gegevens",
+		})
+	}
+
+	// Haal userID op uit context
+	userID, ok := c.Locals("userID").(string)
+	if !ok || userID == "" {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon userID niet ophalen uit context",
+		})
+	}
+
+	ctx := c.Context()
+
+	// Haal huidige permissions voor deze role op
+	currentPermissions, err := h.rolePermissionRepo.GetPermissionsByRole(ctx, roleID)
+	if err != nil {
+		logger.Error("Fout bij ophalen huidige permissions", "error", err, "role_id", roleID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon huidige permissions niet ophalen",
+		})
+	}
+
+	// Maak sets voor vergelijking
+	currentPermissionIDs := make(map[string]bool)
+	for _, perm := range currentPermissions {
+		currentPermissionIDs[perm.ID] = true
+	}
+
+	requestedPermissionIDs := make(map[string]bool)
+	for _, id := range req.PermissionIDs {
+		requestedPermissionIDs[id] = true
+	}
+
+	// Bepaal welke permissions toegevoegd/verwijderd moeten worden
+	var toAdd []string
+	var toRemove []string
+
+	// Permissions die toegevoegd moeten worden (in request maar niet current)
+	for _, permID := range req.PermissionIDs {
+		if !currentPermissionIDs[permID] {
+			toAdd = append(toAdd, permID)
+		}
+	}
+
+	// Permissions die verwijderd moeten worden (current maar niet in request)
+	for _, perm := range currentPermissions {
+		if !requestedPermissionIDs[perm.ID] {
+			toRemove = append(toRemove, perm.ID)
+		}
+	}
+
+	// Voer toevoegingen uit
+	addedCount := 0
+	for _, permissionID := range toAdd {
+		rp := &models.RolePermission{
+			RoleID:       roleID,
+			PermissionID: permissionID,
+			AssignedBy:   &userID,
+		}
+
+		if err := h.rolePermissionRepo.Create(ctx, rp); err != nil {
+			logger.Error("Fout bij toevoegen permission", "error", err, "role_id", roleID, "permission_id", permissionID)
+			continue
+		}
+		addedCount++
+	}
+
+	// Voer verwijderingen uit
+	removedCount := 0
+	for _, permissionID := range toRemove {
+		if err := h.rolePermissionRepo.Delete(ctx, roleID, permissionID); err != nil {
+			logger.Error("Fout bij verwijderen permission", "error", err, "role_id", roleID, "permission_id", permissionID)
+			continue
+		}
+		removedCount++
+	}
+
+	return c.JSON(fiber.Map{
+		"success":         true,
+		"message":         "Role permissions bijgewerkt",
+		"added_count":     addedCount,
+		"removed_count":   removedCount,
+		"total_requested": len(req.PermissionIDs),
 	})
 }
