@@ -76,7 +76,7 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 	emailBatcher := createEmailBatcher(emailService)
 
 	// Initialiseer auth service
-	authService := NewAuthService(repoFactory.Gebruiker)
+	authService := NewAuthService(repoFactory.Gebruiker, repoFactory.RefreshToken)
 
 	// Initialiseer permission service met Redis caching
 	permissionService := NewPermissionServiceWithRedis(

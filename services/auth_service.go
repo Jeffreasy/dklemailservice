@@ -2,9 +2,11 @@ package services
 
 import (
 	"context"
+	"crypto/rand"
 	"dklautomationgo/logger"
 	"dklautomationgo/models"
 	"dklautomationgo/repository"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
@@ -39,13 +41,14 @@ type JWTClaims struct {
 
 // AuthServiceImpl implementeert de AuthService interface
 type AuthServiceImpl struct {
-	gebruikerRepo repository.GebruikerRepository
-	jwtSecret     []byte
-	tokenExpiry   time.Duration
+	gebruikerRepo    repository.GebruikerRepository
+	refreshTokenRepo repository.RefreshTokenRepository
+	jwtSecret        []byte
+	tokenExpiry      time.Duration
 }
 
 // NewAuthService maakt een nieuwe AuthService
-func NewAuthService(gebruikerRepo repository.GebruikerRepository) AuthService {
+func NewAuthService(gebruikerRepo repository.GebruikerRepository, refreshTokenRepo repository.RefreshTokenRepository) AuthService {
 	// Haal JWT secret uit omgevingsvariabele of gebruik een standaard waarde
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
@@ -53,9 +56,9 @@ func NewAuthService(gebruikerRepo repository.GebruikerRepository) AuthService {
 		jwtSecret = "default_jwt_secret_change_in_production"
 	}
 
-	// Haal token expiry uit omgevingsvariabele of gebruik een standaard waarde (24 uur)
+	// Haal token expiry uit omgevingsvariabele of gebruik een standaard waarde (20 minuten)
 	tokenExpiryStr := os.Getenv("JWT_TOKEN_EXPIRY")
-	tokenExpiry := 24 * time.Hour
+	tokenExpiry := 20 * time.Minute
 	if tokenExpiryStr != "" {
 		var err error
 		tokenExpiry, err = time.ParseDuration(tokenExpiryStr)
@@ -65,39 +68,40 @@ func NewAuthService(gebruikerRepo repository.GebruikerRepository) AuthService {
 	}
 
 	return &AuthServiceImpl{
-		gebruikerRepo: gebruikerRepo,
-		jwtSecret:     []byte(jwtSecret),
-		tokenExpiry:   tokenExpiry,
+		gebruikerRepo:    gebruikerRepo,
+		refreshTokenRepo: refreshTokenRepo,
+		jwtSecret:        []byte(jwtSecret),
+		tokenExpiry:      tokenExpiry,
 	}
 }
 
-// Login authenticeert een gebruiker en geeft een JWT token terug
-func (s *AuthServiceImpl) Login(ctx context.Context, email, wachtwoord string) (string, error) {
+// Login authenticeert een gebruiker en geeft een access token en refresh token terug
+func (s *AuthServiceImpl) Login(ctx context.Context, email, wachtwoord string) (string, string, error) {
 	logger.Info("Login poging", "email", email)
 
 	// Haal gebruiker op basis van email
 	gebruiker, err := s.gebruikerRepo.GetByEmail(ctx, email)
 	if err != nil {
 		logger.Error("Fout bij ophalen gebruiker", "email", email, "error", err)
-		return "", err
+		return "", "", err
 	}
 
 	// Controleer of gebruiker bestaat
 	if gebruiker == nil {
 		logger.Warn("Gebruiker niet gevonden", "email", email)
-		return "", ErrInvalidCredentials
+		return "", "", ErrInvalidCredentials
 	}
 
 	// Controleer of gebruiker actief is
 	if !gebruiker.IsActief {
 		logger.Warn("Inactieve gebruiker probeert in te loggen", "email", email)
-		return "", ErrUserInactive
+		return "", "", ErrUserInactive
 	}
 
 	// Verifieer wachtwoord
 	if !s.VerifyPassword(gebruiker.WachtwoordHash, wachtwoord) {
 		logger.Warn("Ongeldig wachtwoord", "email", email)
-		return "", ErrInvalidCredentials
+		return "", "", ErrInvalidCredentials
 	}
 
 	// Update laatste login
@@ -106,15 +110,22 @@ func (s *AuthServiceImpl) Login(ctx context.Context, email, wachtwoord string) (
 		// We gaan door ondanks de fout, omdat de login zelf succesvol was
 	}
 
-	// Genereer JWT token
-	token, err := s.generateToken(gebruiker)
+	// Genereer JWT access token
+	accessToken, err := s.generateToken(gebruiker)
 	if err != nil {
-		logger.Error("Fout bij genereren token", "email", email, "error", err)
-		return "", err
+		logger.Error("Fout bij genereren access token", "email", email, "error", err)
+		return "", "", err
+	}
+
+	// Genereer refresh token
+	refreshToken, err := s.GenerateRefreshToken(ctx, gebruiker.ID)
+	if err != nil {
+		logger.Error("Fout bij genereren refresh token", "email", email, "error", err)
+		return "", "", err
 	}
 
 	logger.Info("Login succesvol", "email", email, "user_id", gebruiker.ID)
-	return token, nil
+	return accessToken, refreshToken, nil
 }
 
 // ValidateToken valideert een JWT token en geeft de gebruiker ID terug
@@ -314,4 +325,101 @@ func (s *AuthServiceImpl) UpdateUser(ctx context.Context, gebruiker *models.Gebr
 // DeleteUser deletes a user by ID
 func (s *AuthServiceImpl) DeleteUser(ctx context.Context, id string) error {
 	return s.gebruikerRepo.Delete(ctx, id)
+}
+
+// GenerateRefreshToken genereert een refresh token voor een gebruiker
+func (s *AuthServiceImpl) GenerateRefreshToken(ctx context.Context, userID string) (string, error) {
+	// Genereer random token (32 bytes)
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		logger.Error("Fout bij genereren random bytes voor refresh token", "error", err)
+		return "", err
+	}
+	token := base64.URLEncoding.EncodeToString(tokenBytes)
+
+	// Sla op in database met 7 dagen expiry
+	refreshToken := &models.RefreshToken{
+		UserID:    userID,
+		Token:     token,
+		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
+		IsRevoked: false,
+	}
+
+	if err := s.refreshTokenRepo.Create(ctx, refreshToken); err != nil {
+		logger.Error("Fout bij opslaan refresh token", "user_id", userID, "error", err)
+		return "", err
+	}
+
+	logger.Debug("Refresh token gegenereerd", "user_id", userID)
+	return token, nil
+}
+
+// RefreshAccessToken vernieuwt een access token met een refresh token
+func (s *AuthServiceImpl) RefreshAccessToken(ctx context.Context, refreshToken string) (string, string, error) {
+	// Valideer refresh token
+	token, err := s.refreshTokenRepo.GetByToken(ctx, refreshToken)
+	if err != nil {
+		logger.Error("Fout bij ophalen refresh token", "error", err)
+		return "", "", err
+	}
+
+	if token == nil || !token.IsValid() {
+		logger.Warn("Ongeldige of verlopen refresh token")
+		return "", "", errors.New("ongeldige of verlopen refresh token")
+	}
+
+	// Haal gebruiker op
+	gebruiker, err := s.gebruikerRepo.GetByID(ctx, token.UserID)
+	if err != nil || gebruiker == nil {
+		logger.Error("Gebruiker niet gevonden voor refresh token", "user_id", token.UserID, "error", err)
+		return "", "", errors.New("gebruiker niet gevonden")
+	}
+
+	if !gebruiker.IsActief {
+		logger.Warn("Inactieve gebruiker probeert token te refreshen", "user_id", gebruiker.ID)
+		return "", "", ErrUserInactive
+	}
+
+	// Genereer nieuwe access token
+	accessToken, err := s.generateToken(gebruiker)
+	if err != nil {
+		logger.Error("Fout bij genereren nieuwe access token", "user_id", gebruiker.ID, "error", err)
+		return "", "", err
+	}
+
+	// Genereer nieuwe refresh token (token rotation voor security)
+	newRefreshToken, err := s.GenerateRefreshToken(ctx, gebruiker.ID)
+	if err != nil {
+		logger.Error("Fout bij genereren nieuwe refresh token", "user_id", gebruiker.ID, "error", err)
+		return "", "", err
+	}
+
+	// Revoke oude refresh token
+	if err := s.refreshTokenRepo.RevokeToken(ctx, refreshToken); err != nil {
+		logger.Error("Fout bij revoken oude refresh token", "error", err)
+		// Continue anyway, nieuwe tokens zijn al gegenereerd
+	}
+
+	logger.Info("Token refresh succesvol", "user_id", gebruiker.ID)
+	return accessToken, newRefreshToken, nil
+}
+
+// RevokeRefreshToken trekt een refresh token in
+func (s *AuthServiceImpl) RevokeRefreshToken(ctx context.Context, refreshToken string) error {
+	if err := s.refreshTokenRepo.RevokeToken(ctx, refreshToken); err != nil {
+		logger.Error("Fout bij revoken refresh token", "error", err)
+		return err
+	}
+	logger.Debug("Refresh token ingetrokken")
+	return nil
+}
+
+// RevokeAllUserRefreshTokens trekt alle refresh tokens van een gebruiker in
+func (s *AuthServiceImpl) RevokeAllUserRefreshTokens(ctx context.Context, userID string) error {
+	if err := s.refreshTokenRepo.RevokeAllUserTokens(ctx, userID); err != nil {
+		logger.Error("Fout bij revoken alle refresh tokens", "user_id", userID, "error", err)
+		return err
+	}
+	logger.Info("Alle refresh tokens ingetrokken", "user_id", userID)
+	return nil
 }

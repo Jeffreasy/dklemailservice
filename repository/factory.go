@@ -28,6 +28,7 @@ type Repository struct {
 	Permission     PermissionRepository
 	RolePermission RolePermissionRepository
 	UserRole       UserRoleRepository
+	RefreshToken   RefreshTokenRepository
 }
 
 // NewRepository maakt een nieuwe Repository met concrete implementaties
@@ -57,6 +58,7 @@ func NewRepository(db *gorm.DB) *Repository {
 		Permission:     NewPermissionRepository(db),
 		RolePermission: NewRolePermissionRepository(db),
 		UserRole:       NewUserRoleRepository(db),
+		RefreshToken:   NewPostgresRefreshTokenRepository(baseRepo),
 	}
 
 	return repo

@@ -69,6 +69,11 @@ func (s *PermissionServiceImpl) HasPermission(ctx context.Context, userID, resou
 	// Probeer eerst uit cache te halen
 	if s.cacheEnabled {
 		if cached := s.getCachedPermission(userID, resource, action); cached != nil {
+			logger.Debug("Permission check from cache",
+				"user_id", userID,
+				"resource", resource,
+				"action", action,
+				"has_permission", *cached)
 			return *cached
 		}
 	}
@@ -80,39 +85,20 @@ func (s *PermissionServiceImpl) HasPermission(ctx context.Context, userID, resou
 		return false
 	}
 
-	// Debug logging voor admin user
-	if userID == "7157f3f6-da85-4058-9d38-19133ec93b03" { // admin user ID from logs
-		logger.Info("Admin user permissions check", "user_id", userID, "resource", resource, "action", action, "permissions_count", len(permissions))
-		for _, perm := range permissions {
-			logger.Info("Admin user permission", "resource", perm.Resource, "action", perm.Action, "role", perm.RoleName)
-		}
-	}
-
 	hasPermission := s.checkPermissionInList(permissions, resource, action)
 
-	// Debug logging voor alle permissie checks
-	logger.Info("Permission check result",
-		"user_id", userID,
-		"resource", resource,
-		"action", action,
-		"has_permission", hasPermission,
-		"permissions_count", len(permissions))
-
-	// Gedetailleerde logging voor admin user of bij permission denied
-	if userID == "7157f3f6-da85-4058-9d38-19133ec93b03" || !hasPermission {
-		logger.Info("Detailed permission analysis",
+	// Log alleen bij permission denied voor debugging
+	if !hasPermission {
+		logger.Warn("Permission denied",
 			"user_id", userID,
 			"resource", resource,
 			"action", action,
-			"permissions_found", len(permissions))
-
-		for _, perm := range permissions {
-			logger.Info("User permission",
-				"user_id", userID,
-				"resource", perm.Resource,
-				"action", perm.Action,
-				"role_name", perm.RoleName)
-		}
+			"permissions_count", len(permissions))
+	} else {
+		logger.Debug("Permission granted",
+			"user_id", userID,
+			"resource", resource,
+			"action", action)
 	}
 
 	// Cache het resultaat
@@ -376,8 +362,8 @@ func (s *PermissionServiceImpl) cachePermission(userID, resource, action string,
 		return
 	}
 
-	// Cache voor 10 minuten
-	err = s.redisClient.Set(ctx, cacheKey, data, 10*time.Minute).Err()
+	// Cache voor 5 minuten voor snellere updates
+	err = s.redisClient.Set(ctx, cacheKey, data, 5*time.Minute).Err()
 	if err != nil {
 		logger.Error("Redis cache set error", "error", err, "key", cacheKey)
 	}

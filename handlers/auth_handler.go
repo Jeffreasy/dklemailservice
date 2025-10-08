@@ -54,7 +54,7 @@ func (h *AuthHandler) HandleLogin(c *fiber.Ctx) error {
 	}
 
 	// Authenticeer gebruiker
-	token, err := h.authService.Login(c.Context(), loginData.Email, loginData.Wachtwoord)
+	token, refreshToken, err := h.authService.Login(c.Context(), loginData.Email, loginData.Wachtwoord)
 	if err != nil {
 		// Specifieke foutafhandeling
 		switch err {
@@ -76,22 +76,94 @@ func (h *AuthHandler) HandleLogin(c *fiber.Ctx) error {
 		}
 	}
 
-	// Stel cookie in met token
+	// Haal gebruiker op voor response
+	gebruiker, err := h.authService.GetUserFromToken(c.Context(), token)
+	if err != nil {
+		logger.Error("Fout bij ophalen gebruiker na login", "email", loginData.Email, "error", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Login succesvol maar kon gebruiker niet ophalen",
+		})
+	}
+
+	// Haal permissies op
+	permissions, err := h.permissionService.GetUserPermissions(c.Context(), gebruiker.ID)
+	if err != nil {
+		logger.Error("Fout bij ophalen permissies na login", "user_id", gebruiker.ID, "error", err)
+		permissions = []*models.UserPermission{} // Fallback naar lege array
+	}
+
+	// Converteer permissies naar frontend format
+	permissionList := make([]map[string]string, len(permissions))
+	for i, perm := range permissions {
+		permissionList[i] = map[string]string{
+			"resource": perm.Resource,
+			"action":   perm.Action,
+		}
+	}
+
+	// Stel cookie in met token (20 minuten expiry)
 	cookie := fiber.Cookie{
 		Name:     "auth_token",
 		Value:    token,
 		Path:     "/",
-		Expires:  time.Now().Add(24 * time.Hour),
+		Expires:  time.Now().Add(20 * time.Minute),
 		HTTPOnly: true,
 		Secure:   c.Protocol() == "https",
 		SameSite: "Strict",
 	}
 	c.Cookie(&cookie)
 
-	// Stuur token terug in response
+	// Stuur complete user data terug met refresh token
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"token":   token,
-		"message": "Login succesvol",
+		"success":       true,
+		"token":         token,
+		"refresh_token": refreshToken,
+		"user": fiber.Map{
+			"id":          gebruiker.ID,
+			"email":       gebruiker.Email,
+			"naam":        gebruiker.Naam,
+			"rol":         gebruiker.Rol,
+			"permissions": permissionList,
+			"is_actief":   gebruiker.IsActief,
+		},
+	})
+}
+
+// HandleRefreshToken handelt token refresh verzoeken af
+func (h *AuthHandler) HandleRefreshToken(c *fiber.Ctx) error {
+	var refreshData struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+
+	if err := c.BodyParser(&refreshData); err != nil {
+		logger.Error("Fout bij parsen refresh token data", "error", err)
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Ongeldige refresh token data",
+		})
+	}
+
+	if refreshData.RefreshToken == "" {
+		logger.Warn("Ontbrekende refresh token")
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Refresh token is verplicht",
+		})
+	}
+
+	// Refresh tokens
+	accessToken, newRefreshToken, err := h.authService.RefreshAccessToken(c.Context(), refreshData.RefreshToken)
+	if err != nil {
+		logger.Warn("Token refresh gefaald", "error", err)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Ongeldige of verlopen refresh token",
+			"code":  "REFRESH_TOKEN_INVALID",
+		})
+	}
+
+	logger.Info("Token refresh succesvol")
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"success":       true,
+		"token":         accessToken,
+		"refresh_token": newRefreshToken,
 	})
 }
 

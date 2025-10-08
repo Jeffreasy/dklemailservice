@@ -56,6 +56,11 @@ func (m *MockRBACRoleRepository) GetSystemRoles(ctx context.Context) ([]*models.
 	return args.Get(0).([]*models.RBACRole), args.Error(1)
 }
 
+func (m *MockRBACRoleRepository) ListWithPermissions(ctx context.Context, limit, offset int) ([]*models.RBACRole, error) {
+	args := m.Called(ctx, limit, offset)
+	return args.Get(0).([]*models.RBACRole), args.Error(1)
+}
+
 type MockPermissionRepository struct {
 	mock.Mock
 }

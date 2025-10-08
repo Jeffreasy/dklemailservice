@@ -562,9 +562,9 @@ type MockAuthService struct {
 	mock.Mock
 }
 
-func (m *MockAuthService) Login(ctx context.Context, email, wachtwoord string) (string, error) {
+func (m *MockAuthService) Login(ctx context.Context, email, wachtwoord string) (string, string, error) {
 	args := m.Called(ctx, email, wachtwoord)
-	return args.String(0), args.Error(1)
+	return args.String(0), args.String(1), args.Error(2)
 }
 
 func (m *MockAuthService) ValidateToken(token string) (string, error) {
@@ -614,5 +614,25 @@ func (m *MockAuthService) UpdateUser(ctx context.Context, gebruiker *models.Gebr
 
 func (m *MockAuthService) DeleteUser(ctx context.Context, id string) error {
 	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
+func (m *MockAuthService) GenerateRefreshToken(ctx context.Context, userID string) (string, error) {
+	args := m.Called(ctx, userID)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockAuthService) RefreshAccessToken(ctx context.Context, refreshToken string) (string, string, error) {
+	args := m.Called(ctx, refreshToken)
+	return args.String(0), args.String(1), args.Error(2)
+}
+
+func (m *MockAuthService) RevokeRefreshToken(ctx context.Context, refreshToken string) error {
+	args := m.Called(ctx, refreshToken)
+	return args.Error(0)
+}
+
+func (m *MockAuthService) RevokeAllUserRefreshTokens(ctx context.Context, userID string) error {
+	args := m.Called(ctx, userID)
 	return args.Error(0)
 }

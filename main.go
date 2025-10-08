@@ -383,6 +383,7 @@ func main() {
 	auth := api.Group("/auth")
 	auth.Post("/login", handlers.RateLimitMiddleware(rateLimiter, "login"), authHandler.HandleLogin)
 	auth.Post("/logout", authHandler.HandleLogout)
+	auth.Post("/refresh", authHandler.HandleRefreshToken)
 
 	// Beveiligde auth routes (vereisen authenticatie)
 	authProtected := auth.Group("/", handlers.AuthMiddleware(serviceFactory.AuthService))

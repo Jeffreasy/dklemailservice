@@ -49,8 +49,8 @@ type EmailMetricsService interface {
 
 // AuthService definieert de interface voor authenticatie operaties
 type AuthService interface {
-	// Login authenticeert een gebruiker en geeft een JWT token terug
-	Login(ctx context.Context, email, wachtwoord string) (string, error)
+	// Login authenticeert een gebruiker en geeft een access token en refresh token terug
+	Login(ctx context.Context, email, wachtwoord string) (accessToken string, refreshToken string, err error)
 
 	// ValidateToken valideert een JWT token en geeft de gebruiker ID terug
 	ValidateToken(token string) (string, error)
@@ -72,6 +72,12 @@ type AuthService interface {
 	GetUser(ctx context.Context, id string) (*models.Gebruiker, error)
 	UpdateUser(ctx context.Context, gebruiker *models.Gebruiker, password *string) error
 	DeleteUser(ctx context.Context, id string) error
+
+	// Refresh token operations
+	GenerateRefreshToken(ctx context.Context, userID string) (string, error)
+	RefreshAccessToken(ctx context.Context, refreshToken string) (accessToken string, newRefreshToken string, err error)
+	RevokeRefreshToken(ctx context.Context, refreshToken string) error
+	RevokeAllUserRefreshTokens(ctx context.Context, userID string) error
 }
 
 // EmailSender definieert de generieke interface voor het versturen van e-mails.

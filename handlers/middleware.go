@@ -14,18 +14,20 @@ func AuthMiddleware(authService services.AuthService) fiber.Handler {
 		// Haal token op uit Authorization header
 		authHeader := c.Get("Authorization")
 		if authHeader == "" {
-			logger.Warn("Geen Authorization header gevonden")
+			logger.Warn("Geen Authorization header gevonden", "path", c.Path(), "ip", c.IP())
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "Niet geautoriseerd",
+				"code":  "NO_AUTH_HEADER",
 			})
 		}
 
 		// Controleer of het een Bearer token is
 		parts := strings.Split(authHeader, " ")
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			logger.Warn("Ongeldige Authorization header", "header", authHeader)
+			logger.Warn("Ongeldige Authorization header", "header", authHeader, "path", c.Path())
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "Ongeldige Authorization header",
+				"code":  "INVALID_AUTH_HEADER",
 			})
 		}
 
@@ -33,15 +35,34 @@ func AuthMiddleware(authService services.AuthService) fiber.Handler {
 		token := parts[1]
 		userID, err := authService.ValidateToken(token)
 		if err != nil {
-			logger.Warn("Ongeldig token", "error", err)
+			// Bepaal error type voor betere frontend handling
+			errorCode := "INVALID_TOKEN"
+			errorMsg := err.Error()
+			if strings.Contains(errorMsg, "expired") || strings.Contains(errorMsg, "exp") {
+				errorCode = "TOKEN_EXPIRED"
+			} else if strings.Contains(errorMsg, "malformed") {
+				errorCode = "TOKEN_MALFORMED"
+			} else if strings.Contains(errorMsg, "signature") {
+				errorCode = "TOKEN_SIGNATURE_INVALID"
+			}
+
+			logger.Warn("Token validatie gefaald",
+				"error", err,
+				"code", errorCode,
+				"path", c.Path(),
+				"ip", c.IP())
+
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "Ongeldig token",
+				"code":  errorCode,
 			})
 		}
 
 		// Sla gebruiker ID op in context
 		c.Locals("userID", userID)
 		c.Locals("token", token)
+
+		logger.Debug("Authenticatie succesvol", "user_id", userID, "path", c.Path())
 
 		// Ga door naar volgende handler
 		return c.Next()
