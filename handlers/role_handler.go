@@ -11,6 +11,7 @@ import (
 
 // RoleHandler bevat handlers voor role-permission assignments
 type RoleHandler struct {
+	roleRepo           repository.RBACRoleRepository
 	rolePermissionRepo repository.RolePermissionRepository
 	authService        services.AuthService
 	permissionService  services.PermissionService
@@ -18,11 +19,13 @@ type RoleHandler struct {
 
 // NewRoleHandler maakt een nieuwe role handler
 func NewRoleHandler(
+	roleRepo repository.RBACRoleRepository,
 	rolePermissionRepo repository.RolePermissionRepository,
 	authService services.AuthService,
 	permissionService services.PermissionService,
 ) *RoleHandler {
 	return &RoleHandler{
+		roleRepo:           roleRepo,
 		rolePermissionRepo: rolePermissionRepo,
 		authService:        authService,
 		permissionService:  permissionService,
@@ -191,12 +194,46 @@ func (h *RoleHandler) UpdateRolePermissions(c *fiber.Ctx) error {
 		removedCount++
 	}
 
+	// Haal de bijgewerkte role op met permissions (zoals frontend verwacht)
+	updatedRole, err := h.roleRepo.GetByID(ctx, roleID)
+	if err != nil {
+		logger.Error("Fout bij ophalen bijgewerkte role", "error", err, "role_id", roleID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon bijgewerkte role niet ophalen",
+		})
+	}
+
+	// Haal permissions voor deze role op
+	permissions, err := h.rolePermissionRepo.GetPermissionsByRole(ctx, roleID)
+	if err != nil {
+		logger.Error("Fout bij ophalen permissions voor role", "error", err, "role_id", roleID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon permissions niet ophalen",
+		})
+	}
+
+	// Format response zoals frontend verwacht
+	permissionObjects := make([]fiber.Map, len(permissions))
+	for i, perm := range permissions {
+		permissionObjects[i] = fiber.Map{
+			"id":                   perm.ID,
+			"resource":             perm.Resource,
+			"action":               perm.Action,
+			"description":          perm.Description,
+			"is_system_permission": perm.IsSystemPermission,
+			"created_at":           perm.CreatedAt,
+			"updated_at":           perm.UpdatedAt,
+		}
+	}
+
 	return c.JSON(fiber.Map{
-		"success":         true,
-		"message":         "Role permissions bijgewerkt",
-		"added_count":     addedCount,
-		"removed_count":   removedCount,
-		"total_requested": len(req.PermissionIDs),
+		"id":             updatedRole.ID,
+		"name":           updatedRole.Name,
+		"description":    updatedRole.Description,
+		"is_system_role": updatedRole.IsSystemRole,
+		"created_at":     updatedRole.CreatedAt,
+		"updated_at":     updatedRole.UpdatedAt,
+		"permissions":    permissionObjects,
 	})
 }
 

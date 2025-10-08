@@ -568,6 +568,7 @@ func main() {
 	permissionHandler.RegisterRoutes(app)
 
 	roleHandler := handlers.NewRoleHandler(
+		repoFactory.RBACRole,
 		repoFactory.RolePermission,
 		serviceFactory.AuthService,
 		serviceFactory.PermissionService,
