@@ -41,7 +41,7 @@ func (h *RoleHandler) RegisterRoutes(app *fiber.App) {
 	roleGroup.Delete("/:id/permissions/:permissionId", h.RemovePermissionFromRole)
 }
 
-// AssignPermissionsToRole wijst permissions toe aan een role
+// AssignPermissionsToRole wijst permissions toe aan een role (vervangt alle bestaande permissions)
 func (h *RoleHandler) AssignPermissionsToRole(c *fiber.Ctx) error {
 	roleID := c.Params("id")
 	if roleID == "" {
@@ -60,12 +60,6 @@ func (h *RoleHandler) AssignPermissionsToRole(c *fiber.Ctx) error {
 		})
 	}
 
-	if len(req.PermissionIDs) == 0 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Ten minste één permission ID is verplicht",
-		})
-	}
-
 	// Haal userID op uit context
 	userID, ok := c.Locals("userID").(string)
 	if !ok || userID == "" {
@@ -75,8 +69,20 @@ func (h *RoleHandler) AssignPermissionsToRole(c *fiber.Ctx) error {
 	}
 
 	ctx := c.Context()
-	assignedPermissions := 0
 
+	// Start transaction - verwijder bestaande permissions en voeg nieuwe toe
+	// Dit is een "replace all" operatie zoals in de JavaScript implementatie
+
+	// Verwijder bestaande permissions voor deze role
+	if err := h.rolePermissionRepo.DeleteByRoleID(ctx, roleID); err != nil {
+		logger.Error("Fout bij verwijderen bestaande permissions", "error", err, "role_id", roleID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon bestaande permissions niet verwijderen",
+		})
+	}
+
+	// Voeg nieuwe permissions toe
+	assignedPermissions := 0
 	for _, permissionID := range req.PermissionIDs {
 		rp := &models.RolePermission{
 			RoleID:       roleID,
