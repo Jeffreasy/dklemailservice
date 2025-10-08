@@ -561,17 +561,11 @@ func main() {
 	permissionHandler := handlers.NewPermissionHandler(
 		repoFactory.Permission,
 		repoFactory.RBACRole,
-		serviceFactory.AuthService,
-		serviceFactory.PermissionService,
-	)
-	permissionHandler.RegisterRoutes(app)
-
-	roleHandler := handlers.NewRoleHandler(
 		repoFactory.RolePermission,
 		serviceFactory.AuthService,
 		serviceFactory.PermissionService,
 	)
-	roleHandler.RegisterRoutes(app)
+	permissionHandler.RegisterRoutes(app)
 
 	// Initialiseer user handler
 	userHandler := handlers.NewUserHandler(serviceFactory.AuthService, serviceFactory.PermissionService, repoFactory.UserRole)

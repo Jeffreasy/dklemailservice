@@ -11,24 +11,27 @@ import (
 
 // PermissionHandler bevat handlers voor permission en role beheer
 type PermissionHandler struct {
-	permissionRepo    repository.PermissionRepository
-	roleRepo          repository.RBACRoleRepository
-	authService       services.AuthService
-	permissionService services.PermissionService
+	permissionRepo     repository.PermissionRepository
+	roleRepo           repository.RBACRoleRepository
+	rolePermissionRepo repository.RolePermissionRepository
+	authService        services.AuthService
+	permissionService  services.PermissionService
 }
 
 // NewPermissionHandler maakt een nieuwe permission handler
 func NewPermissionHandler(
 	permissionRepo repository.PermissionRepository,
 	roleRepo repository.RBACRoleRepository,
+	rolePermissionRepo repository.RolePermissionRepository,
 	authService services.AuthService,
 	permissionService services.PermissionService,
 ) *PermissionHandler {
 	return &PermissionHandler{
-		permissionRepo:    permissionRepo,
-		roleRepo:          roleRepo,
-		authService:       authService,
-		permissionService: permissionService,
+		permissionRepo:     permissionRepo,
+		roleRepo:           roleRepo,
+		rolePermissionRepo: rolePermissionRepo,
+		authService:        authService,
+		permissionService:  permissionService,
 	}
 }
 
@@ -46,6 +49,8 @@ func (h *PermissionHandler) RegisterRoutes(app *fiber.App) {
 	// Role routes
 	rbacGroup.Get("/roles", h.ListRoles)
 	rbacGroup.Post("/roles", h.CreateRole)
+	rbacGroup.Put("/roles/:id/permissions", h.AssignPermissionsToRole)
+	rbacGroup.Delete("/roles/:id/permissions/:permissionId", h.RemovePermissionFromRole)
 }
 
 // ListPermissions haalt een lijst van permissions op
@@ -206,4 +211,88 @@ func (h *PermissionHandler) CreateRole(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(role)
+}
+
+// AssignPermissionsToRole wijst permissions toe aan een role
+func (h *PermissionHandler) AssignPermissionsToRole(c *fiber.Ctx) error {
+	roleID := c.Params("id")
+	if roleID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Role ID is verplicht",
+		})
+	}
+
+	var req struct {
+		PermissionIDs []string `json:"permission_ids"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Ongeldige gegevens",
+		})
+	}
+
+	if len(req.PermissionIDs) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Ten minste één permission ID is verplicht",
+		})
+	}
+
+	// Haal userID op uit context
+	userID, ok := c.Locals("userID").(string)
+	if !ok || userID == "" {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon userID niet ophalen uit context",
+		})
+	}
+
+	ctx := c.Context()
+	assignedPermissions := 0
+
+	for _, permissionID := range req.PermissionIDs {
+		rp := &models.RolePermission{
+			RoleID:       roleID,
+			PermissionID: permissionID,
+			AssignedBy:   &userID,
+		}
+
+		if err := h.rolePermissionRepo.Create(ctx, rp); err != nil {
+			logger.Error("Fout bij toewijzen permission aan role", "error", err, "role_id", roleID, "permission_id", permissionID)
+			// Continue with other permissions
+			continue
+		}
+		assignedPermissions++
+	}
+
+	return c.JSON(fiber.Map{
+		"success":              true,
+		"message":              "Permissions toegewezen aan role",
+		"assigned_permissions": assignedPermissions,
+		"total_requested":      len(req.PermissionIDs),
+	})
+}
+
+// RemovePermissionFromRole verwijdert een permission van een role
+func (h *PermissionHandler) RemovePermissionFromRole(c *fiber.Ctx) error {
+	roleID := c.Params("id")
+	permissionID := c.Params("permissionId")
+
+	if roleID == "" || permissionID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Role ID en Permission ID zijn verplicht",
+		})
+	}
+
+	ctx := c.Context()
+	if err := h.rolePermissionRepo.Delete(ctx, roleID, permissionID); err != nil {
+		logger.Error("Fout bij verwijderen permission van role", "error", err, "role_id", roleID, "permission_id", permissionID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon permission niet verwijderen van role",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Permission verwijderd van role",
+	})
 }
