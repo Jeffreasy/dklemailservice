@@ -49,7 +49,7 @@ func (h *PermissionHandler) RegisterRoutes(app *fiber.App) {
 	// Role routes
 	rbacGroup.Get("/roles", h.ListRoles)
 	rbacGroup.Post("/roles", h.CreateRole)
-	rbacGroup.Put("/roles/:id/permissions", h.AssignPermissionsToRole)
+	rbacGroup.Post("/roles/:id/permissions/:permissionId", h.AddPermissionToRole)
 	rbacGroup.Delete("/roles/:id/permissions/:permissionId", h.RemovePermissionFromRole)
 }
 
@@ -213,22 +213,14 @@ func (h *PermissionHandler) CreateRole(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(role)
 }
 
-// AssignPermissionsToRole wijst permissions toe aan een role (vervangt alle bestaande permissions)
-func (h *PermissionHandler) AssignPermissionsToRole(c *fiber.Ctx) error {
+// AddPermissionToRole voegt één permission toe aan een role
+func (h *PermissionHandler) AddPermissionToRole(c *fiber.Ctx) error {
 	roleID := c.Params("id")
-	if roleID == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Role ID is verplicht",
-		})
-	}
+	permissionID := c.Params("permissionId")
 
-	var req struct {
-		PermissionIDs []string `json:"permission_ids"`
-	}
-
-	if err := c.BodyParser(&req); err != nil {
+	if roleID == "" || permissionID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Ongeldige gegevens",
+			"error": "Role ID en Permission ID zijn verplicht",
 		})
 	}
 
@@ -242,70 +234,38 @@ func (h *PermissionHandler) AssignPermissionsToRole(c *fiber.Ctx) error {
 
 	ctx := c.Context()
 
-	// Start transaction - verwijder bestaande permissions en voeg nieuwe toe
-	// Dit is een "replace all" operatie zoals in de JavaScript implementatie
-
-	// Verwijder bestaande permissions voor deze role
-	if err := h.rolePermissionRepo.DeleteByRoleID(ctx, roleID); err != nil {
-		logger.Error("Fout bij verwijderen bestaande permissions", "error", err, "role_id", roleID)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Kon bestaande permissions niet verwijderen",
-		})
-	}
-
-	// Voeg nieuwe permissions toe
-	assignedPermissions := 0
-	for _, permissionID := range req.PermissionIDs {
-		rp := &models.RolePermission{
-			RoleID:       roleID,
-			PermissionID: permissionID,
-			AssignedBy:   &userID,
-		}
-
-		if err := h.rolePermissionRepo.Create(ctx, rp); err != nil {
-			logger.Error("Fout bij toewijzen permission aan role", "error", err, "role_id", roleID, "permission_id", permissionID)
-			// Continue with other permissions
-			continue
-		}
-		assignedPermissions++
-	}
-
-	// Haal de bijgewerkte role op met permissions (zoals in JavaScript implementatie)
-	updatedRole, err := h.roleRepo.GetByID(ctx, roleID)
+	// Check if permission is already assigned
+	hasPermission, err := h.rolePermissionRepo.HasPermission(ctx, roleID, permissionID)
 	if err != nil {
-		logger.Error("Fout bij ophalen bijgewerkte role", "error", err, "role_id", roleID)
+		logger.Error("Fout bij controleren bestaande permission", "error", err, "role_id", roleID, "permission_id", permissionID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Kon bijgewerkte role niet ophalen",
+			"error": "Kon permission niet controleren",
 		})
 	}
 
-	// Haal permissions voor deze role op
-	permissions, err := h.rolePermissionRepo.GetPermissionsByRole(ctx, roleID)
-	if err != nil {
-		logger.Error("Fout bij ophalen permissions voor role", "error", err, "role_id", roleID)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Kon permissions niet ophalen",
+	if hasPermission {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+			"error": "Permission is al toegewezen aan deze role",
 		})
 	}
 
-	// Format response zoals in JavaScript implementatie
-	permissionObjects := make([]fiber.Map, len(permissions))
-	for i, perm := range permissions {
-		permissionObjects[i] = fiber.Map{
-			"id":          perm.ID,
-			"resource":    perm.Resource,
-			"action":      perm.Action,
-			"description": perm.Description,
-		}
+	// Voeg permission toe
+	rp := &models.RolePermission{
+		RoleID:       roleID,
+		PermissionID: permissionID,
+		AssignedBy:   &userID,
+	}
+
+	if err := h.rolePermissionRepo.Create(ctx, rp); err != nil {
+		logger.Error("Fout bij toewijzen permission aan role", "error", err, "role_id", roleID, "permission_id", permissionID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon permission niet toewijzen aan role",
+		})
 	}
 
 	return c.JSON(fiber.Map{
-		"id":          updatedRole.ID,
-		"name":        updatedRole.Name,
-		"description": updatedRole.Description,
-		"created_at":  updatedRole.CreatedAt,
-		"updated_at":  updatedRole.UpdatedAt,
-		"permissions": permissionObjects,
+		"success": true,
+		"message": "Permission toegevoegd aan role",
 	})
 }
 
