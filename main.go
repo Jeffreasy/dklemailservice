@@ -567,13 +567,15 @@ func main() {
 	)
 	permissionHandler.RegisterRoutes(app)
 
-	roleHandler := handlers.NewRoleHandler(
-		repoFactory.RBACRole,
-		repoFactory.RolePermission,
-		serviceFactory.AuthService,
-		serviceFactory.PermissionService,
-	)
-	roleHandler.RegisterRoutes(app)
+	// RoleHandler uitgecommentarieerd om dubbele route registratie te voorkomen
+	// PermissionHandler bevat alle benodigde endpoints via /api/rbac/roles/*
+	// roleHandler := handlers.NewRoleHandler(
+	// 	repoFactory.RBACRole,
+	// 	repoFactory.RolePermission,
+	// 	serviceFactory.AuthService,
+	// 	serviceFactory.PermissionService,
+	// )
+	// roleHandler.RegisterRoutes(app)
 
 	// Initialiseer user handler
 	userHandler := handlers.NewUserHandler(serviceFactory.AuthService, serviceFactory.PermissionService, repoFactory.UserRole)
