@@ -563,6 +563,7 @@ func main() {
 		repoFactory.Permission,
 		repoFactory.RBACRole,
 		repoFactory.RolePermission,
+		repoFactory.UserRole,
 		serviceFactory.AuthService,
 		serviceFactory.PermissionService,
 	)

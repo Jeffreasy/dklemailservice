@@ -138,8 +138,8 @@ func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 }
 
 func (h *UserHandler) AssignRolesToUser(c *fiber.Ctx) error {
-	userID := c.Params("id")
-	if userID == "" {
+	targetUserID := c.Params("id")
+	if targetUserID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "User ID is verplicht",
 		})
@@ -162,8 +162,8 @@ func (h *UserHandler) AssignRolesToUser(c *fiber.Ctx) error {
 	}
 
 	// Haal userID op uit context voor assigned_by
-	userID, ok := c.Locals("userID").(string)
-	if !ok || userID == "" {
+	currentUserID, ok := c.Locals("userID").(string)
+	if !ok || currentUserID == "" {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon userID niet ophalen uit context",
 		})
@@ -174,14 +174,14 @@ func (h *UserHandler) AssignRolesToUser(c *fiber.Ctx) error {
 
 	for _, roleID := range req.RoleIDs {
 		ur := &models.UserRole{
-			UserID:     userID,
+			UserID:     targetUserID,
 			RoleID:     roleID,
-			AssignedBy: &userID,
+			AssignedBy: &currentUserID,
 			IsActive:   true,
 		}
 
 		if err := h.userRoleRepo.Create(ctx, ur); err != nil {
-			logger.Error("Fout bij toewijzen role aan user", "error", err, "user_id", userID, "role_id", roleID)
+			logger.Error("Fout bij toewijzen role aan user", "error", err, "user_id", targetUserID, "role_id", roleID)
 			// Continue with other roles
 			continue
 		}

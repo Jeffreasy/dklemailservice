@@ -15,6 +15,7 @@ type PermissionHandler struct {
 	permissionRepo     repository.PermissionRepository
 	roleRepo           repository.RBACRoleRepository
 	rolePermissionRepo repository.RolePermissionRepository
+	userRoleRepo       repository.UserRoleRepository
 	authService        services.AuthService
 	permissionService  services.PermissionService
 }
@@ -24,6 +25,7 @@ func NewPermissionHandler(
 	permissionRepo repository.PermissionRepository,
 	roleRepo repository.RBACRoleRepository,
 	rolePermissionRepo repository.RolePermissionRepository,
+	userRoleRepo repository.UserRoleRepository,
 	authService services.AuthService,
 	permissionService services.PermissionService,
 ) *PermissionHandler {
@@ -31,6 +33,7 @@ func NewPermissionHandler(
 		permissionRepo:     permissionRepo,
 		roleRepo:           roleRepo,
 		rolePermissionRepo: rolePermissionRepo,
+		userRoleRepo:       userRoleRepo,
 		authService:        authService,
 		permissionService:  permissionService,
 	}
@@ -46,10 +49,14 @@ func (h *PermissionHandler) RegisterRoutes(app *fiber.App) {
 	// Permission routes
 	rbacGroup.Get("/permissions", h.ListPermissions)
 	rbacGroup.Post("/permissions", h.CreatePermission)
+	rbacGroup.Put("/permissions/:id", h.UpdatePermission)
+	rbacGroup.Delete("/permissions/:id", h.DeletePermission)
 
 	// Role routes
 	rbacGroup.Get("/roles", h.ListRoles)
 	rbacGroup.Post("/roles", h.CreateRole)
+	rbacGroup.Put("/roles/:id", h.UpdateRole)                                            // Update role details
+	rbacGroup.Delete("/roles/:id", h.DeleteRole)                                         // Delete role
 	rbacGroup.Put("/roles/:id/permissions", h.UpdateRolePermissions)                     // Voor bulk updates (frontend compatibiliteit)
 	rbacGroup.Post("/roles/:id/permissions/:permissionId", h.AddPermissionToRole)        // Voor individuele toevoeging
 	rbacGroup.Delete("/roles/:id/permissions/:permissionId", h.RemovePermissionFromRole) // Voor individuele verwijdering
@@ -134,6 +141,115 @@ func (h *PermissionHandler) CreatePermission(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(permission)
+}
+
+// UpdatePermission werkt een permission bij
+func (h *PermissionHandler) UpdatePermission(c *fiber.Ctx) error {
+	permissionID := c.Params("id")
+	if permissionID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Permission ID is verplicht",
+		})
+	}
+
+	var req struct {
+		Resource    *string `json:"resource,omitempty"`
+		Action      *string `json:"action,omitempty"`
+		Description *string `json:"description,omitempty"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Ongeldige gegevens",
+		})
+	}
+
+	ctx := c.Context()
+
+	// Haal huidige permission op
+	permission, err := h.permissionRepo.GetByID(ctx, permissionID)
+	if err != nil {
+		logger.Error("Fout bij ophalen permission", "error", err, "permission_id", permissionID)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Permission niet gevonden",
+		})
+	}
+
+	// Controleer of het een systeempermission is
+	if permission.IsSystemPermission {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "Kan systeempermission niet bewerken",
+		})
+	}
+
+	// Update velden indien opgegeven
+	if req.Resource != nil {
+		permission.Resource = *req.Resource
+	}
+	if req.Action != nil {
+		permission.Action = *req.Action
+	}
+	if req.Description != nil {
+		permission.Description = *req.Description
+	}
+
+	if err := h.permissionRepo.Update(ctx, permission); err != nil {
+		logger.Error("Fout bij bijwerken permission", "error", err, "permission_id", permissionID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon permission niet bijwerken",
+		})
+	}
+
+	return c.JSON(permission)
+}
+
+// DeletePermission verwijdert een permission
+func (h *PermissionHandler) DeletePermission(c *fiber.Ctx) error {
+	permissionID := c.Params("id")
+	if permissionID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Permission ID is verplicht",
+		})
+	}
+
+	ctx := c.Context()
+
+	// Haal permission op om te controleren of het een systeempermission is
+	permission, err := h.permissionRepo.GetByID(ctx, permissionID)
+	if err != nil {
+		logger.Error("Fout bij ophalen permission", "error", err, "permission_id", permissionID)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Permission niet gevonden",
+		})
+	}
+
+	// Controleer of het een systeempermission is
+	if permission.IsSystemPermission {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "Kan systeempermission niet verwijderen",
+		})
+	}
+
+	// Verwijder eerst alle role-permission relaties
+	if err := h.rolePermissionRepo.DeleteByPermissionID(ctx, permissionID); err != nil {
+		logger.Error("Fout bij verwijderen role-permission relaties", "error", err, "permission_id", permissionID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon role-permission relaties niet verwijderen",
+		})
+	}
+
+	// Verwijder de permission
+	if err := h.permissionRepo.Delete(ctx, permissionID); err != nil {
+		logger.Error("Fout bij verwijderen permission", "error", err, "permission_id", permissionID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon permission niet verwijderen",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Permission verwijderd",
+	})
 }
 
 // ListRoles haalt een lijst van roles op met hun permissions
@@ -395,5 +511,118 @@ func (h *PermissionHandler) UpdateRolePermissions(c *fiber.Ctx) error {
 		"added_count":     addedCount,
 		"removed_count":   removedCount,
 		"total_requested": len(req.PermissionIDs),
+	})
+}
+
+// UpdateRole werkt een rol bij
+func (h *PermissionHandler) UpdateRole(c *fiber.Ctx) error {
+	roleID := c.Params("id")
+	if roleID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Role ID is verplicht",
+		})
+	}
+
+	var req struct {
+		Name        *string `json:"name,omitempty"`
+		Description *string `json:"description,omitempty"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Ongeldige gegevens",
+		})
+	}
+
+	ctx := c.Context()
+
+	// Haal huidige rol op
+	role, err := h.roleRepo.GetByID(ctx, roleID)
+	if err != nil {
+		logger.Error("Fout bij ophalen rol", "error", err, "role_id", roleID)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Rol niet gevonden",
+		})
+	}
+
+	// Controleer of het een systeemrol is
+	if role.IsSystemRole {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "Kan systeemrol niet bewerken",
+		})
+	}
+
+	// Update velden indien opgegeven
+	if req.Name != nil {
+		role.Name = *req.Name
+	}
+	if req.Description != nil {
+		role.Description = *req.Description
+	}
+
+	if err := h.roleRepo.Update(ctx, role); err != nil {
+		logger.Error("Fout bij bijwerken rol", "error", err, "role_id", roleID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon rol niet bijwerken",
+		})
+	}
+
+	return c.JSON(role)
+}
+
+// DeleteRole verwijdert een rol
+func (h *PermissionHandler) DeleteRole(c *fiber.Ctx) error {
+	roleID := c.Params("id")
+	if roleID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Role ID is verplicht",
+		})
+	}
+
+	ctx := c.Context()
+
+	// Haal rol op om te controleren of het een systeemrol is
+	role, err := h.roleRepo.GetByID(ctx, roleID)
+	if err != nil {
+		logger.Error("Fout bij ophalen rol", "error", err, "role_id", roleID)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Rol niet gevonden",
+		})
+	}
+
+	// Controleer of het een systeemrol is
+	if role.IsSystemRole {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "Kan systeemrol niet verwijderen",
+		})
+	}
+
+	// Verwijder eerst alle role-permission relaties
+	if err := h.rolePermissionRepo.DeleteByRoleID(ctx, roleID); err != nil {
+		logger.Error("Fout bij verwijderen role-permission relaties", "error", err, "role_id", roleID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon role-permission relaties niet verwijderen",
+		})
+	}
+
+	// Verwijder user-role relaties
+	if err := h.userRoleRepo.DeleteByRole(ctx, roleID); err != nil {
+		logger.Error("Fout bij verwijderen user-role relaties", "error", err, "role_id", roleID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon user-role relaties niet verwijderen",
+		})
+	}
+
+	// Verwijder de rol
+	if err := h.roleRepo.Delete(ctx, roleID); err != nil {
+		logger.Error("Fout bij verwijderen rol", "error", err, "role_id", roleID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon rol niet verwijderen",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Rol verwijderd",
 	})
 }
