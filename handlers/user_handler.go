@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 )
 
 type UserHandler struct {
@@ -30,6 +31,7 @@ func (h *UserHandler) RegisterRoutes(app *fiber.App) {
 	app.Post("/api/users", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "write"), h.CreateUser)
 	app.Put("/api/users/:id", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "write"), h.UpdateUser)
 	app.Put("/api/users/:id/roles", AuthMiddleware(h.authService), AdminPermissionMiddleware(h.permissionService), h.AssignRolesToUser)
+	app.Delete("/api/users/:id/roles/:roleId", AuthMiddleware(h.authService), AdminPermissionMiddleware(h.permissionService), h.RemoveRoleFromUser)
 	app.Delete("/api/users/:id", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "delete"), h.DeleteUser)
 }
 
@@ -193,5 +195,44 @@ func (h *UserHandler) AssignRolesToUser(c *fiber.Ctx) error {
 		"message":         "Roles toegewezen aan user",
 		"assigned_roles":  assignedRoles,
 		"total_requested": len(req.RoleIDs),
+	})
+}
+
+func (h *UserHandler) RemoveRoleFromUser(c *fiber.Ctx) error {
+	userID := c.Params("id")
+	roleID := c.Params("roleId")
+	if userID == "" || roleID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "User ID en Role ID zijn verplicht",
+		})
+	}
+
+	ctx := c.Context()
+
+	// Find the user-role relationship
+	userRole, err := h.userRoleRepo.GetByUserAndRole(ctx, userID, roleID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "Gebruiker heeft deze rol niet",
+			})
+		}
+		logger.Error("Fout bij ophalen user-role relatie", "error", err, "user_id", userID, "role_id", roleID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon user-role relatie niet controleren",
+		})
+	}
+
+	// Deactivate the relationship
+	if err := h.userRoleRepo.Deactivate(ctx, userRole.ID); err != nil {
+		logger.Error("Fout bij verwijderen rol van user", "error", err, "user_id", userID, "role_id", roleID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon rol niet verwijderen van user",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Rol verwijderd van user",
 	})
 }

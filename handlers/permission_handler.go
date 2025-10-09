@@ -54,6 +54,7 @@ func (h *PermissionHandler) RegisterRoutes(app *fiber.App) {
 
 	// Role routes
 	rbacGroup.Get("/roles", h.ListRoles)
+	rbacGroup.Get("/roles/:id", h.GetRole) // Get role details
 	rbacGroup.Post("/roles", h.CreateRole)
 	rbacGroup.Put("/roles/:id", h.UpdateRole)                                            // Update role details
 	rbacGroup.Delete("/roles/:id", h.DeleteRole)                                         // Delete role
@@ -329,6 +330,27 @@ func (h *PermissionHandler) CreateRole(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(role)
+}
+
+// GetRole haalt details van een specifieke rol op
+func (h *PermissionHandler) GetRole(c *fiber.Ctx) error {
+	roleID := c.Params("id")
+	if roleID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Role ID is verplicht",
+		})
+	}
+
+	ctx := c.Context()
+	role, err := h.roleRepo.GetByID(ctx, roleID)
+	if err != nil {
+		logger.Error("Fout bij ophalen rol", "error", err, "role_id", roleID)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Rol niet gevonden",
+		})
+	}
+
+	return c.JSON(role)
 }
 
 // AddPermissionToRole voegt één permission toe aan een role
