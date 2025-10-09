@@ -84,26 +84,96 @@ X-RateLimit-Reset: 1640000000
 
 | Method | Endpoint | Beschrijving | Permission |
 |--------|----------|--------------|------------|
-| GET | `/api/contact` | Contact lijst | `contacts:read` |
-| GET | `/api/contact/:id` | Contact details | `contacts:read` |
-| PUT | `/api/contact/:id` | Contact bijwerken | `contacts:update` |
-| DELETE | `/api/contact/:id` | Contact verwijderen | `contacts:delete` |
-| POST | `/api/contact/:id/antwoord` | Antwoord toevoegen | `contacts:update` |
-| GET | `/api/aanmelding` | Aanmelding lijst | `aanmeldingen:read` |
-| GET | `/api/aanmelding/:id` | Aanmelding details | `aanmeldingen:read` |
-| PUT | `/api/aanmelding/:id` | Aanmelding bijwerken | `aanmeldingen:update` |
-| DELETE | `/api/aanmelding/:id` | Aanmelding verwijderen | `aanmeldingen:delete` |
+| GET | `/api/contact` | Contact lijst | `contact:read` |
+| GET | `/api/contact/:id` | Contact details | `contact:read` |
+| GET | `/api/contact/status/:status` | Contact filter op status | `contact:read` |
+| PUT | `/api/contact/:id` | Contact bijwerken | `contact:write` |
+| DELETE | `/api/contact/:id` | Contact verwijderen | `contact:delete` |
+| POST | `/api/contact/:id/antwoord` | Antwoord toevoegen | `contact:write` |
+| GET | `/api/aanmelding` | Aanmelding lijst | `aanmelding:read` |
+| GET | `/api/aanmelding/:id` | Aanmelding details | `aanmelding:read` |
+| GET | `/api/aanmelding/rol/:rol` | Aanmelding filter op rol | `aanmelding:read` |
+| PUT | `/api/aanmelding/:id` | Aanmelding bijwerken | `aanmelding:write` |
+| DELETE | `/api/aanmelding/:id` | Aanmelding verwijderen | `aanmelding:delete` |
+| POST | `/api/aanmelding/:id/antwoord` | Antwoord toevoegen | `aanmelding:write` |
+| GET | `/api/mail` | Inkomende emails | API Key of `admin:access` |
+| GET | `/api/mail/:id` | Email details | API Key of `admin:access` |
+| PUT | `/api/mail/:id/processed` | Markeer als verwerkt | API Key of `admin:access` |
+| DELETE | `/api/mail/:id` | Email verwijderen | API Key of `admin:access` |
+| POST | `/api/mail/fetch` | Handmatig ophalen | API Key of `admin:access` |
+| GET | `/api/mail/unprocessed` | Onverwerkte emails | API Key of `admin:access` |
+| GET | `/api/mail/account/:type` | Emails per account type | API Key of `admin:access` |
+| GET | `/api/users` | Gebruikers lijst | `user:read` |
+| GET | `/api/users/:id` | Gebruiker details | `user:read` |
+| POST | `/api/users` | Gebruiker aanmaken | `user:write` |
+| PUT | `/api/users/:id` | Gebruiker bijwerken | `user:write` |
+| PUT | `/api/users/:id/roles` | Roles toewijzen | Admin |
+| DELETE | `/api/users/:id` | Gebruiker verwijderen | `user:delete` |
+| GET | `/api/newsletter` | Nieuwsbrief lijst | `newsletter:read` |
+| GET | `/api/newsletter/:id` | Nieuwsbrief details | `newsletter:read` |
+| POST | `/api/newsletter` | Nieuwsbrief aanmaken | `newsletter:write` |
+| PUT | `/api/newsletter/:id` | Nieuwsbrief bijwerken | `newsletter:write` |
+| DELETE | `/api/newsletter/:id` | Nieuwsbrief verwijderen | `newsletter:delete` |
+| POST | `/api/newsletter/:id/send` | Nieuwsbrief verzenden | `newsletter:send` |
+| GET | `/api/rbac/permissions` | Permissions lijst | Admin |
+| POST | `/api/rbac/permissions` | Permission aanmaken | Admin |
+| GET | `/api/rbac/roles` | Roles lijst | Admin |
+| POST | `/api/rbac/roles` | Role aanmaken | Admin |
+| PUT | `/api/rbac/roles/:id/permissions` | Permissions toewijzen | Admin |
+| POST | `/api/rbac/roles/:id/permissions/:permissionId` | Permission toevoegen | Admin |
+| DELETE | `/api/rbac/roles/:id/permissions/:permissionId` | Permission verwijderen | Admin |
+| POST | `/api/admin/mail/send` | Admin email verzenden | `admin_email:send` |
+| GET | `/api/v1/notifications` | Notificaties lijst | Auth |
+| POST | `/api/v1/notifications` | Notificatie aanmaken | Auth |
+| GET | `/api/v1/notifications/:id` | Notificatie details | Auth |
+| DELETE | `/api/v1/notifications/:id` | Notificatie verwijderen | Auth |
+| POST | `/api/v1/notifications/reprocess-all` | Notificaties herverwerken | Auth |
+
+### Chat Endpoints
+
+| Method | Endpoint | Beschrijving | Permission |
+|--------|----------|--------------|------------|
+| GET | `/api/chat/channels` | Gebruikers channels | Auth |
+| GET | `/api/chat/channels/:id/participants` | Channel deelnemers | Auth |
+| GET | `/api/chat/public-channels` | Publieke channels | Auth |
+| POST | `/api/chat/direct` | Direct channel aanmaken | Auth |
+| POST | `/api/chat/channels` | Channel aanmaken | Auth |
+| POST | `/api/chat/channels/:id/join` | Channel joinen | Auth |
+| POST | `/api/chat/channels/:id/leave` | Channel verlaten | Auth |
+| GET | `/api/chat/users` | Gebruikers lijst | Auth |
+| GET | `/api/chat/channels/:channel_id/messages` | Berichten ophalen | Auth |
+| POST | `/api/chat/channels/:channel_id/messages` | Bericht verzenden | Auth |
+| PUT | `/api/chat/messages/:id` | Bericht bewerken | Auth |
+| DELETE | `/api/chat/messages/:id` | Bericht verwijderen | Auth |
+| POST | `/api/chat/messages/:id/reactions` | Reactie toevoegen | Auth |
+| DELETE | `/api/chat/messages/:id/reactions/:emoji` | Reactie verwijderen | Auth |
+| PUT | `/api/chat/presence` | Presence bijwerken | Auth |
+| GET | `/api/chat/online-users` | Online gebruikers | Auth |
+| POST | `/api/chat/channels/:channel_id/typing/start` | Typing starten | Auth |
+| POST | `/api/chat/channels/:channel_id/typing/stop` | Typing stoppen | Auth |
+| GET | `/api/chat/channels/:channel_id/typing` | Typing gebruikers | Auth |
+| POST | `/api/chat/channels/:id/read` | Als gelezen markeren | Auth |
+| GET | `/api/chat/unread` | Ongelezen berichten | Auth |
+| GET | `/api/chat/ws/:channel_id` | WebSocket verbinding | Auth |
+| GET | `/api/chat/ws` | WebSocket verbinding | Auth |
+
+### Whisky for Charity Endpoints
+
+| Method | Endpoint | Beschrijving | Auth |
+|--------|----------|--------------|------|
+| POST | `/api/wfc/order-email` | WFC order emails verzenden | API Key |
 
 ### Mail Management Endpoints
 
 | Method | Endpoint | Beschrijving | Permission |
 |--------|----------|--------------|------------|
-| GET | `/api/mail` | Inkomende emails | `mail:read` |
-| GET | `/api/mail/:id` | Email details | `mail:read` |
-| PUT | `/api/mail/:id/processed` | Markeer als verwerkt | `mail:update` |
-| DELETE | `/api/mail/:id` | Email verwijderen | `mail:delete` |
-| POST | `/api/mail/fetch` | Handmatig ophalen | `mail:manage` |
-| GET | `/api/mail/unprocessed` | Onverwerkte emails | `mail:read` |
+| GET | `/api/mail` | Inkomende emails | API Key of `admin:access` |
+| GET | `/api/mail/:id` | Email details | API Key of `admin:access` |
+| PUT | `/api/mail/:id/processed` | Markeer als verwerkt | API Key of `admin:access` |
+| DELETE | `/api/mail/:id` | Email verwijderen | API Key of `admin:access` |
+| POST | `/api/mail/fetch` | Handmatig ophalen | API Key of `admin:access` |
+| GET | `/api/mail/unprocessed` | Onverwerkte emails | API Key of `admin:access` |
+| GET | `/api/mail/account/:type` | Emails per account type | API Key of `admin:access` |
 
 ## Detailed Endpoints
 
@@ -122,17 +192,401 @@ Service informatie en beschikbare endpoints.
     "environment": "production",
     "timestamp": "2024-03-20T15:04:05Z",
     "endpoints": [
-        {
-            "path": "/api/health",
-            "method": "GET",
-            "description": "Service health status"
-        },
-        {
-            "path": "/api/contact-email",
-            "method": "POST",
-            "description": "Send contact form email"
-        }
-        // ... meer endpoints
+    	{
+    		"path": "/api/health",
+    		"method": "GET",
+    		"description": "Service health status"
+    	},
+    	{
+    		"path": "/api/contact-email",
+    		"method": "POST",
+    		"description": "Send contact form email"
+    	},
+    	{
+    		"path": "/api/aanmelding-email",
+    		"method": "POST",
+    		"description": "Send registration form email"
+    	},
+    	{
+    		"path": "/api/auth/login",
+    		"method": "POST",
+    		"description": "User login"
+    	},
+    	{
+    		"path": "/api/auth/logout",
+    		"method": "POST",
+    		"description": "User logout"
+    	},
+    	{
+    		"path": "/api/auth/refresh",
+    		"method": "POST",
+    		"description": "Token refresh"
+    	},
+    	{
+    		"path": "/api/auth/profile",
+    		"method": "GET",
+    		"description": "Get user profile (requires auth)"
+    	},
+    	{
+    		"path": "/api/auth/reset-password",
+    		"method": "POST",
+    		"description": "Reset password (requires auth)"
+    	},
+    	{
+    		"path": "/api/contact",
+    		"method": "GET",
+    		"description": "List contact forms (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/contact/:id",
+    		"method": "GET",
+    		"description": "Get contact form details (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/contact/:id",
+    		"method": "PUT",
+    		"description": "Update contact form (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/contact/:id",
+    		"method": "DELETE",
+    		"description": "Delete contact form (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/contact/:id/antwoord",
+    		"method": "POST",
+    		"description": "Add reply to contact form (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/contact/status/:status",
+    		"method": "GET",
+    		"description": "Filter contact forms by status (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/aanmelding",
+    		"method": "GET",
+    		"description": "List registrations (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/aanmelding/:id",
+    		"method": "GET",
+    		"description": "Get registration details (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/aanmelding/:id",
+    		"method": "PUT",
+    		"description": "Update registration (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/aanmelding/:id",
+    		"method": "DELETE",
+    		"description": "Delete registration (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/aanmelding/:id/antwoord",
+    		"method": "POST",
+    		"description": "Add reply to registration (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/aanmelding/rol/:rol",
+    		"method": "GET",
+    		"description": "Filter registrations by role (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/wfc/order-email",
+    		"method": "POST",
+    		"description": "Send Whisky for Charity order emails (requires API key)"
+    	},
+    	{
+    		"path": "/metrics",
+    		"method": "GET",
+    		"description": "Prometheus metrics"
+    	},
+    	{
+    		"path": "/api/metrics/email",
+    		"method": "GET",
+    		"description": "Email metrics (requires API key)"
+    	},
+    	{
+    		"path": "/api/metrics/rate-limits",
+    		"method": "GET",
+    		"description": "Rate limit metrics (requires API key)"
+    	},
+    	{
+    		"path": "/api/mail",
+    		"method": "GET",
+    		"description": "List incoming emails (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/mail/:id",
+    		"method": "GET",
+    		"description": "Get email details (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/mail/:id/processed",
+    		"method": "PUT",
+    		"description": "Mark email as processed (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/mail/:id",
+    		"method": "DELETE",
+    		"description": "Delete email (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/mail/fetch",
+    		"method": "POST",
+    		"description": "Manually fetch emails (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/mail/unprocessed",
+    		"method": "GET",
+    		"description": "List unprocessed emails (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/mail/account/:type",
+    		"method": "GET",
+    		"description": "List emails by account type (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/users",
+    		"method": "GET",
+    		"description": "List users (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/users/:id",
+    		"method": "GET",
+    		"description": "Get user details (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/users",
+    		"method": "POST",
+    		"description": "Create user (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/users/:id",
+    		"method": "PUT",
+    		"description": "Update user (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/users/:id/roles",
+    		"method": "PUT",
+    		"description": "Assign roles to user (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/users/:id",
+    		"method": "DELETE",
+    		"description": "Delete user (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/newsletter",
+    		"method": "GET",
+    		"description": "List newsletters (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/newsletter/:id",
+    		"method": "GET",
+    		"description": "Get newsletter details (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/newsletter",
+    		"method": "POST",
+    		"description": "Create newsletter (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/newsletter/:id",
+    		"method": "PUT",
+    		"description": "Update newsletter (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/newsletter/:id",
+    		"method": "DELETE",
+    		"description": "Delete newsletter (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/newsletter/:id/send",
+    		"method": "POST",
+    		"description": "Send newsletter (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/rbac/permissions",
+    		"method": "GET",
+    		"description": "List permissions (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/rbac/permissions",
+    		"method": "POST",
+    		"description": "Create permission (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/rbac/roles",
+    		"method": "GET",
+    		"description": "List roles (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/rbac/roles",
+    		"method": "POST",
+    		"description": "Create role (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/rbac/roles/:id/permissions",
+    		"method": "PUT",
+    		"description": "Update role permissions (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/rbac/roles/:id/permissions/:permissionId",
+    		"method": "POST",
+    		"description": "Add permission to role (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/rbac/roles/:id/permissions/:permissionId",
+    		"method": "DELETE",
+    		"description": "Remove permission from role (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/admin/mail/send",
+    		"method": "POST",
+    		"description": "Send admin email (requires admin auth)"
+    	},
+    	{
+    		"path": "/api/v1/notifications",
+    		"method": "GET",
+    		"description": "List notifications (requires auth)"
+    	},
+    	{
+    		"path": "/api/v1/notifications",
+    		"method": "POST",
+    		"description": "Create notification (requires auth)"
+    	},
+    	{
+    		"path": "/api/v1/notifications/:id",
+    		"method": "GET",
+    		"description": "Get notification details (requires auth)"
+    	},
+    	{
+    		"path": "/api/v1/notifications/:id",
+    		"method": "DELETE",
+    		"description": "Delete notification (requires auth)"
+    	},
+    	{
+    		"path": "/api/v1/notifications/reprocess-all",
+    		"method": "POST",
+    		"description": "Reprocess all notifications (requires auth)"
+    	},
+    	{
+    		"path": "/api/chat/channels",
+    		"method": "GET",
+    		"description": "List user channels (requires auth)"
+    	},
+    	{
+    		"path": "/api/chat/channels/:id/participants",
+    		"method": "GET",
+    		"description": "List channel participants (requires auth)"
+    	},
+    	{
+    		"path": "/api/chat/public-channels",
+    		"method": "GET",
+    		"description": "List public channels (requires auth)"
+    	},
+    	{
+    		"path": "/api/chat/direct",
+    		"method": "POST",
+    		"description": "Create direct channel (requires auth)"
+    	},
+    	{
+    		"path": "/api/chat/channels",
+    		"method": "POST",
+    		"description": "Create channel (requires auth)"
+    	},
+    	{
+    		"path": "/api/chat/channels/:id/join",
+    		"method": "POST",
+    		"description": "Join channel (requires auth)"
+    	},
+    	{
+    		"path": "/api/chat/channels/:id/leave",
+    		"method": "POST",
+    		"description": "Leave channel (requires auth)"
+    	},
+    	{
+    		"path": "/api/chat/users",
+    		"method": "GET",
+    		"description": "List users for chat (requires auth)"
+    	},
+    	{
+    		"path": "/api/chat/channels/:channel_id/messages",
+    		"method": "GET",
+    		"description": "Get channel messages (requires auth)"
+    	},
+    	{
+    		"path": "/api/chat/channels/:channel_id/messages",
+    		"method": "POST",
+    		"description": "Send message (requires auth)"
+    	},
+    	{
+    		"path": "/api/chat/messages/:id",
+    		"method": "PUT",
+    		"description": "Edit message (requires auth)"
+    	},
+    	{
+    		"path": "/api/chat/messages/:id",
+    		"method": "DELETE",
+    		"description": "Delete message (requires auth)"
+    	},
+    	{
+    		"path": "/api/chat/messages/:id/reactions",
+    		"method": "POST",
+    		"description": "Add reaction (requires auth)"
+    	},
+    	{
+    		"path": "/api/chat/messages/:id/reactions/:emoji",
+    		"method": "DELETE",
+    		"description": "Remove reaction (requires auth)"
+    	},
+    	{
+    		"path": "/api/chat/presence",
+    		"method": "PUT",
+    		"description": "Update presence (requires auth)"
+    	},
+    	{
+    		"path": "/api/chat/online-users",
+    		"method": "GET",
+    		"description": "List online users (requires auth)"
+    	},
+    	{
+    		"path": "/api/chat/channels/:channel_id/typing/start",
+    		"method": "POST",
+    		"description": "Start typing (requires auth)"
+    	},
+    	{
+    		"path": "/api/chat/channels/:channel_id/typing/stop",
+    		"method": "POST",
+    		"description": "Stop typing (requires auth)"
+    	},
+    	{
+    		"path": "/api/chat/channels/:channel_id/typing",
+    		"method": "GET",
+    		"description": "Get typing users (requires auth)"
+    	},
+    	{
+    		"path": "/api/chat/channels/:id/read",
+    		"method": "POST",
+    		"description": "Mark as read (requires auth)"
+    	},
+    	{
+    		"path": "/api/chat/unread",
+    		"method": "GET",
+    		"description": "Get unread count (requires auth)"
+    	},
+    	{
+    		"path": "/api/chat/ws/:channel_id",
+    		"method": "GET",
+    		"description": "WebSocket connection (requires auth)"
+    	},
+    	{
+    		"path": "/api/chat/ws",
+    		"method": "GET",
+    		"description": "WebSocket connection (requires auth)"
+    	}
     ]
 }
 ```
@@ -325,6 +779,108 @@ Verzendt een aanmelding email en slaat de aanmelding op in de database.
 - Per IP: 10 emails per uur
 
 **Implementatie:** [`handlers/email_handler.go:205`](../../handlers/email_handler.go:205)
+
+### User Management
+
+#### GET /api/users
+
+Haalt een lijst van gebruikers op (admin only).
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+```
+
+**Query Parameters:**
+- `limit` (optioneel): Maximum aantal resultaten (default: 50)
+- `offset` (optioneel): Aantal resultaten om over te slaan (default: 0)
+
+**Response (200 OK):**
+```json
+{
+    "success": true,
+    "data": [
+        {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "naam": "John Doe",
+            "email": "john@example.com",
+            "rol": "admin",
+            "is_actief": true,
+            "newsletter_subscribed": true,
+            "created_at": "2024-03-20T15:04:05Z",
+            "updated_at": "2024-03-20T15:04:05Z"
+        }
+    ],
+    "total": 1,
+    "limit": 50,
+    "offset": 0
+}
+```
+
+**Implementatie:** [`handlers/user_handler.go:27`](../../handlers/user_handler.go:27)
+
+#### POST /api/users
+
+Maakt een nieuwe gebruiker aan (admin only).
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+    "email": "john@example.com",
+    "naam": "John Doe",
+    "rol": "admin",
+    "password": "securepassword",
+    "is_actief": true,
+    "newsletter_subscribed": false
+}
+```
+
+**Response (201 Created):**
+```json
+{
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "naam": "John Doe",
+    "email": "john@example.com",
+    "rol": "admin",
+    "is_actief": true,
+    "newsletter_subscribed": false,
+    "created_at": "2024-03-20T15:04:05Z",
+    "updated_at": "2024-03-20T15:04:05Z"
+}
+```
+
+#### PUT /api/users/:id/roles
+
+Werkt de roles van een gebruiker bij (admin only).
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+    "role_ids": ["role-uuid-1", "role-uuid-2"]
+}
+```
+
+**Response (200 OK):**
+```json
+{
+    "success": true,
+    "message": "Roles toegewezen aan user",
+    "assigned_roles": 2,
+    "total_requested": 2
+}
+```
 
 **cURL Voorbeeld:**
 ```bash
@@ -555,6 +1111,46 @@ Authorization: Bearer <jwt-token>
 
 **Implementatie:** [`handlers/mail_handler.go`](../../handlers/mail_handler.go:1)
 
+#### GET /api/mail/account/:type
+
+Haalt emails op per account type met paginering.
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+```
+
+**Query Parameters:**
+- `limit` (optioneel): Maximum aantal resultaten (default: 10)
+- `offset` (optioneel): Aantal resultaten om over te slaan (default: 0)
+
+**Response (200 OK):**
+```json
+{
+    "emails": [
+        {
+            "id": "770e8400-e29b-41d4-a716-446655440000",
+            "message_id": "<message123@example.com>",
+            "sender": "sender@example.com",
+            "to": "info@dekoninklijkeloop.nl",
+            "subject": "Vraag over het evenement",
+            "html": "Hallo, ik heb een vraag...",
+            "content_type": "text/plain",
+            "received_at": "2024-04-01T09:30:00Z",
+            "uid": "AAABBCCC123",
+            "account_type": "info",
+            "read": false,
+            "processed_at": null,
+            "created_at": "2024-04-01T09:35:00Z",
+            "updated_at": "2024-04-01T09:35:00Z"
+        }
+    ],
+    "totalCount": 1
+}
+```
+
+**Implementatie:** [`handlers/mail_handler.go`](../../handlers/mail_handler.go:1)
+
 ### Metrics Endpoints
 
 #### GET /api/metrics/email
@@ -609,6 +1205,440 @@ email_latency_seconds_bucket{type="contact",le="0.1"} 10
 email_latency_seconds_bucket{type="contact",le="0.5"} 45
 email_latency_seconds_bucket{type="contact",le="1"} 50
 ```
+
+### Newsletter Management
+
+#### GET /api/newsletter
+
+Haalt een lijst van nieuwsbrieven op (admin only).
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+```
+
+**Query Parameters:**
+- `limit` (optioneel): Maximum aantal resultaten (default: 10)
+- `offset` (optioneel): Aantal resultaten om over te slaan (default: 0)
+
+**Response (200 OK):**
+```json
+{
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "subject": "Nieuwsbrief onderwerp",
+    "content": "Nieuwsbrief inhoud...",
+    "sent_at": null,
+    "created_at": "2024-03-20T15:04:05Z",
+    "updated_at": "2024-03-20T15:04:05Z"
+}
+```
+
+**Implementatie:** [`handlers/newsletter_handler.go`](../../handlers/newsletter_handler.go:1)
+
+#### POST /api/newsletter
+
+Maakt een nieuwe nieuwsbrief aan (admin only).
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+    "subject": "Nieuwsbrief onderwerp",
+    "content": "Nieuwsbrief inhoud..."
+}
+```
+
+**Response (201 Created):**
+```json
+{
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "subject": "Nieuwsbrief onderwerp",
+    "content": "Nieuwsbrief inhoud...",
+    "sent_at": null,
+    "created_at": "2024-03-20T15:04:05Z",
+    "updated_at": "2024-03-20T15:04:05Z"
+}
+```
+
+#### POST /api/newsletter/:id/send
+
+Verzendt een nieuwsbrief naar subscribers (admin only).
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+```
+
+**Response (200 OK):**
+```json
+{
+    "success": true,
+    "message": "Nieuwsbrief wordt verzonden naar subscribers"
+}
+```
+
+**Implementatie:** [`handlers/newsletter_handler.go`](../../handlers/newsletter_handler.go:1)
+
+### Notification Management
+
+#### GET /api/v1/notifications
+
+Haalt een lijst van notificaties op.
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+```
+
+**Query Parameters:**
+- `type` (optioneel): Filter op type
+- `priority` (optioneel): Filter op prioriteit
+
+**Response (200 OK):**
+```json
+[
+    {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "type": "contact",
+        "priority": "medium",
+        "title": "Nieuwe contact aanvraag",
+        "message": "Nieuwe contact aanvraag ontvangen",
+        "sent": false,
+        "created_at": "2024-03-20T15:04:05Z"
+    }
+]
+```
+
+**Implementatie:** [`handlers/notification_handler.go`](../../handlers/notification_handler.go:1)
+
+#### POST /api/v1/notifications
+
+Maakt een nieuwe notificatie aan.
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+    "type": "contact",
+    "priority": "medium",
+    "title": "Nieuwe contact aanvraag",
+    "message": "Nieuwe contact aanvraag ontvangen"
+}
+```
+
+**Response (201 Created):**
+```json
+{
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "type": "contact",
+    "priority": "medium",
+    "title": "Nieuwe contact aanvraag",
+    "message": "Nieuwe contact aanvraag ontvangen",
+    "sent": false,
+    "created_at": "2024-03-20T15:04:05Z"
+}
+```
+
+### RBAC Management
+
+#### GET /api/rbac/permissions
+
+Haalt een lijst van permissions op (admin only).
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+```
+
+**Response (200 OK):**
+```json
+[
+    {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "resource": "contact",
+        "action": "read",
+        "description": "Kan contact formulieren lezen"
+    }
+]
+```
+
+**Implementatie:** [`handlers/permission_handler.go`](../../handlers/permission_handler.go:1)
+
+#### GET /api/rbac/roles
+
+Haalt een lijst van roles met hun permissions op (admin only).
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+```
+
+**Response (200 OK):**
+```json
+[
+    {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "name": "admin",
+        "description": "Administrator rol",
+        "permissions": [
+            {
+                "id": "550e8400-e29b-41d4-a716-446655440001",
+                "resource": "contact",
+                "action": "read"
+            }
+        ]
+    }
+]
+```
+
+#### PUT /api/rbac/roles/:id/permissions
+
+Werkt permissions voor een role bij (admin only).
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+    "permission_ids": ["perm-uuid-1", "perm-uuid-2"]
+}
+```
+
+**Response (200 OK):**
+```json
+{
+    "success": true,
+    "message": "Role permissions bijgewerkt",
+    "added_count": 1,
+    "removed_count": 0,
+    "total_requested": 2
+}
+```
+
+**Implementatie:** [`handlers/permission_handler.go`](../../handlers/permission_handler.go:1)
+
+### Chat API
+
+#### GET /api/chat/channels
+
+Haalt channels op waar de gebruiker lid van is.
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+```
+
+**Query Parameters:**
+- `limit` (optioneel): Maximum aantal resultaten (default: 50)
+- `offset` (optioneel): Aantal resultaten om over te slaan (default: 0)
+
+**Response (200 OK):**
+```json
+[
+    {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "name": "Algemeen",
+        "type": "public",
+        "created_by": "user-uuid",
+        "created_at": "2024-03-20T15:04:05Z"
+    }
+]
+```
+
+**Implementatie:** [`handlers/chat_handler.go`](../../handlers/chat_handler.go:1)
+
+#### POST /api/chat/direct
+
+Maakt een direct channel aan tussen twee gebruikers.
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+    "user_id": "target-user-uuid"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "name": "Chat between User A and User B",
+    "type": "direct",
+    "created_by": "current-user-uuid",
+    "created_at": "2024-03-20T15:04:05Z"
+}
+```
+
+#### GET /api/chat/channels/:channel_id/messages
+
+Haalt berichten op voor een channel.
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+```
+
+**Query Parameters:**
+- `limit` (optioneel): Maximum aantal resultaten (default: 50)
+- `offset` (optioneel): Aantal resultaten om over te slaan (default: 0)
+
+**Response (200 OK):**
+```json
+[
+    {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "channel_id": "channel-uuid",
+        "user_id": "user-uuid",
+        "content": "Hallo allemaal!",
+        "created_at": "2024-03-20T15:04:05Z",
+        "edited_at": null
+    }
+]
+```
+
+#### POST /api/chat/channels/:channel_id/messages
+
+Verzendt een nieuw bericht naar een channel.
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+    "content": "Hallo allemaal!"
+}
+```
+
+**Response (201 Created):**
+```json
+{
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "channel_id": "channel-uuid",
+    "user_id": "user-uuid",
+    "content": "Hallo allemaal!",
+    "created_at": "2024-03-20T15:04:05Z",
+    "edited_at": null
+}
+```
+
+#### GET /api/chat/ws/:channel_id
+
+WebSocket verbinding voor real-time chat in een specifiek channel.
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+```
+
+**WebSocket Protocol:**
+- Client stuurt: `{"type": "message", "content": "Hallo!"}`
+- Server stuurt: `{"type": "message", "data": {...}}`
+
+**Implementatie:** [`handlers/chat_handler.go`](../../handlers/chat_handler.go:1)
+
+### Whisky for Charity API
+
+#### POST /api/wfc/order-email
+
+Verzendt order emails voor Whisky for Charity bestellingen.
+
+**Headers:**
+```http
+X-API-Key: <wfc-api-key>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+    "order_id": "WFC-12345",
+    "customer_name": "John Doe",
+    "customer_email": "john@example.com",
+    "customer_address": "Straat 123",
+    "customer_city": "Amsterdam",
+    "customer_postal": "1234AB",
+    "customer_country": "NL",
+    "total_amount": 150.00,
+    "items": [
+        {
+            "name": "Whisky Glas Set",
+            "quantity": 2,
+            "price": 75.00
+        }
+    ]
+}
+```
+
+**Response (200 OK):**
+```json
+{
+    "success": true,
+    "customer_email_sent": true,
+    "admin_email_sent": true,
+    "order_id": "WFC-12345"
+}
+```
+
+**Implementatie:** [`handlers/wfc_order_handler.go`](../../handlers/wfc_order_handler.go:1)
+
+### Admin Email API
+
+#### POST /api/admin/mail/send
+
+Verzendt emails namens admin gebruikers.
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+    "to": "recipient@example.com",
+    "subject": "Onderwerp",
+    "body": "Email inhoud...",
+    "template_name": "optional_template",
+    "template_variables": {
+        "name": "John"
+    }
+}
+```
+
+**Response (200 OK):**
+```json
+{
+    "success": true,
+    "message": "Email succesvol verzonden."
+}
+```
+
+**Implementatie:** [`handlers/admin_mail_handler.go`](../../handlers/admin_mail_handler.go:1)
 
 ## Error Codes
 
@@ -817,6 +1847,5 @@ async function sendContactEmail(contact: ContactRequest): Promise<ApiResponse> {
 ## Zie Ook
 
 - [Authentication API](./authentication.md) - Authenticatie endpoints
-- [Email Endpoints](./email-endpoints.md) - Email specifieke endpoints
-- [Admin Endpoints](./admin-endpoints.md) - Admin beheer endpoints
-- [WebSocket API](./websocket-api.md) - Real-time chat API
+- [RBAC Frontend Guide](../../docs/RBAC_FRONTEND.md) - RBAC permissies voor frontend
+- [README](../../README.md) - Project documentatie
