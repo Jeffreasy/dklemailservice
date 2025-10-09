@@ -71,7 +71,7 @@ func (h *PermissionHandler) ListPermissions(c *fiber.Ctx) error {
 	resourceFilter := c.Query("resource", "")
 	actionFilter := c.Query("action", "")
 	search := c.Query("search", "")
-	groupByResource := c.QueryBool("group_by_resource", false) // Default to false for backward compatibility
+	groupByResource := c.QueryBool("group_by_resource", true) // Default to true for grouped display
 
 	// Pagination (alleen gebruikt als niet gegroepeerd)
 	limit := c.QueryInt("limit", 1000) // Hogere limit voor gegroepeerde weergave
