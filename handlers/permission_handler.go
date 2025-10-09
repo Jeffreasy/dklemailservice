@@ -7,6 +7,7 @@ import (
 	"dklautomationgo/services"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 )
 
 // PermissionHandler bevat handlers voor permission en role beheer
@@ -106,7 +107,7 @@ func (h *PermissionHandler) CreatePermission(c *fiber.Ctx) error {
 	// Check if permission already exists
 	ctx := c.Context()
 	existing, err := h.permissionRepo.GetByResourceAction(ctx, req.Resource, req.Action)
-	if err != nil {
+	if err != nil && err != gorm.ErrRecordNotFound {
 		logger.Error("Fout bij controleren bestaande permission", "error", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon permission niet controleren",
@@ -186,7 +187,7 @@ func (h *PermissionHandler) CreateRole(c *fiber.Ctx) error {
 	// Check if role already exists
 	ctx := c.Context()
 	existing, err := h.roleRepo.GetByName(ctx, req.Name)
-	if err != nil {
+	if err != nil && err != gorm.ErrRecordNotFound {
 		logger.Error("Fout bij controleren bestaande role", "error", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon role niet controleren",
