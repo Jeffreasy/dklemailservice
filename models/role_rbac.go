@@ -50,7 +50,7 @@ type RolePermission struct {
 	AssignedBy   *string   `gorm:"type:uuid" json:"assigned_by,omitempty"`
 
 	// Relations
-	Role       Role       `gorm:"foreignKey:RoleID" json:"role,omitempty"`
+	Role       RBACRole   `gorm:"foreignKey:RoleID" json:"role,omitempty"`
 	Permission Permission `gorm:"foreignKey:PermissionID" json:"permission,omitempty"`
 }
 
