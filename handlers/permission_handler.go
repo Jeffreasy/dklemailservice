@@ -71,7 +71,7 @@ func (h *PermissionHandler) ListPermissions(c *fiber.Ctx) error {
 	resourceFilter := c.Query("resource", "")
 	actionFilter := c.Query("action", "")
 	search := c.Query("search", "")
-	groupByResource := c.QueryBool("group_by_resource", true)
+	groupByResource := c.QueryBool("group_by_resource", false) // Default to false for backward compatibility
 
 	// Pagination (alleen gebruikt als niet gegroepeerd)
 	limit := c.QueryInt("limit", 1000) // Hogere limit voor gegroepeerde weergave
@@ -154,11 +154,8 @@ func (h *PermissionHandler) ListPermissions(c *fiber.Ctx) error {
 		})
 	}
 
-	// Normale lijst response
-	return c.JSON(fiber.Map{
-		"permissions": filteredPermissions,
-		"total":       len(filteredPermissions),
-	})
+	// Backward compatible response - return array directly
+	return c.JSON(filteredPermissions)
 }
 
 // CreatePermission maakt een nieuwe permission aan
