@@ -5,6 +5,8 @@ import (
 	"dklautomationgo/models"
 	"dklautomationgo/repository"
 	"dklautomationgo/services"
+	"sort"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -63,14 +65,21 @@ func (h *PermissionHandler) RegisterRoutes(app *fiber.App) {
 	rbacGroup.Delete("/roles/:id/permissions/:permissionId", h.RemovePermissionFromRole) // Voor individuele verwijdering
 }
 
-// ListPermissions haalt een lijst van permissions op
+// ListPermissions haalt een lijst van permissions op, gegroepeerd per resource
 func (h *PermissionHandler) ListPermissions(c *fiber.Ctx) error {
-	limit := c.QueryInt("limit", 50)
+	// Query parameters voor filtering
+	resourceFilter := c.Query("resource", "")
+	actionFilter := c.Query("action", "")
+	search := c.Query("search", "")
+	groupByResource := c.QueryBool("group_by_resource", true)
+
+	// Pagination (alleen gebruikt als niet gegroepeerd)
+	limit := c.QueryInt("limit", 1000) // Hogere limit voor gegroepeerde weergave
 	offset := c.QueryInt("offset", 0)
 
-	if limit < 1 || limit > 100 {
+	if limit < 1 || limit > 1000 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Limit moet tussen 1 en 100 liggen",
+			"error": "Limit moet tussen 1 en 1000 liggen",
 		})
 	}
 
@@ -81,6 +90,8 @@ func (h *PermissionHandler) ListPermissions(c *fiber.Ctx) error {
 	}
 
 	ctx := c.Context()
+
+	// Haal alle permissions op (we filteren client-side voor betere performance)
 	permissions, err := h.permissionRepo.List(ctx, limit, offset)
 	if err != nil {
 		logger.Error("Fout bij ophalen permissions", "error", err)
@@ -89,7 +100,65 @@ func (h *PermissionHandler) ListPermissions(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.JSON(permissions)
+	// Filter permissions gebaseerd op query parameters
+	var filteredPermissions []*models.Permission
+	for _, perm := range permissions {
+		// Resource filter
+		if resourceFilter != "" && perm.Resource != resourceFilter {
+			continue
+		}
+
+		// Action filter
+		if actionFilter != "" && perm.Action != actionFilter {
+			continue
+		}
+
+		// Search filter (in resource, action of description)
+		if search != "" {
+			searchLower := strings.ToLower(search)
+			if !strings.Contains(strings.ToLower(perm.Resource), searchLower) &&
+				!strings.Contains(strings.ToLower(perm.Action), searchLower) &&
+				!strings.Contains(strings.ToLower(perm.Description), searchLower) {
+				continue
+			}
+		}
+
+		filteredPermissions = append(filteredPermissions, perm)
+	}
+
+	// Als gegroepeerd per resource gewenst
+	if groupByResource {
+		grouped := make(map[string][]*models.Permission)
+		for _, perm := range filteredPermissions {
+			grouped[perm.Resource] = append(grouped[perm.Resource], perm)
+		}
+
+		// Converteer naar frontend format
+		result := make([]map[string]interface{}, 0, len(grouped))
+		for resource, perms := range grouped {
+			result = append(result, map[string]interface{}{
+				"resource":    resource,
+				"permissions": perms,
+				"count":       len(perms),
+			})
+		}
+
+		// Sorteer op resource naam
+		sort.Slice(result, func(i, j int) bool {
+			return result[i]["resource"].(string) < result[j]["resource"].(string)
+		})
+
+		return c.JSON(fiber.Map{
+			"groups": result,
+			"total":  len(filteredPermissions),
+		})
+	}
+
+	// Normale lijst response
+	return c.JSON(fiber.Map{
+		"permissions": filteredPermissions,
+		"total":       len(filteredPermissions),
+	})
 }
 
 // CreatePermission maakt een nieuwe permission aan
