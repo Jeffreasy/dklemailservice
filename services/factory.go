@@ -29,6 +29,7 @@ type ServiceFactory struct {
 	NewsletterService   *NewsletterService
 	NewsletterSender    *NewsletterSender
 	PermissionService   PermissionService
+	ImageService        *ImageService
 	RedisClient         *redis.Client
 }
 
@@ -111,6 +112,18 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 		newsletterSvc = NewNewsletterService(fetcher, processor, formatter, sender)
 	}
 
+	// Initialize ImageService if Cloudinary is configured
+	var imageService *ImageService
+	if cloudinaryConfig := config.LoadCloudinaryConfig(); cloudinaryConfig != nil {
+		var err error
+		imageService, err = NewImageService(cloudinaryConfig, repoFactory.UploadedImage)
+		if err != nil {
+			logger.Warn("Failed to initialize Cloudinary service", "error", err)
+		} else {
+			logger.Info("Cloudinary ImageService initialized")
+		}
+	}
+
 	return &ServiceFactory{
 		EmailService:        emailService,
 		SMTPClient:          smtpClient,
@@ -126,6 +139,7 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 		NewsletterService:   newsletterSvc,
 		NewsletterSender:    sender,
 		PermissionService:   permissionService,
+		ImageService:        imageService,
 		RedisClient:         redisClient,
 	}
 }

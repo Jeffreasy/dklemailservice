@@ -7,6 +7,7 @@ import (
 	"dklautomationgo/services"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,17 +20,19 @@ type ChatHandler struct {
 	chatService       services.ChatService
 	authService       services.AuthService
 	permissionService services.PermissionService
+	imageService      *services.ImageService
 	hub               *services.Hub // global, if needed
 	mutex             sync.Mutex
 	channelHubs       map[string]*services.Hub
 }
 
 // NewChatHandler creates a new ChatHandler
-func NewChatHandler(chatService services.ChatService, authService services.AuthService, permissionService services.PermissionService, hub *services.Hub) *ChatHandler {
+func NewChatHandler(chatService services.ChatService, authService services.AuthService, permissionService services.PermissionService, imageService *services.ImageService, hub *services.Hub) *ChatHandler {
 	return &ChatHandler{
 		chatService:       chatService,
 		authService:       authService,
 		permissionService: permissionService,
+		imageService:      imageService,
 		hub:               hub,
 		channelHubs:       make(map[string]*services.Hub),
 	}
@@ -322,11 +325,23 @@ func (h *ChatHandler) GetMessages(c *fiber.Ctx) error {
 	return c.JSON(messages)
 }
 
-// SendMessage sends a new message
+// SendMessage sends a new message (supports both text and image messages)
 func (h *ChatHandler) SendMessage(c *fiber.Ctx) error {
 	channelID := c.Params("channel_id")
 	userID := c.Locals("userID").(string)
 
+	// Check if this is a multipart form (image upload)
+	contentType := c.Get("Content-Type")
+	if strings.Contains(contentType, "multipart/form-data") {
+		return h.handleImageMessage(c, userID, channelID)
+	}
+
+	// Handle text message as before
+	return h.handleTextMessage(c, userID, channelID)
+}
+
+// handleTextMessage handles regular text messages
+func (h *ChatHandler) handleTextMessage(c *fiber.Ctx, userID, channelID string) error {
 	var message models.ChatMessage
 	if err := c.BodyParser(&message); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid input"})
@@ -334,11 +349,102 @@ func (h *ChatHandler) SendMessage(c *fiber.Ctx) error {
 
 	message.ChannelID = channelID
 	message.UserID = userID
+	message.MessageType = "text"
 
 	err := h.chatService.CreateMessage(c.Context(), &message)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
+	return c.JSON(message)
+}
+
+// handleImageMessage handles image uploads in chat
+func (h *ChatHandler) handleImageMessage(c *fiber.Ctx, userID, channelID string) error {
+	// Check if image service is available
+	if h.imageService == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error": "Image upload service is not available",
+		})
+	}
+
+	// Parse multipart form
+	form, err := c.MultipartForm()
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Failed to parse form data",
+		})
+	}
+
+	// Get image file
+	files := form.File["image"]
+	if len(files) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "No image file provided",
+		})
+	}
+
+	file := files[0]
+
+	// Validate file type
+	if !h.isValidImageType(file.Filename) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid image type. Only JPEG, PNG, GIF, and WebP are allowed.",
+		})
+	}
+
+	// Get optional content from form
+	content := ""
+	if formValues := form.Value["content"]; len(formValues) > 0 {
+		content = formValues[0]
+	}
+
+	// Open and upload image
+	src, err := file.Open()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to process image",
+		})
+	}
+	defer src.Close()
+
+	// Upload to Cloudinary
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	result, err := h.imageService.UploadImage(ctx, src, file.Filename, "chat_images", userID)
+	if err != nil {
+		logger.Error("Chat image upload failed", "error", err, "user_id", userID, "filename", file.Filename)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to upload image",
+		})
+	}
+
+	// Create chat message
+	message := &models.ChatMessage{
+		ChannelID:   channelID,
+		UserID:      userID,
+		Content:     content,
+		MessageType: "image",
+		FileURL:     result.SecureURL,
+		FileName:    file.Filename,
+		FileSize:    result.Bytes,
+	}
+
+	// Add thumbnail URL if available
+	if result.ThumbnailURL != "" {
+		message.ThumbnailURL = &result.ThumbnailURL
+	}
+
+	// Save message
+	err = h.chatService.CreateMessage(c.Context(), message)
+	if err != nil {
+		// Cleanup uploaded image on failure
+		h.imageService.DeleteImage(context.Background(), result.PublicID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to save message",
+		})
+	}
+
 	return c.JSON(message)
 }
 
@@ -383,6 +489,8 @@ func (h *ChatHandler) EditMessage(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Not authorized to edit this message"})
 	}
 
+	// If message type is image and being edited (not deleted), we don't delete the image
+	// Only update the content
 	message.Content = update.Content
 	message.EditedAt = time.Now()
 
@@ -425,6 +533,20 @@ func (h *ChatHandler) DeleteMessage(c *fiber.Ctx) error {
 
 	if !canDelete {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Not authorized to delete this message"})
+	}
+
+	// Cleanup associated images if message type is image
+	if message.MessageType == "image" && message.FileURL != "" && h.imageService != nil {
+		publicID := h.extractPublicIDFromURL(message.FileURL)
+		if publicID != "" {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := h.imageService.DeleteImage(ctx, publicID); err != nil {
+				logger.Warn("Failed to delete image from Cloudinary during message deletion",
+					"error", err, "public_id", publicID, "message_id", id)
+				// Don't fail the message deletion if image cleanup fails
+			}
+		}
 	}
 
 	err = h.chatService.DeleteMessage(c.Context(), id)
@@ -594,4 +716,32 @@ func (h *ChatHandler) MarkAsRead(c *fiber.Ctx) error {
 
 func (h *ChatHandler) GetUnreadCount(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"unread": 0})
+}
+
+// isValidImageType checks if the file extension is a valid image type
+func (h *ChatHandler) isValidImageType(filename string) bool {
+	validTypes := []string{".jpg", ".jpeg", ".png", ".gif", ".webp"}
+	filename = strings.ToLower(filename)
+
+	for _, ext := range validTypes {
+		if strings.HasSuffix(filename, ext) {
+			return true
+		}
+	}
+	return false
+}
+
+// extractPublicIDFromURL extracts the public ID from a Cloudinary URL
+func (h *ChatHandler) extractPublicIDFromURL(url string) string {
+	// Cloudinary URL format: https://res.cloudinary.com/{cloud_name}/image/upload/v{version}/{public_id}.{format}
+	parts := strings.Split(url, "/")
+	if len(parts) >= 8 {
+		filename := parts[len(parts)-1]
+		// Remove file extension to get public ID
+		if dotIndex := strings.LastIndex(filename, "."); dotIndex != -1 {
+			return filename[:dotIndex]
+		}
+		return filename
+	}
+	return ""
 }

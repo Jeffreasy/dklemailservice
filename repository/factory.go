@@ -22,6 +22,7 @@ type Repository struct {
 	ChatMessageReaction    ChatMessageReactionRepository
 	ChatUserPresence       ChatUserPresenceRepository
 	Newsletter             NewsletterRepository
+	UploadedImage          UploadedImageRepository
 
 	// RBAC repositories
 	RBACRole       RBACRoleRepository
@@ -52,6 +53,7 @@ func NewRepository(db *gorm.DB) *Repository {
 		ChatMessageReaction:    NewPostgresChatMessageReactionRepository(baseRepo),
 		ChatUserPresence:       NewPostgresChatUserPresenceRepository(baseRepo),
 		Newsletter:             NewPostgresNewsletterRepository(baseRepo),
+		UploadedImage:          NewPostgresUploadedImageRepository(baseRepo),
 
 		// RBAC repositories
 		RBACRole:       NewRBACRoleRepository(db),

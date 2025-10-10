@@ -364,6 +364,10 @@ func main() {
 				{"path": "/api/aanmelding/:id/antwoord", "method": "POST", "description": "Add reply to registration (requires admin auth)"},
 				{"path": "/api/aanmelding/rol/:rol", "method": "GET", "description": "Filter registrations by role (requires admin auth)"},
 				{"path": "/api/wfc/order-email", "method": "POST", "description": "Send Whisky for Charity order emails (requires API key)"},
+				{"path": "/api/images/upload", "method": "POST", "description": "Upload single image (requires auth)"},
+				{"path": "/api/images/batch-upload", "method": "POST", "description": "Upload multiple images (requires auth)"},
+				{"path": "/api/images/:public_id", "method": "GET", "description": "Get image metadata (requires auth)"},
+				{"path": "/api/images/:public_id", "method": "DELETE", "description": "Delete image (requires auth)"},
 				{"path": "/metrics", "method": "GET", "description": "Prometheus metrics"},
 			},
 		})
@@ -552,7 +556,7 @@ func main() {
 	adminMailHandler.RegisterRoutes(app)
 
 	// Initialiseer chat handler
-	chatHandler := handlers.NewChatHandler(serviceFactory.ChatService, serviceFactory.AuthService, serviceFactory.PermissionService, serviceFactory.Hub)
+	chatHandler := handlers.NewChatHandler(serviceFactory.ChatService, serviceFactory.AuthService, serviceFactory.PermissionService, serviceFactory.ImageService, serviceFactory.Hub)
 	chatHandler.RegisterRoutes(app)
 
 	// Set WebSocket channel callback
@@ -582,6 +586,10 @@ func main() {
 	// Initialiseer user handler
 	userHandler := handlers.NewUserHandler(serviceFactory.AuthService, serviceFactory.PermissionService, repoFactory.UserRole)
 	userHandler.RegisterRoutes(app)
+
+	// Initialiseer image handler
+	imageHandler := handlers.NewImageHandler(serviceFactory.ImageService, serviceFactory.AuthService)
+	imageHandler.RegisterRoutes(app)
 
 	// Start server
 	port := os.Getenv("PORT")

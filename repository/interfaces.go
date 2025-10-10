@@ -306,3 +306,33 @@ type ChatUserPresenceRepository interface {
 	Delete(ctx context.Context, userID string) error
 	ListOnlineUsers(ctx context.Context) ([]*models.OnlineUser, error)
 }
+
+// UploadedImageRepository defines the interface for uploaded image operations
+type UploadedImageRepository interface {
+	// Create saves a new uploaded image record
+	Create(ctx context.Context, image *models.UploadedImage) error
+
+	// GetByID retrieves an uploaded image by ID
+	GetByID(ctx context.Context, id string) (*models.UploadedImage, error)
+
+	// GetByPublicID retrieves an uploaded image by Cloudinary public ID
+	GetByPublicID(ctx context.Context, publicID string) (*models.UploadedImage, error)
+
+	// GetByUserID retrieves uploaded images for a user with pagination
+	GetByUserID(ctx context.Context, userID string, limit, offset int) ([]*models.UploadedImage, error)
+
+	// List retrieves a paginated list of all uploaded images
+	List(ctx context.Context, limit, offset int) ([]*models.UploadedImage, error)
+
+	// Update updates an existing uploaded image record
+	Update(ctx context.Context, image *models.UploadedImage) error
+
+	// Delete removes an uploaded image record
+	Delete(ctx context.Context, id string) error
+
+	// SoftDelete marks an image as deleted (for GDPR compliance)
+	SoftDelete(ctx context.Context, id string) error
+
+	// GetByFolder retrieves images by folder
+	GetByFolder(ctx context.Context, folder string, limit, offset int) ([]*models.UploadedImage, error)
+}
