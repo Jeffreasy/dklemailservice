@@ -40,4 +40,5 @@ INSERT INTO program_schedule (id, time, event_description, category, icon_name, 
 ('cf1514db-2e06-45ab-891b-76736eb308d3', '13:00u', 'START 10KM, Hervatting 15km', 'Start', 'start', 90, true, '2025-04-15 21:57:08.444242+00', '2025-04-15 21:57:08.444242+00', '52.20071361748442', '5.836023236413426'),
 ('de0cd4c1-2fe0-4f13-9b94-00c03ce38527', '15:05u', 'Deelnemers 2,5km aanwezig bij het startpunt (Berg & Bos)', 'Aanwezig', 'aanwezig', 170, true, '2025-04-15 21:57:08.444242+00', '2025-04-15 21:57:08.444242+00', '52.22044761505996', '5.9288957497254176'),
 ('fd80912e-f112-4bee-a2dd-570c4cf88c89', '13:15u', 'Aanvang Deelnemers 6km bij het coördinatiepunt', 'Aanvang', 'aanvang', 100, true, '2025-04-15 21:57:08.444242+00', '2025-04-15 21:57:08.444242+00', null, null),
-('fec9b64c-4cdd-4fc1-a507-9c222fdeb958', '13:45u', 'Vertrek deelnemers 6 km met de pendelbussen naar het startpunt 6km', 'Vertrek', 'vertrek', 110, true, '2025-04-15 21:57:08.444242+00', '2025-04-15 21:57:08.444242+00', null, null);
+('fec9b64c-4cdd-4fc1-a507-9c222fdeb958', '13:45u', 'Vertrek deelnemers 6 km met de pendelbussen naar het startpunt 6km', 'Vertrek', 'vertrek', 110, true, '2025-04-15 21:57:08.444242+00', '2025-04-15 21:57:08.444242+00', null, null)
+ON CONFLICT (id) DO NOTHING;
