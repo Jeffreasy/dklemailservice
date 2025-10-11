@@ -680,6 +680,7 @@ func main() {
 	albumHandler := handlers.NewAlbumHandler(
 		repoFactory.Album,
 		repoFactory.Photo,
+		repoFactory.AlbumPhoto,
 		serviceFactory.AuthService,
 		serviceFactory.PermissionService,
 	)

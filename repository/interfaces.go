@@ -555,3 +555,27 @@ type UnderConstructionRepository interface {
 	// Delete removes an under construction record
 	Delete(ctx context.Context, id int) error
 }
+
+// AlbumPhotoRepository defines the interface for album photo operations
+type AlbumPhotoRepository interface {
+	// Create adds a photo to an album
+	Create(ctx context.Context, albumPhoto *models.AlbumPhoto) error
+
+	// Delete removes a photo from an album
+	Delete(ctx context.Context, albumID, photoID string) error
+
+	// GetByAlbumAndPhoto retrieves a specific album-photo relationship
+	GetByAlbumAndPhoto(ctx context.Context, albumID, photoID string) (*models.AlbumPhoto, error)
+
+	// ListByAlbum retrieves all photos for an album ordered by order_number
+	ListByAlbum(ctx context.Context, albumID string) ([]*models.AlbumPhoto, error)
+
+	// UpdateOrder updates the order number of a photo in an album
+	UpdateOrder(ctx context.Context, albumID, photoID string, orderNumber int) error
+
+	// DeleteByAlbum removes all photos from an album
+	DeleteByAlbum(ctx context.Context, albumID string) error
+
+	// DeleteByPhoto removes a photo from all albums
+	DeleteByPhoto(ctx context.Context, photoID string) error
+}
