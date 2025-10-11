@@ -12,6 +12,7 @@ import (
 // AlbumHandler handles album-related HTTP requests
 type AlbumHandler struct {
 	albumRepo         repository.AlbumRepository
+	photoRepo         repository.PhotoRepository
 	authService       services.AuthService
 	permissionService services.PermissionService
 }
@@ -19,11 +20,13 @@ type AlbumHandler struct {
 // NewAlbumHandler creates a new album handler
 func NewAlbumHandler(
 	albumRepo repository.AlbumRepository,
+	photoRepo repository.PhotoRepository,
 	authService services.AuthService,
 	permissionService services.PermissionService,
 ) *AlbumHandler {
 	return &AlbumHandler{
 		albumRepo:         albumRepo,
+		photoRepo:         photoRepo,
 		authService:       authService,
 		permissionService: permissionService,
 	}
@@ -34,6 +37,7 @@ func (h *AlbumHandler) RegisterRoutes(app *fiber.App) {
 	// Public routes (no authentication required)
 	public := app.Group("/api/albums")
 	public.Get("/", h.ListVisibleAlbums)
+	public.Get("/:id/photos", h.GetAlbumPhotos)
 
 	// Admin routes (require authentication and permissions)
 	admin := app.Group("/api/albums", AuthMiddleware(h.authService))
@@ -55,23 +59,38 @@ func (h *AlbumHandler) RegisterRoutes(app *fiber.App) {
 
 // ListVisibleAlbums returns all visible albums for public display
 // @Summary Get visible albums
-// @Description Returns all visible albums ordered by order_number
+// @Description Returns all visible albums ordered by order_number. Use ?include_covers=true to include cover photo information.
 // @Tags Albums
 // @Accept json
 // @Produce json
+// @Param include_covers query bool false "Include cover photo information"
 // @Success 200 {array} models.Album
+// @Success 200 {array} models.AlbumWithCover
 // @Router /api/albums [get]
 func (h *AlbumHandler) ListVisibleAlbums(c *fiber.Ctx) error {
-	ctx := c.Context()
-	albums, err := h.albumRepo.ListVisible(ctx)
-	if err != nil {
-		logger.Error("Failed to fetch visible albums", "error", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to fetch albums",
-		})
-	}
+	includeCovers := c.QueryBool("include_covers", false)
 
-	return c.JSON(albums)
+	ctx := c.Context()
+
+	if includeCovers {
+		albums, err := h.albumRepo.ListVisibleWithCovers(ctx)
+		if err != nil {
+			logger.Error("Failed to fetch visible albums with covers", "error", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to fetch albums",
+			})
+		}
+		return c.JSON(albums)
+	} else {
+		albums, err := h.albumRepo.ListVisible(ctx)
+		if err != nil {
+			logger.Error("Failed to fetch visible albums", "error", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to fetch albums",
+			})
+		}
+		return c.JSON(albums)
+	}
 }
 
 // ListAlbums returns all albums for admin management
@@ -308,4 +327,50 @@ func (h *AlbumHandler) DeleteAlbum(c *fiber.Ctx) error {
 		"success": true,
 		"message": "Album deleted successfully",
 	})
+}
+
+// GetAlbumPhotos returns photos for a specific album
+// @Summary Get photos for album
+// @Description Returns all visible photos for a specific album
+// @Tags Albums
+// @Accept json
+// @Produce json
+// @Param id path string true "Album ID"
+// @Success 200 {array} models.Photo
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /api/albums/{id}/photos [get]
+func (h *AlbumHandler) GetAlbumPhotos(c *fiber.Ctx) error {
+	id := c.Params("id")
+	if id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Album ID is required",
+		})
+	}
+
+	// Check if album exists and is visible
+	ctx := c.Context()
+	album, err := h.albumRepo.GetByID(ctx, id)
+	if err != nil {
+		logger.Error("Failed to fetch album", "error", err, "id", id)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to fetch album",
+		})
+	}
+
+	if album == nil || !album.Visible {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Album not found",
+		})
+	}
+
+	photos, err := h.photoRepo.ListByAlbumID(ctx, id)
+	if err != nil {
+		logger.Error("Failed to fetch album photos", "error", err, "album_id", id)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to fetch album photos",
+		})
+	}
+
+	return c.JSON(photos)
 }

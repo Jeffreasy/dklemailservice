@@ -17,3 +17,9 @@ type Album struct {
 func (Album) TableName() string {
 	return "albums"
 }
+
+// AlbumWithCover extends Album with cover photo information
+type AlbumWithCover struct {
+	Album
+	CoverPhoto *Photo `json:"cover_photo,omitempty" gorm:"foreignKey:CoverPhotoID"`
+}

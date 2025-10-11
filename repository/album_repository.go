@@ -46,6 +46,17 @@ func (r *PostgresAlbumRepository) ListVisible(ctx context.Context) ([]*models.Al
 	return albums, err
 }
 
+// ListVisibleWithCovers retrieves visible albums with cover photo information
+func (r *PostgresAlbumRepository) ListVisibleWithCovers(ctx context.Context) ([]*models.AlbumWithCover, error) {
+	var albums []*models.AlbumWithCover
+	err := r.db.WithContext(ctx).
+		Where("albums.visible = ?", true).
+		Preload("CoverPhoto").
+		Order("albums.order_number ASC, albums.created_at DESC").
+		Find(&albums).Error
+	return albums, err
+}
+
 // Update updates an existing album
 func (r *PostgresAlbumRepository) Update(ctx context.Context, album *models.Album) error {
 	return r.db.WithContext(ctx).Save(album).Error

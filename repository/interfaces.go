@@ -379,6 +379,30 @@ type RadioRecordingRepository interface {
 	Delete(ctx context.Context, id string) error
 }
 
+// PhotoRepository defines the interface for photo operations
+type PhotoRepository interface {
+	// Create saves a new photo
+	Create(ctx context.Context, photo *models.Photo) error
+
+	// GetByID retrieves a photo by ID
+	GetByID(ctx context.Context, id string) (*models.Photo, error)
+
+	// List retrieves a paginated list of photos
+	List(ctx context.Context, limit, offset int) ([]*models.Photo, error)
+
+	// ListVisible retrieves only visible photos
+	ListVisible(ctx context.Context) ([]*models.Photo, error)
+
+	// ListByAlbumID retrieves photos for a specific album
+	ListByAlbumID(ctx context.Context, albumID string) ([]*models.Photo, error)
+
+	// Update updates an existing photo
+	Update(ctx context.Context, photo *models.Photo) error
+
+	// Delete removes a photo
+	Delete(ctx context.Context, id string) error
+}
+
 // AlbumRepository defines the interface for album operations
 type AlbumRepository interface {
 	// Create saves a new album
@@ -392,6 +416,9 @@ type AlbumRepository interface {
 
 	// ListVisible retrieves only visible albums ordered by order_number
 	ListVisible(ctx context.Context) ([]*models.Album, error)
+
+	// ListVisibleWithCovers retrieves visible albums with cover photo information
+	ListVisibleWithCovers(ctx context.Context) ([]*models.AlbumWithCover, error)
 
 	// Update updates an existing album
 	Update(ctx context.Context, album *models.Album) error

@@ -25,6 +25,7 @@ type Repository struct {
 	UploadedImage          UploadedImageRepository
 	Partner                PartnerRepository
 	RadioRecording         RadioRecordingRepository
+	Photo                  PhotoRepository
 	Album                  AlbumRepository
 	Video                  VideoRepository
 	Sponsor                SponsorRepository
@@ -65,6 +66,7 @@ func NewRepository(db *gorm.DB) *Repository {
 		UploadedImage:          NewPostgresUploadedImageRepository(baseRepo),
 		Partner:                NewPostgresPartnerRepository(db),
 		RadioRecording:         NewPostgresRadioRecordingRepository(db),
+		Photo:                  NewPostgresPhotoRepository(db),
 		Album:                  NewPostgresAlbumRepository(db),
 		Video:                  NewPostgresVideoRepository(db),
 		Sponsor:                NewPostgresSponsorRepository(db),
