@@ -336,3 +336,192 @@ type UploadedImageRepository interface {
 	// GetByFolder retrieves images by folder
 	GetByFolder(ctx context.Context, folder string, limit, offset int) ([]*models.UploadedImage, error)
 }
+
+// PartnerRepository defines the interface for partner operations
+type PartnerRepository interface {
+	// Create saves a new partner
+	Create(ctx context.Context, partner *models.Partner) error
+
+	// GetByID retrieves a partner by ID
+	GetByID(ctx context.Context, id string) (*models.Partner, error)
+
+	// List retrieves a paginated list of partners
+	List(ctx context.Context, limit, offset int) ([]*models.Partner, error)
+
+	// ListVisible retrieves only visible partners ordered by order_number
+	ListVisible(ctx context.Context) ([]*models.Partner, error)
+
+	// Update updates an existing partner
+	Update(ctx context.Context, partner *models.Partner) error
+
+	// Delete removes a partner
+	Delete(ctx context.Context, id string) error
+}
+
+// RadioRecordingRepository defines the interface for radio recording operations
+type RadioRecordingRepository interface {
+	// Create saves a new radio recording
+	Create(ctx context.Context, recording *models.RadioRecording) error
+
+	// GetByID retrieves a radio recording by ID
+	GetByID(ctx context.Context, id string) (*models.RadioRecording, error)
+
+	// List retrieves a paginated list of radio recordings
+	List(ctx context.Context, limit, offset int) ([]*models.RadioRecording, error)
+
+	// ListVisible retrieves only visible radio recordings ordered by order_number
+	ListVisible(ctx context.Context) ([]*models.RadioRecording, error)
+
+	// Update updates an existing radio recording
+	Update(ctx context.Context, recording *models.RadioRecording) error
+
+	// Delete removes a radio recording
+	Delete(ctx context.Context, id string) error
+}
+
+// AlbumRepository defines the interface for album operations
+type AlbumRepository interface {
+	// Create saves a new album
+	Create(ctx context.Context, album *models.Album) error
+
+	// GetByID retrieves an album by ID
+	GetByID(ctx context.Context, id string) (*models.Album, error)
+
+	// List retrieves a paginated list of albums
+	List(ctx context.Context, limit, offset int) ([]*models.Album, error)
+
+	// ListVisible retrieves only visible albums ordered by order_number
+	ListVisible(ctx context.Context) ([]*models.Album, error)
+
+	// Update updates an existing album
+	Update(ctx context.Context, album *models.Album) error
+
+	// Delete removes an album
+	Delete(ctx context.Context, id string) error
+}
+
+// VideoRepository defines the interface for video operations
+type VideoRepository interface {
+	// Create saves a new video
+	Create(ctx context.Context, video *models.Video) error
+
+	// GetByID retrieves a video by ID
+	GetByID(ctx context.Context, id string) (*models.Video, error)
+
+	// List retrieves a paginated list of videos
+	List(ctx context.Context, limit, offset int) ([]*models.Video, error)
+
+	// ListVisible retrieves only visible videos ordered by order_number
+	ListVisible(ctx context.Context) ([]*models.Video, error)
+
+	// Update updates an existing video
+	Update(ctx context.Context, video *models.Video) error
+
+	// Delete removes a video
+	Delete(ctx context.Context, id string) error
+}
+
+// SponsorRepository defines the interface for sponsor operations
+type SponsorRepository interface {
+	// Create saves a new sponsor
+	Create(ctx context.Context, sponsor *models.Sponsor) error
+
+	// GetByID retrieves a sponsor by ID
+	GetByID(ctx context.Context, id string) (*models.Sponsor, error)
+
+	// List retrieves a paginated list of sponsors
+	List(ctx context.Context, limit, offset int) ([]*models.Sponsor, error)
+
+	// ListVisible retrieves only visible sponsors ordered by order_number
+	ListVisible(ctx context.Context) ([]*models.Sponsor, error)
+
+	// Update updates an existing sponsor
+	Update(ctx context.Context, sponsor *models.Sponsor) error
+
+	// Delete removes a sponsor
+	Delete(ctx context.Context, id string) error
+}
+
+// ProgramScheduleRepository defines the interface for program schedule operations
+type ProgramScheduleRepository interface {
+	// Create saves a new program schedule
+	Create(ctx context.Context, schedule *models.ProgramSchedule) error
+
+	// GetByID retrieves a program schedule by ID
+	GetByID(ctx context.Context, id string) (*models.ProgramSchedule, error)
+
+	// List retrieves a paginated list of program schedules
+	List(ctx context.Context, limit, offset int) ([]*models.ProgramSchedule, error)
+
+	// ListVisible retrieves only visible program schedules ordered by order_number
+	ListVisible(ctx context.Context) ([]*models.ProgramSchedule, error)
+
+	// Update updates an existing program schedule
+	Update(ctx context.Context, schedule *models.ProgramSchedule) error
+
+	// Delete removes a program schedule
+	Delete(ctx context.Context, id string) error
+}
+
+// SocialEmbedRepository defines the interface for social embed operations
+type SocialEmbedRepository interface {
+	// Create saves a new social embed
+	Create(ctx context.Context, embed *models.SocialEmbed) error
+
+	// GetByID retrieves a social embed by ID
+	GetByID(ctx context.Context, id string) (*models.SocialEmbed, error)
+
+	// List retrieves a paginated list of social embeds
+	List(ctx context.Context, limit, offset int) ([]*models.SocialEmbed, error)
+
+	// ListVisible retrieves only visible social embeds ordered by order_number
+	ListVisible(ctx context.Context) ([]*models.SocialEmbed, error)
+
+	// Update updates an existing social embed
+	Update(ctx context.Context, embed *models.SocialEmbed) error
+
+	// Delete removes a social embed
+	Delete(ctx context.Context, id string) error
+}
+
+// SocialLinkRepository defines the interface for social link operations
+type SocialLinkRepository interface {
+	// Create saves a new social link
+	Create(ctx context.Context, link *models.SocialLink) error
+
+	// GetByID retrieves a social link by ID
+	GetByID(ctx context.Context, id string) (*models.SocialLink, error)
+
+	// List retrieves a paginated list of social links
+	List(ctx context.Context, limit, offset int) ([]*models.SocialLink, error)
+
+	// ListVisible retrieves only visible social links ordered by order_number
+	ListVisible(ctx context.Context) ([]*models.SocialLink, error)
+
+	// Update updates an existing social link
+	Update(ctx context.Context, link *models.SocialLink) error
+
+	// Delete removes a social link
+	Delete(ctx context.Context, id string) error
+}
+
+// UnderConstructionRepository defines the interface for under construction operations
+type UnderConstructionRepository interface {
+	// Create saves a new under construction record
+	Create(ctx context.Context, uc *models.UnderConstruction) error
+
+	// GetByID retrieves an under construction record by ID
+	GetByID(ctx context.Context, id int) (*models.UnderConstruction, error)
+
+	// List retrieves a paginated list of under construction records
+	List(ctx context.Context, limit, offset int) ([]*models.UnderConstruction, error)
+
+	// GetActive retrieves the active under construction record
+	GetActive(ctx context.Context) (*models.UnderConstruction, error)
+
+	// Update updates an existing under construction record
+	Update(ctx context.Context, uc *models.UnderConstruction) error
+
+	// Delete removes an under construction record
+	Delete(ctx context.Context, id int) error
+}

@@ -368,6 +368,60 @@ func main() {
 				{"path": "/api/images/batch-upload", "method": "POST", "description": "Upload multiple images (requires auth)"},
 				{"path": "/api/images/:public_id", "method": "GET", "description": "Get image metadata (requires auth)"},
 				{"path": "/api/images/:public_id", "method": "DELETE", "description": "Delete image (requires auth)"},
+				{"path": "/api/partners", "method": "GET", "description": "Get visible partners (public)"},
+				{"path": "/api/partners/admin", "method": "GET", "description": "List all partners (requires admin auth)"},
+				{"path": "/api/partners/:id", "method": "GET", "description": "Get partner by ID (requires admin auth)"},
+				{"path": "/api/partners", "method": "POST", "description": "Create partner (requires admin auth)"},
+				{"path": "/api/partners/:id", "method": "PUT", "description": "Update partner (requires admin auth)"},
+				{"path": "/api/partners/:id", "method": "DELETE", "description": "Delete partner (requires admin auth)"},
+				{"path": "/api/radio-recordings", "method": "GET", "description": "Get visible radio recordings (public)"},
+				{"path": "/api/radio-recordings/admin", "method": "GET", "description": "List all radio recordings (requires admin auth)"},
+				{"path": "/api/radio-recordings/:id", "method": "GET", "description": "Get radio recording by ID (requires admin auth)"},
+				{"path": "/api/radio-recordings", "method": "POST", "description": "Create radio recording (requires admin auth)"},
+				{"path": "/api/radio-recordings/:id", "method": "PUT", "description": "Update radio recording (requires admin auth)"},
+				{"path": "/api/radio-recordings/:id", "method": "DELETE", "description": "Delete radio recording (requires admin auth)"},
+				{"path": "/api/albums", "method": "GET", "description": "Get visible albums (public)"},
+				{"path": "/api/albums/admin", "method": "GET", "description": "List all albums (requires admin auth)"},
+				{"path": "/api/albums/:id", "method": "GET", "description": "Get album by ID (requires admin auth)"},
+				{"path": "/api/albums", "method": "POST", "description": "Create album (requires admin auth)"},
+				{"path": "/api/albums/:id", "method": "PUT", "description": "Update album (requires admin auth)"},
+				{"path": "/api/albums/:id", "method": "DELETE", "description": "Delete album (requires admin auth)"},
+				{"path": "/api/videos", "method": "GET", "description": "Get visible videos (public)"},
+				{"path": "/api/videos/admin", "method": "GET", "description": "List all videos (requires admin auth)"},
+				{"path": "/api/videos/:id", "method": "GET", "description": "Get video by ID (requires admin auth)"},
+				{"path": "/api/videos", "method": "POST", "description": "Create video (requires admin auth)"},
+				{"path": "/api/videos/:id", "method": "PUT", "description": "Update video (requires admin auth)"},
+				{"path": "/api/videos/:id", "method": "DELETE", "description": "Delete video (requires admin auth)"},
+				{"path": "/api/sponsors", "method": "GET", "description": "Get visible sponsors (public)"},
+				{"path": "/api/sponsors/admin", "method": "GET", "description": "List all sponsors (requires admin auth)"},
+				{"path": "/api/sponsors/:id", "method": "GET", "description": "Get sponsor by ID (requires admin auth)"},
+				{"path": "/api/sponsors", "method": "POST", "description": "Create sponsor (requires admin auth)"},
+				{"path": "/api/sponsors/:id", "method": "PUT", "description": "Update sponsor (requires admin auth)"},
+				{"path": "/api/sponsors/:id", "method": "DELETE", "description": "Delete sponsor (requires admin auth)"},
+				{"path": "/api/program-schedule", "method": "GET", "description": "Get visible program schedule (public)"},
+				{"path": "/api/program-schedule/admin", "method": "GET", "description": "List all program schedule (requires admin auth)"},
+				{"path": "/api/program-schedule/:id", "method": "GET", "description": "Get program schedule by ID (requires admin auth)"},
+				{"path": "/api/program-schedule", "method": "POST", "description": "Create program schedule (requires admin auth)"},
+				{"path": "/api/program-schedule/:id", "method": "PUT", "description": "Update program schedule (requires admin auth)"},
+				{"path": "/api/program-schedule/:id", "method": "DELETE", "description": "Delete program schedule (requires admin auth)"},
+				{"path": "/api/social-embeds", "method": "GET", "description": "Get visible social embeds (public)"},
+				{"path": "/api/social-embeds/admin", "method": "GET", "description": "List all social embeds (requires admin auth)"},
+				{"path": "/api/social-embeds/:id", "method": "GET", "description": "Get social embed by ID (requires admin auth)"},
+				{"path": "/api/social-embeds", "method": "POST", "description": "Create social embed (requires admin auth)"},
+				{"path": "/api/social-embeds/:id", "method": "PUT", "description": "Update social embed (requires admin auth)"},
+				{"path": "/api/social-embeds/:id", "method": "DELETE", "description": "Delete social embed (requires admin auth)"},
+				{"path": "/api/social-links", "method": "GET", "description": "Get visible social links (public)"},
+				{"path": "/api/social-links/admin", "method": "GET", "description": "List all social links (requires admin auth)"},
+				{"path": "/api/social-links/:id", "method": "GET", "description": "Get social link by ID (requires admin auth)"},
+				{"path": "/api/social-links", "method": "POST", "description": "Create social link (requires admin auth)"},
+				{"path": "/api/social-links/:id", "method": "PUT", "description": "Update social link (requires admin auth)"},
+				{"path": "/api/social-links/:id", "method": "DELETE", "description": "Delete social link (requires admin auth)"},
+				{"path": "/api/under-construction/active", "method": "GET", "description": "Get active under construction (public)"},
+				{"path": "/api/under-construction/admin", "method": "GET", "description": "List all under construction (requires admin auth)"},
+				{"path": "/api/under-construction/:id", "method": "GET", "description": "Get under construction by ID (requires admin auth)"},
+				{"path": "/api/under-construction", "method": "POST", "description": "Create under construction (requires admin auth)"},
+				{"path": "/api/under-construction/:id", "method": "PUT", "description": "Update under construction (requires admin auth)"},
+				{"path": "/api/under-construction/:id", "method": "DELETE", "description": "Delete under construction (requires admin auth)"},
 				{"path": "/metrics", "method": "GET", "description": "Prometheus metrics"},
 			},
 		})
@@ -590,6 +644,78 @@ func main() {
 	// Initialiseer image handler
 	imageHandler := handlers.NewImageHandler(serviceFactory.ImageService, serviceFactory.AuthService)
 	imageHandler.RegisterRoutes(app)
+
+	// Initialiseer partner handler
+	partnerHandler := handlers.NewPartnerHandler(
+		repoFactory.Partner,
+		serviceFactory.AuthService,
+		serviceFactory.PermissionService,
+	)
+	partnerHandler.RegisterRoutes(app)
+
+	// Initialiseer radio recording handler
+	radioRecordingHandler := handlers.NewRadioRecordingHandler(
+		repoFactory.RadioRecording,
+		serviceFactory.AuthService,
+		serviceFactory.PermissionService,
+	)
+	radioRecordingHandler.RegisterRoutes(app)
+
+	// Initialiseer album handler
+	albumHandler := handlers.NewAlbumHandler(
+		repoFactory.Album,
+		serviceFactory.AuthService,
+		serviceFactory.PermissionService,
+	)
+	albumHandler.RegisterRoutes(app)
+
+	// Initialiseer video handler
+	videoHandler := handlers.NewVideoHandler(
+		repoFactory.Video,
+		serviceFactory.AuthService,
+		serviceFactory.PermissionService,
+	)
+	videoHandler.RegisterRoutes(app)
+
+	// Initialiseer sponsor handler
+	sponsorHandler := handlers.NewSponsorHandler(
+		repoFactory.Sponsor,
+		serviceFactory.AuthService,
+		serviceFactory.PermissionService,
+	)
+	sponsorHandler.RegisterRoutes(app)
+
+	// Initialiseer program schedule handler
+	programScheduleHandler := handlers.NewProgramScheduleHandler(
+		repoFactory.ProgramSchedule,
+		serviceFactory.AuthService,
+		serviceFactory.PermissionService,
+	)
+	programScheduleHandler.RegisterRoutes(app)
+
+	// Initialiseer social embed handler
+	socialEmbedHandler := handlers.NewSocialEmbedHandler(
+		repoFactory.SocialEmbed,
+		serviceFactory.AuthService,
+		serviceFactory.PermissionService,
+	)
+	socialEmbedHandler.RegisterRoutes(app)
+
+	// Initialiseer social link handler
+	socialLinkHandler := handlers.NewSocialLinkHandler(
+		repoFactory.SocialLink,
+		serviceFactory.AuthService,
+		serviceFactory.PermissionService,
+	)
+	socialLinkHandler.RegisterRoutes(app)
+
+	// Initialiseer under construction handler
+	underConstructionHandler := handlers.NewUnderConstructionHandler(
+		repoFactory.UnderConstruction,
+		serviceFactory.AuthService,
+		serviceFactory.PermissionService,
+	)
+	underConstructionHandler.RegisterRoutes(app)
 
 	// Start server
 	port := os.Getenv("PORT")

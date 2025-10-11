@@ -23,6 +23,15 @@ type Repository struct {
 	ChatUserPresence       ChatUserPresenceRepository
 	Newsletter             NewsletterRepository
 	UploadedImage          UploadedImageRepository
+	Partner                PartnerRepository
+	RadioRecording         RadioRecordingRepository
+	Album                  AlbumRepository
+	Video                  VideoRepository
+	Sponsor                SponsorRepository
+	ProgramSchedule        ProgramScheduleRepository
+	SocialEmbed            SocialEmbedRepository
+	SocialLink             SocialLinkRepository
+	UnderConstruction      UnderConstructionRepository
 
 	// RBAC repositories
 	RBACRole       RBACRoleRepository
@@ -54,6 +63,15 @@ func NewRepository(db *gorm.DB) *Repository {
 		ChatUserPresence:       NewPostgresChatUserPresenceRepository(baseRepo),
 		Newsletter:             NewPostgresNewsletterRepository(baseRepo),
 		UploadedImage:          NewPostgresUploadedImageRepository(baseRepo),
+		Partner:                NewPostgresPartnerRepository(db),
+		RadioRecording:         NewPostgresRadioRecordingRepository(db),
+		Album:                  NewPostgresAlbumRepository(db),
+		Video:                  NewPostgresVideoRepository(db),
+		Sponsor:                NewPostgresSponsorRepository(db),
+		ProgramSchedule:        NewPostgresProgramScheduleRepository(db),
+		SocialEmbed:            NewPostgresSocialEmbedRepository(db),
+		SocialLink:             NewPostgresSocialLinkRepository(db),
+		UnderConstruction:      NewPostgresUnderConstructionRepository(db),
 
 		// RBAC repositories
 		RBACRole:       NewRBACRoleRepository(db),
