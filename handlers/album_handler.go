@@ -54,6 +54,7 @@ func (h *AlbumHandler) RegisterRoutes(app *fiber.App) {
 	writeGroup := admin.Group("", PermissionMiddleware(h.permissionService, "album", "write"))
 	writeGroup.Post("/", h.CreateAlbum)
 	writeGroup.Put("/:id", h.UpdateAlbum)
+	writeGroup.Put("/reorder", h.ReorderAlbums)
 	writeGroup.Post("/:id/photos", h.AddPhotoToAlbum)
 	writeGroup.Put("/:id/photos/reorder", h.ReorderAlbumPhotos)
 
@@ -637,5 +638,54 @@ func (h *AlbumHandler) ReorderAlbumPhotos(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"success": true,
 		"message": "Photos reordered successfully",
+	})
+}
+
+// ReorderAlbums reorders albums
+// @Summary Reorder albums
+// @Description Updates the order of multiple albums
+// @Tags Albums
+// @Accept json
+// @Produce json
+// @Param album_order body models.ReorderAlbumsRequest true "Album order data"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Failure 403 {object} map[string]interface{}
+// @Router /api/albums/reorder [put]
+// @Security BearerAuth
+func (h *AlbumHandler) ReorderAlbums(c *fiber.Ctx) error {
+	var req models.ReorderAlbumsRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	if len(req.AlbumOrder) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Album order is required",
+		})
+	}
+
+	ctx := c.Context()
+
+	// Update order for each album
+	for _, albumOrder := range req.AlbumOrder {
+		if albumOrder.ID == "" {
+			continue
+		}
+
+		if err := h.albumRepo.UpdateOrder(ctx, albumOrder.ID, albumOrder.OrderNumber); err != nil {
+			logger.Error("Failed to update album order", "error", err, "album_id", albumOrder.ID)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to update album order",
+			})
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Albums reordered successfully",
 	})
 }

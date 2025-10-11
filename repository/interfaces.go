@@ -426,6 +426,9 @@ type AlbumRepository interface {
 	// Update updates an existing album
 	Update(ctx context.Context, album *models.Album) error
 
+	// UpdateOrder updates the order number of an album
+	UpdateOrder(ctx context.Context, id string, orderNumber int) error
+
 	// Delete removes an album
 	Delete(ctx context.Context, id string) error
 }
