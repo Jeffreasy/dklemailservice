@@ -338,12 +338,12 @@ func (h *AlbumHandler) DeleteAlbum(c *fiber.Ctx) error {
 
 // GetAlbumPhotos returns photos for a specific album
 // @Summary Get photos for album
-// @Description Returns all visible photos for a specific album
+// @Description Returns all visible photos for a specific album with relationship data
 // @Tags Albums
 // @Accept json
 // @Produce json
 // @Param id path string true "Album ID"
-// @Success 200 {array} models.Photo
+// @Success 200 {array} models.PhotoWithAlbumInfo
 // @Failure 400 {object} map[string]interface{}
 // @Failure 404 {object} map[string]interface{}
 // @Router /api/albums/{id}/photos [get]
@@ -371,7 +371,7 @@ func (h *AlbumHandler) GetAlbumPhotos(c *fiber.Ctx) error {
 		})
 	}
 
-	photos, err := h.photoRepo.ListByAlbumID(ctx, id)
+	photos, err := h.photoRepo.ListByAlbumIDWithInfo(ctx, id)
 	if err != nil {
 		logger.Error("Failed to fetch album photos", "error", err, "album_id", id)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -641,13 +641,13 @@ func (h *AlbumHandler) ReorderAlbumPhotos(c *fiber.Ctx) error {
 	})
 }
 
-// ReorderAlbums reorders albums
+// ReorderAlbums reorders multiple albums
 // @Summary Reorder albums
 // @Description Updates the order of multiple albums
 // @Tags Albums
 // @Accept json
 // @Produce json
-// @Param album_order body models.ReorderAlbumsRequest true "Album order data"
+// @Param order body models.ReorderAlbumsRequest true "Album order data"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
 // @Failure 401 {object} map[string]interface{}

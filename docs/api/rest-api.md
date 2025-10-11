@@ -5,7 +5,7 @@ Complete API referentie voor de DKL Email Service met daadwerkelijke code voorbe
 ## Base URL
 
 ```
-Production: https://api.dekoninklijkeloop.nl
+Production: https://dklemailservice.onrender.com
 Development: http://localhost:8080
 ```
 
@@ -128,6 +128,71 @@ X-RateLimit-Reset: 1640000000
 | GET | `/api/v1/notifications/:id` | Notificatie details | Auth |
 | DELETE | `/api/v1/notifications/:id` | Notificatie verwijderen | Auth |
 | POST | `/api/v1/notifications/reprocess-all` | Notificaties herverwerken | Auth |
+| GET | `/api/albums` | Zichtbare albums lijst | Public |
+| GET | `/api/albums/:id/photos` | Foto's van album | Public |
+| GET | `/api/albums/admin` | Alle albums (admin) | `album:read` |
+| GET | `/api/albums/:id` | Album details | `album:read` |
+| POST | `/api/albums` | Album aanmaken | `album:write` |
+| PUT | `/api/albums/:id` | Album bijwerken | `album:write` |
+| PUT | `/api/albums/reorder` | Albums herschikken | `album:write` |
+| DELETE | `/api/albums/:id` | Album verwijderen | `album:delete` |
+| POST | `/api/albums/:id/photos` | Foto toevoegen aan album | `album:write` |
+| PUT | `/api/albums/:id/photos/reorder` | Foto's in album herschikken | `album:write` |
+| DELETE | `/api/albums/:id/photos/:photoId` | Foto uit album verwijderen | `album:delete` |
+| GET | `/api/photos` | Zichtbare foto's lijst | Public |
+| GET | `/api/photos/admin` | Alle foto's (admin) | `photo:read` |
+| GET | `/api/photos/:id` | Foto details | `photo:read` |
+| POST | `/api/photos` | Foto aanmaken | `photo:write` |
+| PUT | `/api/photos/:id` | Foto bijwerken | `photo:write` |
+| DELETE | `/api/photos/:id` | Foto verwijderen | `photo:delete` |
+| GET | `/api/partners` | Partners lijst | Public |
+| GET | `/api/partners/admin` | Alle partners (admin) | `partner:read` |
+| GET | `/api/partners/:id` | Partner details | `partner:read` |
+| POST | `/api/partners` | Partner aanmaken | `partner:write` |
+| PUT | `/api/partners/:id` | Partner bijwerken | `partner:write` |
+| DELETE | `/api/partners/:id` | Partner verwijderen | `partner:delete` |
+| GET | `/api/radio-recordings` | Radio opnames lijst | Public |
+| GET | `/api/radio-recordings/admin` | Alle radio opnames (admin) | `radio_recording:read` |
+| GET | `/api/radio-recordings/:id` | Radio opname details | `radio_recording:read` |
+| POST | `/api/radio-recordings` | Radio opname aanmaken | `radio_recording:write` |
+| PUT | `/api/radio-recordings/:id` | Radio opname bijwerken | `radio_recording:write` |
+| DELETE | `/api/radio-recordings/:id` | Radio opname verwijderen | `radio_recording:delete` |
+| GET | `/api/videos` | Video's lijst | Public |
+| GET | `/api/videos/admin` | Alle video's (admin) | `video:read` |
+| GET | `/api/videos/:id` | Video details | `video:read` |
+| POST | `/api/videos` | Video aanmaken | `video:write` |
+| PUT | `/api/videos/:id` | Video bijwerken | `video:write` |
+| DELETE | `/api/videos/:id` | Video verwijderen | `video:delete` |
+| GET | `/api/sponsors` | Sponsors lijst | Public |
+| GET | `/api/sponsors/admin` | Alle sponsors (admin) | `sponsor:read` |
+| GET | `/api/sponsors/:id` | Sponsor details | `sponsor:read` |
+| POST | `/api/sponsors` | Sponsor aanmaken | `sponsor:write` |
+| PUT | `/api/sponsors/:id` | Sponsor bijwerken | `sponsor:write` |
+| DELETE | `/api/sponsors/:id` | Sponsor verwijderen | `sponsor:delete` |
+| GET | `/api/program-schedule` | Programma schema lijst | Public |
+| GET | `/api/program-schedule/admin` | Alle programma schema's (admin) | `program_schedule:read` |
+| GET | `/api/program-schedule/:id` | Programma schema details | `program_schedule:read` |
+| POST | `/api/program-schedule` | Programma schema aanmaken | `program_schedule:write` |
+| PUT | `/api/program-schedule/:id` | Programma schema bijwerken | `program_schedule:write` |
+| DELETE | `/api/program-schedule/:id` | Programma schema verwijderen | `program_schedule:delete` |
+| GET | `/api/social-embeds` | Social embeds lijst | Public |
+| GET | `/api/social-embeds/admin` | Alle social embeds (admin) | `social_embed:read` |
+| GET | `/api/social-embeds/:id` | Social embed details | `social_embed:read` |
+| POST | `/api/social-embeds` | Social embed aanmaken | `social_embed:write` |
+| PUT | `/api/social-embeds/:id` | Social embed bijwerken | `social_embed:write` |
+| DELETE | `/api/social-embeds/:id` | Social embed verwijderen | `social_embed:delete` |
+| GET | `/api/social-links` | Social links lijst | Public |
+| GET | `/api/social-links/admin` | Alle social links (admin) | `social_link:read` |
+| GET | `/api/social-links/:id` | Social link details | `social_link:read` |
+| POST | `/api/social-links` | Social link aanmaken | `social_link:write` |
+| PUT | `/api/social-links/:id` | Social link bijwerken | `social_link:write` |
+| DELETE | `/api/social-links/:id` | Social link verwijderen | `social_link:delete` |
+| GET | `/api/under-construction` | Under construction status | Public |
+| PUT | `/api/under-construction` | Under construction bijwerken | `under_construction:write` |
+| GET | `/api/images/upload` | Upload instellingen | Auth |
+| POST | `/api/images/upload` | Afbeelding uploaden | Auth |
+| GET | `/api/images/:id` | Afbeelding details | Auth |
+| DELETE | `/api/images/:id` | Afbeelding verwijderen | Auth |
 
 ### Chat Endpoints
 
@@ -697,7 +762,7 @@ Verzendt een contact formulier email naar admin en bevestiging naar gebruiker.
 
 **cURL Voorbeeld:**
 ```bash
-curl -X POST https://api.dekoninklijkeloop.nl/api/contact-email \
+curl -X POST https://dklemailservice.onrender.com/api/contact-email \
   -H "Content-Type: application/json" \
   -d '{
     "naam": "John Doe",
@@ -709,7 +774,7 @@ curl -X POST https://api.dekoninklijkeloop.nl/api/contact-email \
 
 **JavaScript Voorbeeld:**
 ```javascript
-const response = await fetch('https://api.dekoninklijkeloop.nl/api/contact-email', {
+const response = await fetch('https://dklemailservice.onrender.com/api/contact-email', {
     method: 'POST',
     headers: {
         'Content-Type': 'application/json',
@@ -884,7 +949,7 @@ Content-Type: application/json
 
 **cURL Voorbeeld:**
 ```bash
-curl -X POST https://api.dekoninklijkeloop.nl/api/aanmelding-email \
+curl -X POST https://dklemailservice.onrender.com/api/aanmelding-email \
   -H "Content-Type: application/json" \
   -d '{
     "naam": "John Doe",
@@ -1640,6 +1705,530 @@ Content-Type: application/json
 
 **Implementatie:** [`handlers/admin_mail_handler.go`](../../handlers/admin_mail_handler.go:1)
 
+### Album Management
+
+#### GET /api/albums
+
+Haalt een lijst van zichtbare albums op voor publiek gebruik.
+
+**Query Parameters:**
+- `include_covers` (optioneel): Inclusief cover foto informatie (`true`/`false`)
+
+**Response (200 OK):**
+```json
+[
+    {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "title": "Album Titel",
+        "description": "Album beschrijving",
+        "cover_photo_id": "photo-uuid",
+        "visible": true,
+        "order_number": 1,
+        "created_at": "2024-03-20T15:04:05Z",
+        "updated_at": "2024-03-20T15:04:05Z"
+    }
+]
+```
+
+**Implementatie:** [`handlers/album_handler.go:77`](../../handlers/album_handler.go:77)
+
+#### GET /api/albums/:id/photos
+
+Haalt alle zichtbare foto's van een specifiek album op.
+
+**Response (200 OK):**
+```json
+[
+    {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "url": "https://example.com/photo.jpg",
+        "alt_text": "Foto beschrijving",
+        "visible": true,
+        "thumbnail_url": "https://example.com/thumb.jpg",
+        "title": "Foto titel",
+        "description": "Foto beschrijving",
+        "year": 2024,
+        "cloudinary_folder": "albums/2024",
+        "created_at": "2024-03-20T15:04:05Z",
+        "updated_at": "2024-03-20T15:04:05Z",
+        "album_id": "album-uuid",
+        "order_number": 1
+    }
+]
+```
+
+**Implementatie:** [`handlers/album_handler.go:350`](../../handlers/album_handler.go:350)
+
+#### GET /api/albums/admin
+
+Haalt een lijst van alle albums op voor admin beheer.
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+```
+
+**Query Parameters:**
+- `limit` (optioneel): Maximum aantal resultaten (default: 10)
+- `offset` (optioneel): Aantal resultaten om over te slaan (default: 0)
+
+**Response (200 OK):**
+```json
+{
+    "success": true,
+    "data": [
+        {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "title": "Album Titel",
+            "description": "Album beschrijving",
+            "cover_photo_id": "photo-uuid",
+            "visible": true,
+            "order_number": 1,
+            "created_at": "2024-03-20T15:04:05Z",
+            "updated_at": "2024-03-20T15:04:05Z"
+        }
+    ],
+    "total": 1,
+    "limit": 10,
+    "offset": 0
+}
+```
+
+**Implementatie:** [`handlers/album_handler.go:117`](../../handlers/album_handler.go:117)
+
+#### GET /api/albums/:id
+
+Haalt details van een specifiek album op.
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+```
+
+**Response (200 OK):**
+```json
+{
+    "success": true,
+    "data": {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "title": "Album Titel",
+        "description": "Album beschrijving",
+        "cover_photo_id": "photo-uuid",
+        "visible": true,
+        "order_number": 1,
+        "created_at": "2024-03-20T15:04:05Z",
+        "updated_at": "2024-03-20T15:04:05Z"
+    }
+}
+```
+
+**Implementatie:** [`handlers/album_handler.go:159`](../../handlers/album_handler.go:159)
+
+#### POST /api/albums
+
+Maakt een nieuw album aan.
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+    "title": "Nieuw Album",
+    "description": "Album beschrijving",
+    "cover_photo_id": "photo-uuid",
+    "visible": true,
+    "order_number": 1
+}
+```
+
+**Response (201 Created):**
+```json
+{
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "title": "Nieuw Album",
+    "description": "Album beschrijving",
+    "cover_photo_id": "photo-uuid",
+    "visible": true,
+    "order_number": 1,
+    "created_at": "2024-03-20T15:04:05Z",
+    "updated_at": "2024-03-20T15:04:05Z"
+}
+```
+
+**Implementatie:** [`handlers/album_handler.go:198`](../../handlers/album_handler.go:198)
+
+#### PUT /api/albums/:id
+
+Werkt een bestaand album bij.
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+    "title": "Bijgewerkte Titel",
+    "description": "Bijgewerkte beschrijving",
+    "visible": false
+}
+```
+
+**Response (200 OK):**
+```json
+{
+    "success": true,
+    "message": "Album bijgewerkt",
+    "data": {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "title": "Bijgewerkte Titel",
+        "description": "Bijgewerkte beschrijving",
+        "visible": false,
+        "updated_at": "2024-03-20T16:00:00Z"
+    }
+}
+```
+
+**Implementatie:** [`handlers/album_handler.go:239`](../../handlers/album_handler.go:239)
+
+#### PUT /api/albums/reorder
+
+Herschikt de volgorde van meerdere albums (bulk operatie).
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+    "album_order": [
+        {"id": "album-1", "order_number": 1},
+        {"id": "album-2", "order_number": 2},
+        {"id": "album-3", "order_number": 3}
+    ]
+}
+```
+
+**Response (200 OK):**
+```json
+{
+    "success": true,
+    "message": "Albums reordered successfully"
+}
+```
+
+**Implementatie:** [`handlers/album_handler.go:657`](../../handlers/album_handler.go:657)
+
+#### DELETE /api/albums/:id
+
+Verwijdert een album.
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+```
+
+**Response (200 OK):**
+```json
+{
+    "success": true,
+    "message": "Album deleted successfully"
+}
+```
+
+**Implementatie:** [`handlers/album_handler.go:302`](../../handlers/album_handler.go:302)
+
+#### POST /api/albums/:id/photos
+
+Voegt een foto toe aan een album.
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+    "photo_id": "photo-uuid",
+    "order_number": 1
+}
+```
+
+**Response (201 Created):**
+```json
+{
+    "id": "album-photo-uuid",
+    "album_id": "album-uuid",
+    "photo_id": "photo-uuid",
+    "order_number": 1,
+    "created_at": "2024-03-20T15:04:05Z"
+}
+```
+
+**Implementatie:** [`handlers/album_handler.go:400`](../../handlers/album_handler.go:400)
+
+#### PUT /api/albums/:id/photos/reorder
+
+Herschikt de volgorde van foto's in een album.
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+    "photo_order": [
+        {"photo_id": "photo-1", "order_number": 1},
+        {"photo_id": "photo-2", "order_number": 2}
+    ]
+}
+```
+
+**Response (200 OK):**
+```json
+{
+    "success": true,
+    "message": "Photos reordered successfully"
+}
+```
+
+**Implementatie:** [`handlers/album_handler.go:586`](../../handlers/album_handler.go:586)
+
+#### DELETE /api/albums/:id/photos/:photoId
+
+Verwijdert een foto uit een album.
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+```
+
+**Response (200 OK):**
+```json
+{
+    "success": true,
+    "message": "Photo removed from album successfully"
+}
+```
+
+**Implementatie:** [`handlers/album_handler.go:500`](../../handlers/album_handler.go:500)
+
+### Photo Management
+
+#### GET /api/photos
+
+Haalt een lijst van zichtbare foto's op.
+
+**Query Parameters:**
+- `year` (optioneel): Filter op jaar
+- `title` (optioneel): Filter op titel (gedeeltelijke match, case-insensitive)
+- `description` (optioneel): Filter op beschrijving (gedeeltelijke match, case-insensitive)
+- `cloudinary_folder` (optioneel): Filter op Cloudinary folder (exact match)
+
+**Response (200 OK):**
+```json
+[
+    {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "url": "https://example.com/photo.jpg",
+        "alt_text": "Foto beschrijving",
+        "visible": true,
+        "thumbnail_url": "https://example.com/thumb.jpg",
+        "title": "Foto titel",
+        "description": "Foto beschrijving",
+        "year": 2024,
+        "cloudinary_folder": "albums/2024",
+        "created_at": "2024-03-20T15:04:05Z",
+        "updated_at": "2024-03-20T15:04:05Z"
+    }
+]
+```
+
+**Implementatie:** [`handlers/photo_handler.go:69`](../../handlers/photo_handler.go:69)
+
+#### GET /api/photos/admin
+
+Haalt een lijst van alle foto's op voor admin beheer.
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+```
+
+**Query Parameters:**
+- `limit` (optioneel): Maximum aantal resultaten (default: 10)
+- `offset` (optioneel): Aantal resultaten om over te slaan (default: 0)
+
+**Response (200 OK):**
+```json
+{
+    "success": true,
+    "data": [
+        {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "url": "https://example.com/photo.jpg",
+            "alt_text": "Foto beschrijving",
+            "visible": true,
+            "thumbnail_url": "https://example.com/thumb.jpg",
+            "title": "Foto titel",
+            "description": "Foto beschrijving",
+            "year": 2024,
+            "cloudinary_folder": "albums/2024",
+            "created_at": "2024-03-20T15:04:05Z",
+            "updated_at": "2024-03-20T15:04:05Z"
+        }
+    ],
+    "total": 1,
+    "limit": 10,
+    "offset": 0
+}
+```
+
+**Implementatie:** [`handlers/photo_handler.go:126`](../../handlers/photo_handler.go:126)
+
+#### GET /api/photos/:id
+
+Haalt details van een specifieke foto op.
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+```
+
+**Response (200 OK):**
+```json
+{
+    "success": true,
+    "data": {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "url": "https://example.com/photo.jpg",
+        "alt_text": "Foto beschrijving",
+        "visible": true,
+        "thumbnail_url": "https://example.com/thumb.jpg",
+        "title": "Foto titel",
+        "description": "Foto beschrijving",
+        "year": 2024,
+        "cloudinary_folder": "albums/2024",
+        "created_at": "2024-03-20T15:04:05Z",
+        "updated_at": "2024-03-20T15:04:05Z"
+    }
+}
+```
+
+**Implementatie:** [`handlers/photo_handler.go:168`](../../handlers/photo_handler.go:168)
+
+#### POST /api/photos
+
+Maakt een nieuwe foto aan.
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+    "url": "https://example.com/photo.jpg",
+    "alt_text": "Foto beschrijving",
+    "visible": true,
+    "thumbnail_url": "https://example.com/thumb.jpg",
+    "title": "Foto titel",
+    "description": "Foto beschrijving",
+    "year": 2024,
+    "cloudinary_folder": "albums/2024"
+}
+```
+
+**Response (201 Created):**
+```json
+{
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "url": "https://example.com/photo.jpg",
+    "alt_text": "Foto beschrijving",
+    "visible": true,
+    "thumbnail_url": "https://example.com/thumb.jpg",
+    "title": "Foto titel",
+    "description": "Foto beschrijving",
+    "year": 2024,
+    "cloudinary_folder": "albums/2024",
+    "created_at": "2024-03-20T15:04:05Z",
+    "updated_at": "2024-03-20T15:04:05Z"
+}
+```
+
+**Implementatie:** [`handlers/photo_handler.go:207`](../../handlers/photo_handler.go:207)
+
+#### PUT /api/photos/:id
+
+Werkt een bestaande foto bij.
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+    "title": "Bijgewerkte titel",
+    "description": "Bijgewerkte beschrijving",
+    "visible": false
+}
+```
+
+**Response (200 OK):**
+```json
+{
+    "success": true,
+    "data": {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "title": "Bijgewerkte titel",
+        "description": "Bijgewerkte beschrijving",
+        "visible": false,
+        "updated_at": "2024-03-20T16:00:00Z"
+    }
+}
+```
+
+**Implementatie:** [`handlers/photo_handler.go:248`](../../handlers/photo_handler.go:248)
+
+#### DELETE /api/photos/:id
+
+Verwijdert een foto.
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+```
+
+**Response (200 OK):**
+```json
+{
+    "success": true,
+    "message": "Photo deleted successfully"
+}
+```
+
+**Implementatie:** [`handlers/photo_handler.go:314`](../../handlers/photo_handler.go:314)
+
+## Error Codes
 ## Error Codes
 
 | HTTP Status | Code | Beschrijving |
@@ -1789,7 +2378,7 @@ func sendContactEmail(contact ContactRequest) error {
     jsonData, _ := json.Marshal(contact)
     
     resp, err := http.Post(
-        "https://api.dekoninklijkeloop.nl/api/contact-email",
+        "https://dklemailservice.onrender.com/api/contact-email",
         "application/json",
         bytes.NewBuffer(jsonData),
     )
@@ -1832,7 +2421,7 @@ interface ApiResponse<T = any> {
 }
 
 async function sendContactEmail(contact: ContactRequest): Promise<ApiResponse> {
-    const response = await fetch('https://api.dekoninklijkeloop.nl/api/contact-email', {
+    const response = await fetch('https://dklemailservice.onrender.com/api/contact-email', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

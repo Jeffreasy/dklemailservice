@@ -83,6 +83,19 @@ func (r *PostgresPhotoRepository) ListByAlbumID(ctx context.Context, albumID str
 	return photos, err
 }
 
+// ListByAlbumIDWithInfo retrieves photos for a specific album with relationship info
+func (r *PostgresPhotoRepository) ListByAlbumIDWithInfo(ctx context.Context, albumID string) ([]*models.PhotoWithAlbumInfo, error) {
+	var photos []*models.PhotoWithAlbumInfo
+	err := r.db.WithContext(ctx).
+		Table("photos").
+		Select("photos.*, album_photos.album_id, album_photos.order_number").
+		Joins("JOIN album_photos ON photos.id = album_photos.photo_id").
+		Where("album_photos.album_id = ? AND photos.visible = ?", albumID, true).
+		Order("album_photos.order_number ASC, photos.created_at DESC").
+		Find(&photos).Error
+	return photos, err
+}
+
 // Update updates an existing photo
 func (r *PostgresPhotoRepository) Update(ctx context.Context, photo *models.Photo) error {
 	return r.db.WithContext(ctx).Save(photo).Error

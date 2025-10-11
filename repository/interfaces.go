@@ -399,6 +399,9 @@ type PhotoRepository interface {
 	// ListByAlbumID retrieves photos for a specific album
 	ListByAlbumID(ctx context.Context, albumID string) ([]*models.Photo, error)
 
+	// ListByAlbumIDWithInfo retrieves photos for a specific album with relationship info
+	ListByAlbumIDWithInfo(ctx context.Context, albumID string) ([]*models.PhotoWithAlbumInfo, error)
+
 	// Update updates an existing photo
 	Update(ctx context.Context, photo *models.Photo) error
 
