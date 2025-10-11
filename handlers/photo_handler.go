@@ -5,6 +5,7 @@ import (
 	"dklautomationgo/models"
 	"dklautomationgo/repository"
 	"dklautomationgo/services"
+	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -53,17 +54,51 @@ func (h *PhotoHandler) RegisterRoutes(app *fiber.App) {
 	deleteGroup.Delete("/:id", h.DeletePhoto)
 }
 
-// ListVisiblePhotos returns all visible photos for public display
+// ListVisiblePhotos returns all visible photos for public display with optional filtering
 // @Summary Get visible photos
-// @Description Returns all visible photos
+// @Description Returns all visible photos with optional filtering by year, title, description, or cloudinary_folder
 // @Tags Photos
 // @Accept json
 // @Produce json
+// @Param year query int false "Filter by year"
+// @Param title query string false "Filter by title (partial match)"
+// @Param description query string false "Filter by description (partial match)"
+// @Param cloudinary_folder query string false "Filter by cloudinary folder"
 // @Success 200 {array} models.Photo
 // @Router /api/photos [get]
 func (h *PhotoHandler) ListVisiblePhotos(c *fiber.Ctx) error {
 	ctx := c.Context()
-	photos, err := h.photoRepo.ListVisible(ctx)
+
+	// Parse filter parameters
+	filters := make(map[string]interface{})
+
+	if yearStr := c.Query("year"); yearStr != "" {
+		if year, err := strconv.Atoi(yearStr); err == nil && year > 0 {
+			filters["year"] = year
+		}
+	}
+
+	if title := c.Query("title"); title != "" {
+		filters["title"] = title
+	}
+
+	if description := c.Query("description"); description != "" {
+		filters["description"] = description
+	}
+
+	if cloudinaryFolder := c.Query("cloudinary_folder"); cloudinaryFolder != "" {
+		filters["cloudinary_folder"] = cloudinaryFolder
+	}
+
+	var photos []*models.Photo
+	var err error
+
+	if len(filters) > 0 {
+		photos, err = h.photoRepo.ListVisibleFiltered(ctx, filters)
+	} else {
+		photos, err = h.photoRepo.ListVisible(ctx)
+	}
+
 	if err != nil {
 		logger.Error("Failed to fetch visible photos", "error", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

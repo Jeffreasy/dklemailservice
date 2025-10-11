@@ -46,6 +46,32 @@ func (r *PostgresPhotoRepository) ListVisible(ctx context.Context) ([]*models.Ph
 	return photos, err
 }
 
+// ListVisibleFiltered retrieves visible photos with filtering
+func (r *PostgresPhotoRepository) ListVisibleFiltered(ctx context.Context, filters map[string]interface{}) ([]*models.Photo, error) {
+	var photos []*models.Photo
+	query := r.db.WithContext(ctx).Where("visible = ?", true)
+
+	// Apply filters
+	if year, ok := filters["year"].(int); ok && year > 0 {
+		query = query.Where("year = ?", year)
+	}
+
+	if title, ok := filters["title"].(string); ok && title != "" {
+		query = query.Where("title ILIKE ?", "%"+title+"%")
+	}
+
+	if description, ok := filters["description"].(string); ok && description != "" {
+		query = query.Where("description ILIKE ?", "%"+description+"%")
+	}
+
+	if cloudinaryFolder, ok := filters["cloudinary_folder"].(string); ok && cloudinaryFolder != "" {
+		query = query.Where("cloudinary_folder = ?", cloudinaryFolder)
+	}
+
+	err := query.Order("created_at DESC").Find(&photos).Error
+	return photos, err
+}
+
 // ListByAlbumID retrieves photos for a specific album
 func (r *PostgresPhotoRepository) ListByAlbumID(ctx context.Context, albumID string) ([]*models.Photo, error) {
 	var photos []*models.Photo

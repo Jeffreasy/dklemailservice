@@ -380,7 +380,7 @@ func main() {
 				{"path": "/api/radio-recordings", "method": "POST", "description": "Create radio recording (requires admin auth)"},
 				{"path": "/api/radio-recordings/:id", "method": "PUT", "description": "Update radio recording (requires admin auth)"},
 				{"path": "/api/radio-recordings/:id", "method": "DELETE", "description": "Delete radio recording (requires admin auth)"},
-				{"path": "/api/photos", "method": "GET", "description": "Get visible photos (public)"},
+				{"path": "/api/photos", "method": "GET", "description": "Get visible photos (public). Supports filtering: ?year=2024&title=search&description=search&cloudinary_folder=folder"},
 				{"path": "/api/photos/admin", "method": "GET", "description": "List all photos (requires admin auth)"},
 				{"path": "/api/photos/:id", "method": "GET", "description": "Get photo by ID (requires admin auth)"},
 				{"path": "/api/photos", "method": "POST", "description": "Create photo (requires admin auth)"},

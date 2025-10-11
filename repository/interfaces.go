@@ -393,6 +393,9 @@ type PhotoRepository interface {
 	// ListVisible retrieves only visible photos
 	ListVisible(ctx context.Context) ([]*models.Photo, error)
 
+	// ListVisibleFiltered retrieves visible photos with filtering
+	ListVisibleFiltered(ctx context.Context, filters map[string]interface{}) ([]*models.Photo, error)
+
 	// ListByAlbumID retrieves photos for a specific album
 	ListByAlbumID(ctx context.Context, albumID string) ([]*models.Photo, error)
 
