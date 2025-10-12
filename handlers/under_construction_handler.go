@@ -74,6 +74,7 @@ func (h *UnderConstructionHandler) GetActiveUnderConstruction(c *fiber.Ctx) erro
 	}
 
 	if uc == nil {
+		// Return 404 without logging an error - this is expected when maintenance mode is disabled
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "No active under construction found",
 		})
