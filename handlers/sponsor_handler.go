@@ -1,10 +1,14 @@
 package handlers
 
 import (
+	"context"
 	"dklautomationgo/logger"
 	"dklautomationgo/models"
 	"dklautomationgo/repository"
 	"dklautomationgo/services"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -14,6 +18,7 @@ type SponsorHandler struct {
 	sponsorRepo       repository.SponsorRepository
 	authService       services.AuthService
 	permissionService services.PermissionService
+	imageService      *services.ImageService
 }
 
 // NewSponsorHandler creates a new sponsor handler
@@ -21,11 +26,13 @@ func NewSponsorHandler(
 	sponsorRepo repository.SponsorRepository,
 	authService services.AuthService,
 	permissionService services.PermissionService,
+	imageService *services.ImageService,
 ) *SponsorHandler {
 	return &SponsorHandler{
 		sponsorRepo:       sponsorRepo,
 		authService:       authService,
 		permissionService: permissionService,
+		imageService:      imageService,
 	}
 }
 
@@ -158,11 +165,18 @@ func (h *SponsorHandler) GetSponsor(c *fiber.Ctx) error {
 
 // CreateSponsor creates a new sponsor
 // @Summary Create sponsor
-// @Description Creates a new sponsor
+// @Description Creates a new sponsor. Supports both JSON and multipart/form-data for logo upload.
 // @Tags Sponsors
-// @Accept json
+// @Accept json,multipartFormData
 // @Produce json
-// @Param sponsor body models.Sponsor true "Sponsor data"
+// @Param sponsor body models.Sponsor true "Sponsor data (JSON)"
+// @Param logo formData file false "Logo image file"
+// @Param name formData string false "Sponsor name (multipart)"
+// @Param description formData string false "Sponsor description (multipart)"
+// @Param website_url formData string false "Website URL (multipart)"
+// @Param order_number formData int false "Order number (multipart)"
+// @Param is_active formData bool false "Is active (multipart)"
+// @Param visible formData bool false "Is visible (multipart)"
 // @Success 201 {object} models.Sponsor
 // @Failure 400 {object} map[string]interface{}
 // @Failure 401 {object} map[string]interface{}
@@ -171,10 +185,85 @@ func (h *SponsorHandler) GetSponsor(c *fiber.Ctx) error {
 // @Security BearerAuth
 func (h *SponsorHandler) CreateSponsor(c *fiber.Ctx) error {
 	var sponsor models.Sponsor
-	if err := c.BodyParser(&sponsor); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
+
+	// Check if request is multipart form data
+	contentType := c.Get("Content-Type")
+	if strings.Contains(contentType, "multipart/form-data") {
+		// Handle multipart form data
+		form, err := c.MultipartForm()
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Failed to parse form data",
+			})
+		}
+
+		// Parse form fields
+		if name := form.Value["name"]; len(name) > 0 {
+			sponsor.Name = name[0]
+		}
+		if description := form.Value["description"]; len(description) > 0 {
+			sponsor.Description = description[0]
+		}
+		if websiteURL := form.Value["website_url"]; len(websiteURL) > 0 {
+			sponsor.WebsiteURL = websiteURL[0]
+		}
+		if orderNumber := form.Value["order_number"]; len(orderNumber) > 0 {
+			if orderNum, err := strconv.Atoi(orderNumber[0]); err == nil {
+				sponsor.OrderNumber = orderNum
+			}
+		}
+		if isActive := form.Value["is_active"]; len(isActive) > 0 {
+			if active, err := strconv.ParseBool(isActive[0]); err == nil {
+				sponsor.IsActive = active
+			}
+		}
+		if visible := form.Value["visible"]; len(visible) > 0 {
+			if vis, err := strconv.ParseBool(visible[0]); err == nil {
+				sponsor.Visible = vis
+			}
+		}
+
+		// Handle logo upload if present
+		if files := form.File["logo"]; len(files) > 0 {
+			file := files[0]
+
+			// Validate file type
+			if !h.isValidImageType(file.Filename) {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"error": "Invalid logo file type. Only JPEG, PNG, GIF, and WebP are allowed.",
+				})
+			}
+
+			// Open file
+			src, err := file.Open()
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error": "Failed to open uploaded logo file",
+				})
+			}
+			defer src.Close()
+
+			// Upload to Cloudinary
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			result, err := h.imageService.UploadImage(ctx, src, file.Filename, "sponsor_logos", "system")
+			if err != nil {
+				logger.Error("Logo upload failed", "error", err, "filename", file.Filename)
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error": "Failed to upload logo",
+				})
+			}
+
+			sponsor.LogoURL = result.URL
+		}
+	} else {
+		// Handle JSON request
+		if err := c.BodyParser(&sponsor); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid request body",
+			})
+		}
 	}
 
 	// Validate required fields
@@ -193,6 +282,19 @@ func (h *SponsorHandler) CreateSponsor(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(sponsor)
+}
+
+// isValidImageType controleert of het bestandstype geldig is
+func (h *SponsorHandler) isValidImageType(filename string) bool {
+	validTypes := []string{".jpg", ".jpeg", ".png", ".gif", ".webp"}
+	filename = strings.ToLower(filename)
+
+	for _, ext := range validTypes {
+		if strings.HasSuffix(filename, ext) {
+			return true
+		}
+	}
+	return false
 }
 
 // UpdateSponsor updates an existing sponsor

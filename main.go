@@ -704,6 +704,7 @@ func main() {
 		repoFactory.Sponsor,
 		serviceFactory.AuthService,
 		serviceFactory.PermissionService,
+		serviceFactory.ImageService,
 	)
 	sponsorHandler.RegisterRoutes(app)
 
