@@ -429,6 +429,11 @@ func main() {
 				{"path": "/api/under-construction", "method": "POST", "description": "Create under construction (requires admin auth)"},
 				{"path": "/api/under-construction/:id", "method": "PUT", "description": "Update under construction (requires admin auth)"},
 				{"path": "/api/under-construction/:id", "method": "DELETE", "description": "Delete under construction (requires admin auth)"},
+				{"path": "/api/title_section_content", "method": "GET", "description": "Get title section content (public)"},
+				{"path": "/api/title_section_content/admin", "method": "GET", "description": "Get title section content for admin (requires admin auth)"},
+				{"path": "/api/title_section_content", "method": "POST", "description": "Create title section content (requires admin auth)"},
+				{"path": "/api/title_section_content", "method": "PUT", "description": "Update title section content (requires admin auth)"},
+				{"path": "/api/title_section_content/:id", "method": "DELETE", "description": "Delete title section content (requires admin auth)"},
 				{"path": "/metrics", "method": "GET", "description": "Prometheus metrics"},
 			},
 		})

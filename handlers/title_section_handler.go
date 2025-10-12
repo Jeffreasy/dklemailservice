@@ -32,11 +32,11 @@ func NewTitleSectionHandler(
 // RegisterRoutes registers the title section routes
 func (h *TitleSectionHandler) RegisterRoutes(app *fiber.App) {
 	// Public routes (no authentication required)
-	public := app.Group("/api/title-sections")
+	public := app.Group("/api/title_section_content")
 	public.Get("/", h.GetTitleSection)
 
 	// Admin routes (require authentication and permissions)
-	admin := app.Group("/api/title-sections", AuthMiddleware(h.authService))
+	admin := app.Group("/api/title_section_content", AuthMiddleware(h.authService))
 
 	// Read routes (require title_section read permission)
 	readGroup := admin.Group("", PermissionMiddleware(h.permissionService, "title_section", "read"))
