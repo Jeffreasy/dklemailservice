@@ -27,6 +27,7 @@ type Repository struct {
 	RadioRecording         RadioRecordingRepository
 	Photo                  PhotoRepository
 	Album                  AlbumRepository
+	AlbumPhoto             AlbumPhotoRepository
 	Video                  VideoRepository
 	Sponsor                SponsorRepository
 	ProgramSchedule        ProgramScheduleRepository
@@ -69,6 +70,7 @@ func NewRepository(db *gorm.DB) *Repository {
 		RadioRecording:         NewPostgresRadioRecordingRepository(db),
 		Photo:                  NewPostgresPhotoRepository(db),
 		Album:                  NewPostgresAlbumRepository(db),
+		AlbumPhoto:             NewPostgresAlbumPhotoRepository(db),
 		Video:                  NewPostgresVideoRepository(db),
 		Sponsor:                NewPostgresSponsorRepository(db),
 		ProgramSchedule:        NewPostgresProgramScheduleRepository(db),

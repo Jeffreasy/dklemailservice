@@ -62,6 +62,13 @@ func (r *PostgresAlbumRepository) Update(ctx context.Context, album *models.Albu
 	return r.db.WithContext(ctx).Save(album).Error
 }
 
+// UpdateOrder updates the order number of an album
+func (r *PostgresAlbumRepository) UpdateOrder(ctx context.Context, id string, orderNumber int) error {
+	return r.db.WithContext(ctx).Model(&models.Album{}).
+		Where("id = ?", id).
+		Update("order_number", orderNumber).Error
+}
+
 // Delete removes an album
 func (r *PostgresAlbumRepository) Delete(ctx context.Context, id string) error {
 	return r.db.WithContext(ctx).Delete(&models.Album{}, "id = ?", id).Error

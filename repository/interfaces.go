@@ -399,6 +399,9 @@ type PhotoRepository interface {
 	// ListByAlbumID retrieves photos for a specific album
 	ListByAlbumID(ctx context.Context, albumID string) ([]*models.Photo, error)
 
+	// ListByAlbumIDWithInfo retrieves photos for a specific album with relationship info
+	ListByAlbumIDWithInfo(ctx context.Context, albumID string) ([]*models.PhotoWithAlbumInfo, error)
+
 	// Update updates an existing photo
 	Update(ctx context.Context, photo *models.Photo) error
 
@@ -425,6 +428,9 @@ type AlbumRepository interface {
 
 	// Update updates an existing album
 	Update(ctx context.Context, album *models.Album) error
+
+	// UpdateOrder updates the order number of an album
+	UpdateOrder(ctx context.Context, id string, orderNumber int) error
 
 	// Delete removes an album
 	Delete(ctx context.Context, id string) error
@@ -556,6 +562,7 @@ type UnderConstructionRepository interface {
 	Delete(ctx context.Context, id int) error
 }
 
+<<<<<<< HEAD
 // TitleSectionRepository defines the interface for title section operations
 type TitleSectionRepository interface {
 	// Get retrieves the title section content (assuming there's only one record)
@@ -569,4 +576,28 @@ type TitleSectionRepository interface {
 
 	// Delete removes a title section
 	Delete(ctx context.Context, id string) error
+=======
+// AlbumPhotoRepository defines the interface for album photo operations
+type AlbumPhotoRepository interface {
+	// Create adds a photo to an album
+	Create(ctx context.Context, albumPhoto *models.AlbumPhoto) error
+
+	// Delete removes a photo from an album
+	Delete(ctx context.Context, albumID, photoID string) error
+
+	// GetByAlbumAndPhoto retrieves a specific album-photo relationship
+	GetByAlbumAndPhoto(ctx context.Context, albumID, photoID string) (*models.AlbumPhoto, error)
+
+	// ListByAlbum retrieves all photos for an album ordered by order_number
+	ListByAlbum(ctx context.Context, albumID string) ([]*models.AlbumPhoto, error)
+
+	// UpdateOrder updates the order number of a photo in an album
+	UpdateOrder(ctx context.Context, albumID, photoID string, orderNumber int) error
+
+	// DeleteByAlbum removes all photos from an album
+	DeleteByAlbum(ctx context.Context, albumID string) error
+
+	// DeleteByPhoto removes a photo from all albums
+	DeleteByPhoto(ctx context.Context, photoID string) error
+>>>>>>> c95df6dc4594908d4b727187274d064839cdb364
 }

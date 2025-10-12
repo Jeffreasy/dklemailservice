@@ -13,6 +13,7 @@ import (
 type AlbumHandler struct {
 	albumRepo         repository.AlbumRepository
 	photoRepo         repository.PhotoRepository
+	albumPhotoRepo    repository.AlbumPhotoRepository
 	authService       services.AuthService
 	permissionService services.PermissionService
 }
@@ -21,12 +22,14 @@ type AlbumHandler struct {
 func NewAlbumHandler(
 	albumRepo repository.AlbumRepository,
 	photoRepo repository.PhotoRepository,
+	albumPhotoRepo repository.AlbumPhotoRepository,
 	authService services.AuthService,
 	permissionService services.PermissionService,
 ) *AlbumHandler {
 	return &AlbumHandler{
 		albumRepo:         albumRepo,
 		photoRepo:         photoRepo,
+		albumPhotoRepo:    albumPhotoRepo,
 		authService:       authService,
 		permissionService: permissionService,
 	}
@@ -51,10 +54,14 @@ func (h *AlbumHandler) RegisterRoutes(app *fiber.App) {
 	writeGroup := admin.Group("", PermissionMiddleware(h.permissionService, "album", "write"))
 	writeGroup.Post("/", h.CreateAlbum)
 	writeGroup.Put("/:id", h.UpdateAlbum)
+	writeGroup.Put("/reorder", h.ReorderAlbums)
+	writeGroup.Post("/:id/photos", h.AddPhotoToAlbum)
+	writeGroup.Put("/:id/photos/reorder", h.ReorderAlbumPhotos)
 
 	// Delete routes (require album delete permission)
 	deleteGroup := admin.Group("", PermissionMiddleware(h.permissionService, "album", "delete"))
 	deleteGroup.Delete("/:id", h.DeleteAlbum)
+	deleteGroup.Delete("/:id/photos/:photoId", h.RemovePhotoFromAlbum)
 }
 
 // ListVisibleAlbums returns all visible albums for public display
@@ -331,12 +338,12 @@ func (h *AlbumHandler) DeleteAlbum(c *fiber.Ctx) error {
 
 // GetAlbumPhotos returns photos for a specific album
 // @Summary Get photos for album
-// @Description Returns all visible photos for a specific album
+// @Description Returns all visible photos for a specific album with relationship data
 // @Tags Albums
 // @Accept json
 // @Produce json
 // @Param id path string true "Album ID"
-// @Success 200 {array} models.Photo
+// @Success 200 {array} models.PhotoWithAlbumInfo
 // @Failure 400 {object} map[string]interface{}
 // @Failure 404 {object} map[string]interface{}
 // @Router /api/albums/{id}/photos [get]
@@ -364,7 +371,7 @@ func (h *AlbumHandler) GetAlbumPhotos(c *fiber.Ctx) error {
 		})
 	}
 
-	photos, err := h.photoRepo.ListByAlbumID(ctx, id)
+	photos, err := h.photoRepo.ListByAlbumIDWithInfo(ctx, id)
 	if err != nil {
 		logger.Error("Failed to fetch album photos", "error", err, "album_id", id)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -373,4 +380,312 @@ func (h *AlbumHandler) GetAlbumPhotos(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(photos)
+}
+
+// AddPhotoToAlbum adds a photo to an album
+// @Summary Add photo to album
+// @Description Adds a photo to an album with optional order number
+// @Tags Albums
+// @Accept json
+// @Produce json
+// @Param id path string true "Album ID"
+// @Param photo body models.AddPhotoToAlbumRequest true "Photo data"
+// @Success 201 {object} models.AlbumPhoto
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Failure 403 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /api/albums/{id}/photos [post]
+// @Security BearerAuth
+func (h *AlbumHandler) AddPhotoToAlbum(c *fiber.Ctx) error {
+	albumID := c.Params("id")
+	if albumID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Album ID is required",
+		})
+	}
+
+	var req models.AddPhotoToAlbumRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	if req.PhotoID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Photo ID is required",
+		})
+	}
+
+	ctx := c.Context()
+
+	// Check if album exists
+	album, err := h.albumRepo.GetByID(ctx, albumID)
+	if err != nil {
+		logger.Error("Failed to fetch album", "error", err, "id", albumID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to fetch album",
+		})
+	}
+
+	if album == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Album not found",
+		})
+	}
+
+	// Check if photo exists
+	photo, err := h.photoRepo.GetByID(ctx, req.PhotoID)
+	if err != nil {
+		logger.Error("Failed to fetch photo", "error", err, "id", req.PhotoID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to fetch photo",
+		})
+	}
+
+	if photo == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Photo not found",
+		})
+	}
+
+	// Check if photo is already in album
+	existing, err := h.albumPhotoRepo.GetByAlbumAndPhoto(ctx, albumID, req.PhotoID)
+	if err != nil {
+		logger.Error("Failed to check existing album photo", "error", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to check album photo relationship",
+		})
+	}
+
+	if existing != nil {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+			"error": "Photo is already in this album",
+		})
+	}
+
+	// Create album photo relationship
+	albumPhoto := &models.AlbumPhoto{
+		AlbumID:     albumID,
+		PhotoID:     req.PhotoID,
+		OrderNumber: req.OrderNumber,
+	}
+
+	if err := h.albumPhotoRepo.Create(ctx, albumPhoto); err != nil {
+		logger.Error("Failed to add photo to album", "error", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to add photo to album",
+		})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(albumPhoto)
+}
+
+// RemovePhotoFromAlbum removes a photo from an album
+// @Summary Remove photo from album
+// @Description Removes a photo from an album
+// @Tags Albums
+// @Accept json
+// @Produce json
+// @Param id path string true "Album ID"
+// @Param photoId path string true "Photo ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Failure 403 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /api/albums/{id}/photos/{photoId} [delete]
+// @Security BearerAuth
+func (h *AlbumHandler) RemovePhotoFromAlbum(c *fiber.Ctx) error {
+	albumID := c.Params("id")
+	photoID := c.Params("photoId")
+
+	if albumID == "" || photoID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Album ID and Photo ID are required",
+		})
+	}
+
+	ctx := c.Context()
+
+	// Check if album exists
+	album, err := h.albumRepo.GetByID(ctx, albumID)
+	if err != nil {
+		logger.Error("Failed to fetch album", "error", err, "id", albumID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to fetch album",
+		})
+	}
+
+	if album == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Album not found",
+		})
+	}
+
+	// Check if photo exists
+	photo, err := h.photoRepo.GetByID(ctx, photoID)
+	if err != nil {
+		logger.Error("Failed to fetch photo", "error", err, "id", photoID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to fetch photo",
+		})
+	}
+
+	if photo == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Photo not found",
+		})
+	}
+
+	// Check if photo is in album
+	existing, err := h.albumPhotoRepo.GetByAlbumAndPhoto(ctx, albumID, photoID)
+	if err != nil {
+		logger.Error("Failed to check existing album photo", "error", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to check album photo relationship",
+		})
+	}
+
+	if existing == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Photo is not in this album",
+		})
+	}
+
+	// Remove photo from album
+	if err := h.albumPhotoRepo.Delete(ctx, albumID, photoID); err != nil {
+		logger.Error("Failed to remove photo from album", "error", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to remove photo from album",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Photo removed from album successfully",
+	})
+}
+
+// ReorderAlbumPhotos reorders photos in an album
+// @Summary Reorder photos in album
+// @Description Updates the order of photos in an album
+// @Tags Albums
+// @Accept json
+// @Produce json
+// @Param id path string true "Album ID"
+// @Param order body models.ReorderPhotosRequest true "Photo order data"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Failure 403 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /api/albums/{id}/photos/reorder [put]
+// @Security BearerAuth
+func (h *AlbumHandler) ReorderAlbumPhotos(c *fiber.Ctx) error {
+	albumID := c.Params("id")
+	if albumID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Album ID is required",
+		})
+	}
+
+	var req models.ReorderPhotosRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	if len(req.PhotoOrder) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Photo order is required",
+		})
+	}
+
+	ctx := c.Context()
+
+	// Check if album exists
+	album, err := h.albumRepo.GetByID(ctx, albumID)
+	if err != nil {
+		logger.Error("Failed to fetch album", "error", err, "id", albumID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to fetch album",
+		})
+	}
+
+	if album == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Album not found",
+		})
+	}
+
+	// Update order for each photo
+	for _, photoOrder := range req.PhotoOrder {
+		if photoOrder.PhotoID == "" {
+			continue
+		}
+
+		if err := h.albumPhotoRepo.UpdateOrder(ctx, albumID, photoOrder.PhotoID, photoOrder.OrderNumber); err != nil {
+			logger.Error("Failed to update photo order", "error", err, "album_id", albumID, "photo_id", photoOrder.PhotoID)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to update photo order",
+			})
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Photos reordered successfully",
+	})
+}
+
+// ReorderAlbums reorders multiple albums
+// @Summary Reorder albums
+// @Description Updates the order of multiple albums
+// @Tags Albums
+// @Accept json
+// @Produce json
+// @Param order body models.ReorderAlbumsRequest true "Album order data"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Failure 403 {object} map[string]interface{}
+// @Router /api/albums/reorder [put]
+// @Security BearerAuth
+func (h *AlbumHandler) ReorderAlbums(c *fiber.Ctx) error {
+	var req models.ReorderAlbumsRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	if len(req.AlbumOrder) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Album order is required",
+		})
+	}
+
+	ctx := c.Context()
+
+	// Update order for each album
+	for _, albumOrder := range req.AlbumOrder {
+		if albumOrder.ID == "" {
+			continue
+		}
+
+		if err := h.albumRepo.UpdateOrder(ctx, albumOrder.ID, albumOrder.OrderNumber); err != nil {
+			logger.Error("Failed to update album order", "error", err, "album_id", albumOrder.ID)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to update album order",
+			})
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Albums reordered successfully",
+	})
 }
