@@ -555,3 +555,18 @@ type UnderConstructionRepository interface {
 	// Delete removes an under construction record
 	Delete(ctx context.Context, id int) error
 }
+
+// TitleSectionRepository defines the interface for title section operations
+type TitleSectionRepository interface {
+	// Get retrieves the title section content (assuming there's only one record)
+	Get(ctx context.Context) (*models.TitleSection, error)
+
+	// Create saves a new title section
+	Create(ctx context.Context, titleSection *models.TitleSection) error
+
+	// Update updates an existing title section
+	Update(ctx context.Context, titleSection *models.TitleSection) error
+
+	// Delete removes a title section
+	Delete(ctx context.Context, id string) error
+}

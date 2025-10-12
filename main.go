@@ -733,6 +733,14 @@ func main() {
 	)
 	underConstructionHandler.RegisterRoutes(app)
 
+	// Initialiseer title section handler
+	titleSectionHandler := handlers.NewTitleSectionHandler(
+		repoFactory.TitleSection,
+		serviceFactory.AuthService,
+		serviceFactory.PermissionService,
+	)
+	titleSectionHandler.RegisterRoutes(app)
+
 	// Start server
 	port := os.Getenv("PORT")
 	if port == "" {

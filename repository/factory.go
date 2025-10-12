@@ -33,6 +33,7 @@ type Repository struct {
 	SocialEmbed            SocialEmbedRepository
 	SocialLink             SocialLinkRepository
 	UnderConstruction      UnderConstructionRepository
+	TitleSection           TitleSectionRepository
 
 	// RBAC repositories
 	RBACRole       RBACRoleRepository
@@ -74,6 +75,7 @@ func NewRepository(db *gorm.DB) *Repository {
 		SocialEmbed:            NewPostgresSocialEmbedRepository(db),
 		SocialLink:             NewPostgresSocialLinkRepository(db),
 		UnderConstruction:      NewPostgresUnderConstructionRepository(db),
+		TitleSection:           NewPostgresTitleSectionRepository(db),
 
 		// RBAC repositories
 		RBACRole:       NewRBACRoleRepository(db),
