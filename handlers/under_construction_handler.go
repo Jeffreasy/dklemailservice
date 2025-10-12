@@ -67,6 +67,14 @@ func (h *UnderConstructionHandler) GetActiveUnderConstruction(c *fiber.Ctx) erro
 	ctx := c.Context()
 	uc, err := h.underConstructionRepo.GetActive(ctx)
 	if err != nil {
+		// Check if this is a "record not found" error, which is expected when no maintenance mode is active
+		if err.Error() == "record not found" {
+			// Return 404 without logging an error - this is expected when maintenance mode is disabled
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "No active under construction found",
+			})
+		}
+		// For other errors (database connection issues, etc.), log and return 500
 		logger.Error("Failed to fetch active under construction", "error", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to fetch under construction",
