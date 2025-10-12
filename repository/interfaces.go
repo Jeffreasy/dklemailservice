@@ -562,7 +562,6 @@ type UnderConstructionRepository interface {
 	Delete(ctx context.Context, id int) error
 }
 
-<<<<<<< HEAD
 // TitleSectionRepository defines the interface for title section operations
 type TitleSectionRepository interface {
 	// Get retrieves the title section content (assuming there's only one record)
@@ -576,7 +575,8 @@ type TitleSectionRepository interface {
 
 	// Delete removes a title section
 	Delete(ctx context.Context, id string) error
-=======
+}
+
 // AlbumPhotoRepository defines the interface for album photo operations
 type AlbumPhotoRepository interface {
 	// Create adds a photo to an album
@@ -599,5 +599,4 @@ type AlbumPhotoRepository interface {
 
 	// DeleteByPhoto removes a photo from all albums
 	DeleteByPhoto(ctx context.Context, photoID string) error
->>>>>>> c95df6dc4594908d4b727187274d064839cdb364
 }
