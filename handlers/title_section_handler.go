@@ -119,9 +119,9 @@ func (h *TitleSectionHandler) CreateTitleSection(c *fiber.Ctx) error {
 	}
 
 	// Validate required fields
-	if titleSection.Title == "" {
+	if titleSection.EventTitle == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Title is required",
+			"error": "Event title is required",
 		})
 	}
 
@@ -169,12 +169,17 @@ func (h *TitleSectionHandler) UpdateTitleSection(c *fiber.Ctx) error {
 	}
 
 	// Update fields
-	existing.Title = updateData.Title
-	existing.Subtitle = updateData.Subtitle
-	existing.CtaText = updateData.CtaText
+	existing.EventTitle = updateData.EventTitle
+	existing.EventSubtitle = updateData.EventSubtitle
 	existing.ImageURL = updateData.ImageURL
-	existing.EventDetails = updateData.EventDetails
-	existing.Styling = updateData.Styling
+	existing.ImageAlt = updateData.ImageAlt
+	existing.Detail1Title = updateData.Detail1Title
+	existing.Detail1Description = updateData.Detail1Description
+	existing.Detail2Title = updateData.Detail2Title
+	existing.Detail2Description = updateData.Detail2Description
+	existing.Detail3Title = updateData.Detail3Title
+	existing.Detail3Description = updateData.Detail3Description
+	existing.ParticipantCount = updateData.ParticipantCount
 
 	if err := h.titleSectionRepo.Update(ctx, existing); err != nil {
 		logger.Error("Failed to update title section", "error", err)
