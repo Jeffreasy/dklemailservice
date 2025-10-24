@@ -207,7 +207,7 @@ func main() {
 	serviceFactory := services.NewServiceFactory(repoFactory)
 
 	// Initialiseer steps service
-	stepsService := services.NewStepsService(db, repoFactory.Aanmelding)
+	stepsService := services.NewStepsService(db, repoFactory.Aanmelding, repoFactory.RouteFund)
 
 	// Start Newsletter service indien geconfigureerd
 	if serviceFactory.NewsletterService != nil {

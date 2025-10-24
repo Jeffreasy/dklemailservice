@@ -35,6 +35,7 @@ type Repository struct {
 	SocialLink             SocialLinkRepository
 	UnderConstruction      UnderConstructionRepository
 	TitleSection           TitleSectionRepository
+	RouteFund              RouteFundRepository
 
 	// RBAC repositories
 	RBACRole       RBACRoleRepository
@@ -78,6 +79,7 @@ func NewRepository(db *gorm.DB) *Repository {
 		SocialLink:             NewPostgresSocialLinkRepository(db),
 		UnderConstruction:      NewPostgresUnderConstructionRepository(db),
 		TitleSection:           NewPostgresTitleSectionRepository(db),
+		RouteFund:              NewRouteFundRepository(db),
 
 		// RBAC repositories
 		RBACRole:       NewRBACRoleRepository(db),

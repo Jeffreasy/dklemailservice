@@ -131,12 +131,12 @@ Authorization: Bearer <jwt-token>
 **Response (200 OK):**
 ```json
 {
-    "totalX": 10000,
+    "totalX": 350,
     "routes": {
-        "6 KM": 2500,
-        "10 KM": 2500,
-        "15 KM": 2500,
-        "20 KM": 2500
+        "6 KM": 50,
+        "10 KM": 75,
+        "15 KM": 100,
+        "20 KM": 125
     }
 }
 ```
@@ -145,11 +145,133 @@ Authorization: Bearer <jwt-token>
 
 **Implementatie:** [`handlers/steps_handler.go:185`](../../handlers/steps_handler.go:185)
 
+### GET /api/steps/admin/route-funds
+
+Haalt alle route fondsallocaties op voor beheer (admin only).
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+```
+
+**Response (200 OK):**
+```json
+[
+    {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "route": "6 KM",
+        "amount": 50,
+        "created_at": "2024-03-20T15:04:05Z",
+        "updated_at": "2024-03-20T15:04:05Z"
+    },
+    {
+        "id": "550e8400-e29b-41d4-a716-446655440001",
+        "route": "10 KM",
+        "amount": 75,
+        "created_at": "2024-03-20T15:04:05Z",
+        "updated_at": "2024-03-20T15:04:05Z"
+    }
+]
+```
+
+**Permissions:** `steps:write`
+
+**Implementatie:** [`handlers/steps_handler.go:200`](../../handlers/steps_handler.go:200)
+
+### POST /api/steps/admin/route-funds
+
+Maakt een nieuwe route fondsallocatie aan (admin only).
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+    "route": "5 KM",
+    "amount": 40
+}
+```
+
+**Response (201 Created):**
+```json
+{
+    "id": "550e8400-e29b-41d4-a716-446655440002",
+    "route": "5 KM",
+    "amount": 40,
+    "created_at": "2024-03-20T15:04:05Z",
+    "updated_at": "2024-03-20T15:04:05Z"
+}
+```
+
+**Permissions:** `steps:write`
+
+**Implementatie:** [`handlers/steps_handler.go:220`](../../handlers/steps_handler.go:220)
+
+### PUT /api/steps/admin/route-funds/{route}
+
+Werkt een route fondsallocatie bij (admin only).
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+    "route": "6 KM",
+    "amount": 60
+}
+```
+
+**Response (200 OK):**
+```json
+{
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "route": "6 KM",
+    "amount": 60,
+    "created_at": "2024-03-20T15:04:05Z",
+    "updated_at": "2024-03-20T16:00:00Z"
+}
+```
+
+**Permissions:** `steps:write`
+
+**Implementatie:** [`handlers/steps_handler.go:270`](../../handlers/steps_handler.go:270)
+
+### DELETE /api/steps/admin/route-funds/{route}
+
+Verwijdert een route fondsallocatie (admin only).
+
+**Headers:**
+```http
+Authorization: Bearer <jwt-token>
+```
+
+**Response (200 OK):**
+```json
+{
+    "success": true,
+    "message": "Route fund succesvol verwijderd"
+}
+```
+
+**Permissions:** `steps:write`
+
+**Implementatie:** [`handlers/steps_handler.go:320`](../../handlers/steps_handler.go:320)
+
 ## Business Logic
 
 ### Fondsverdeling per Afstand
 
-Het systeem kent automatisch fondsen toe gebaseerd op de gekozen afstand:
+Het systeem kent automatisch fondsen toe gebaseerd op de gekozen afstand. Deze bedragen zijn **configureerbaar** via de admin API.
+
+**Standaard bedragen (kan aangepast worden):**
 
 | Afstand | Toegewezen Fonds |
 |---------|------------------|
@@ -157,6 +279,12 @@ Het systeem kent automatisch fondsen toe gebaseerd op de gekozen afstand:
 | 10 KM   | €75             |
 | 15 KM   | €100            |
 | 20 KM   | €125            |
+
+**Admin beheer van fondsbedragen:**
+- `GET /api/steps/admin/route-funds` - Alle fondsbedragen ophalen
+- `POST /api/steps/admin/route-funds` - Nieuw fondsbedrag toevoegen
+- `PUT /api/steps/admin/route-funds/{route}` - Fondsbedrag bijwerken
+- `DELETE /api/steps/admin/route-funds/{route}` - Fondsbedrag verwijderen
 
 ### Stappen Updates
 
@@ -422,6 +550,36 @@ Nieuwe endpoints zijn backwards compatible en breken bestaande functionaliteit n
 3. Add step update functionality
 4. Update permission checks
 
+## Database Schema
+
+### Aanmeldingen Tabel
+
+```sql
+ALTER TABLE aanmeldingen ADD COLUMN steps INTEGER DEFAULT 0;
+```
+
+**Nieuwe Kolom:**
+- `steps`: INTEGER, DEFAULT 0, NOT NULL
+
+### Route Funds Tabel
+
+```sql
+CREATE TABLE route_funds (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    route VARCHAR(50) NOT NULL UNIQUE,
+    amount INTEGER NOT NULL CHECK (amount >= 0),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Kolommen:**
+- `id`: UUID, Primary Key
+- `route`: VARCHAR(50), Unique, Not Null (bijv. "6 KM", "10 KM")
+- `amount`: INTEGER, Not Null, >= 0 (bedrag in euro's)
+- `created_at`: TIMESTAMP, Auto-create
+- `updated_at`: TIMESTAMP, Auto-update
+
 ## Future Enhancements
 
 ### Geplande Features
@@ -432,6 +590,9 @@ Nieuwe endpoints zijn backwards compatible en breken bestaande functionaliteit n
 - **Gamification**: Badges en achievements
 - **Mobile App**: Native mobile ondersteuning
 - **Wearable Integration**: Directe integratie met fitness trackers
+- **Bulk Import**: Excel/CSV import van stappen data
+- **Step Validation**: Automatische validatie van ingevoerde stappen
+- **Reporting**: Uitgebreide rapportages voor sponsors
 
 ### API Extensions
 

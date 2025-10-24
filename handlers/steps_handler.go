@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"dklautomationgo/logger"
+	"dklautomationgo/models"
 	"dklautomationgo/services"
 	"strconv"
 
@@ -44,6 +45,13 @@ func (h *StepsHandler) RegisterRoutes(app *fiber.App) {
 
 	// GET /api/funds-distribution - Fondsverdeling (admin)
 	stepsGroup.Get("/funds-distribution", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "steps", "read"), h.GetFundsDistribution)
+
+	// Admin endpoints voor route fund beheer
+	adminGroup := stepsGroup.Group("/admin", PermissionMiddleware(h.permissionService, "steps", "write"))
+	adminGroup.Get("/route-funds", h.GetRouteFunds)
+	adminGroup.Post("/route-funds", h.CreateRouteFund)
+	adminGroup.Put("/route-funds/:route", h.UpdateRouteFund)
+	adminGroup.Delete("/route-funds/:route", h.DeleteRouteFund)
 }
 
 // UpdateSteps werkt stappen bij voor een deelnemer
@@ -195,5 +203,160 @@ func (h *StepsHandler) GetFundsDistribution(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"totalX": totalX,
 		"routes": distribution,
+	})
+}
+
+// GetRouteFunds haalt alle route fondsallocaties op (admin only)
+// @Summary Route fondsallocaties ophalen
+// @Description Haalt alle route fondsallocaties op voor beheer
+// @Tags Steps Admin
+// @Accept json
+// @Produce json
+// @Success 200 {array} models.RouteFund
+// @Failure 401 {object} map[string]interface{}
+// @Failure 403 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/steps/admin/route-funds [get]
+// @Security BearerAuth
+func (h *StepsHandler) GetRouteFunds(c *fiber.Ctx) error {
+	routeFunds, err := h.stepsService.GetRouteFunds()
+	if err != nil {
+		logger.Error("Fout bij ophalen route funds", "error", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon route funds niet ophalen",
+		})
+	}
+
+	return c.JSON(routeFunds)
+}
+
+// CreateRouteFund maakt een nieuwe route fondsallocatie aan (admin only)
+// @Summary Route fondsallocatie aanmaken
+// @Description Maakt een nieuwe route fondsallocatie aan
+// @Tags Steps Admin
+// @Accept json
+// @Produce json
+// @Param request body models.RouteFundRequest true "Route fund data"
+// @Success 201 {object} models.RouteFund
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Failure 403 {object} map[string]interface{}
+// @Failure 409 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/steps/admin/route-funds [post]
+// @Security BearerAuth
+func (h *StepsHandler) CreateRouteFund(c *fiber.Ctx) error {
+	var req models.RouteFundRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Ongeldige request data",
+		})
+	}
+
+	// Validatie
+	if req.Route == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Route is verplicht",
+		})
+	}
+
+	if req.Amount < 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Bedrag moet groter of gelijk zijn aan 0",
+		})
+	}
+
+	routeFund, err := h.stepsService.CreateRouteFund(req.Route, req.Amount)
+	if err != nil {
+		logger.Error("Fout bij aanmaken route fund", "error", err, "route", req.Route)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon route fund niet aanmaken",
+		})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(routeFund)
+}
+
+// UpdateRouteFund werkt een route fondsallocatie bij (admin only)
+// @Summary Route fondsallocatie bijwerken
+// @Description Werkt een bestaande route fondsallocatie bij
+// @Tags Steps Admin
+// @Accept json
+// @Produce json
+// @Param route path string true "Route naam"
+// @Param request body models.RouteFundRequest true "Route fund data"
+// @Success 200 {object} models.RouteFund
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Failure 403 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/steps/admin/route-funds/{route} [put]
+// @Security BearerAuth
+func (h *StepsHandler) UpdateRouteFund(c *fiber.Ctx) error {
+	route := c.Params("route")
+	if route == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Route parameter is verplicht",
+		})
+	}
+
+	var req models.RouteFundRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Ongeldige request data",
+		})
+	}
+
+	if req.Amount < 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Bedrag moet groter of gelijk zijn aan 0",
+		})
+	}
+
+	routeFund, err := h.stepsService.UpdateRouteFund(route, req.Amount)
+	if err != nil {
+		logger.Error("Fout bij bijwerken route fund", "error", err, "route", route)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon route fund niet bijwerken",
+		})
+	}
+
+	return c.JSON(routeFund)
+}
+
+// DeleteRouteFund verwijdert een route fondsallocatie (admin only)
+// @Summary Route fondsallocatie verwijderen
+// @Description Verwijdert een route fondsallocatie
+// @Tags Steps Admin
+// @Accept json
+// @Produce json
+// @Param route path string true "Route naam"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Failure 403 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/steps/admin/route-funds/{route} [delete]
+// @Security BearerAuth
+func (h *StepsHandler) DeleteRouteFund(c *fiber.Ctx) error {
+	route := c.Params("route")
+	if route == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Route parameter is verplicht",
+		})
+	}
+
+	if err := h.stepsService.DeleteRouteFund(route); err != nil {
+		logger.Error("Fout bij verwijderen route fund", "error", err, "route", route)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon route fund niet verwijderen",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Route fund succesvol verwijderd",
 	})
 }
