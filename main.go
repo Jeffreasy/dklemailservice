@@ -205,6 +205,10 @@ func main() {
 
 	// Initialiseer service factory
 	serviceFactory := services.NewServiceFactory(repoFactory)
+
+	// Initialiseer steps service
+	stepsService := services.NewStepsService(db, repoFactory.Aanmelding)
+
 	// Start Newsletter service indien geconfigureerd
 	if serviceFactory.NewsletterService != nil {
 		serviceFactory.NewsletterService.Start()
@@ -248,6 +252,13 @@ func main() {
 		repoFactory.Aanmelding,
 		repoFactory.AanmeldingAntwoord,
 		serviceFactory.EmailService,
+		serviceFactory.AuthService,
+		serviceFactory.PermissionService,
+	)
+
+	// Initialiseer steps handler
+	stepsHandler := handlers.NewStepsHandler(
+		stepsService,
 		serviceFactory.AuthService,
 		serviceFactory.PermissionService,
 	)
@@ -434,6 +445,10 @@ func main() {
 				{"path": "/api/title_section_content", "method": "POST", "description": "Create title section content (requires admin auth)"},
 				{"path": "/api/title_section_content", "method": "PUT", "description": "Update title section content (requires admin auth)"},
 				{"path": "/api/title_section_content/:id", "method": "DELETE", "description": "Delete title section content (requires admin auth)"},
+				{"path": "/api/steps/:id", "method": "POST", "description": "Update steps for participant (requires steps write permission)"},
+				{"path": "/api/participant/:id/dashboard", "method": "GET", "description": "Get participant dashboard (requires steps read permission)"},
+				{"path": "/api/total-steps", "method": "GET", "description": "Get total steps for year (requires steps read permission)"},
+				{"path": "/api/funds-distribution", "method": "GET", "description": "Get funds distribution (requires steps read permission)"},
 				{"path": "/metrics", "method": "GET", "description": "Prometheus metrics"},
 			},
 		})
@@ -471,6 +486,9 @@ func main() {
 	// Registreer routes voor contact en aanmelding beheer
 	contactHandler.RegisterRoutes(app)
 	aanmeldingHandler.RegisterRoutes(app)
+
+	// Registreer routes voor stappen beheer
+	stepsHandler.RegisterRoutes(app)
 
 	// Registreer routes voor newsletter beheer
 	newsletterHandler.RegisterRoutes(app)

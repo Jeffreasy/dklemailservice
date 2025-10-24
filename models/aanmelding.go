@@ -28,6 +28,9 @@ type Aanmelding struct {
 	// Test mode veld
 	TestMode bool `json:"test_mode" gorm:"type:boolean;not null;default:false"`
 
+	// Steps veld voor stappen tracking
+	Steps int `json:"steps" gorm:"default:0"`
+
 	// Relatie met antwoorden
 	Antwoorden []AanmeldingAntwoord `json:"antwoorden,omitempty" gorm:"foreignKey:AanmeldingID"`
 }
