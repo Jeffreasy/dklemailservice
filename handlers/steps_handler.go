@@ -117,7 +117,29 @@ func (h *StepsHandler) UpdateSteps(c *fiber.Ctx) error {
 // @Router /api/participant/{id}/dashboard [get]
 // @Security BearerAuth
 func (h *StepsHandler) GetParticipantDashboard(c *fiber.Ctx) error {
-	// Haal ID op uit URL
+	// Probeer eerst gebruiker ID uit de context (voor ingelogde gebruikers)
+	userID, ok := c.Locals("userID").(string)
+
+	// Als er een gebruiker is ingelogd, gebruik dan hun dashboard
+	if ok && userID != "" {
+		participant, allocatedFunds, err := h.stepsService.GetParticipantDashboardByUserID(userID)
+		if err != nil {
+			logger.Error("Fout bij ophalen dashboard", "error", err, "id", userID)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Kon dashboard data niet ophalen",
+			})
+		}
+
+		return c.JSON(fiber.Map{
+			"steps":          participant.Steps,
+			"route":          participant.Afstand,
+			"allocatedFunds": allocatedFunds,
+			"naam":           participant.Naam,
+			"email":          participant.Email,
+		})
+	}
+
+	// Fallback: gebruik ID uit URL parameter (voor admin/staff toegang)
 	id := c.Params("id")
 	if id == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -138,6 +160,8 @@ func (h *StepsHandler) GetParticipantDashboard(c *fiber.Ctx) error {
 		"steps":          participant.Steps,
 		"route":          participant.Afstand,
 		"allocatedFunds": allocatedFunds,
+		"naam":           participant.Naam,
+		"email":          participant.Email,
 	})
 }
 

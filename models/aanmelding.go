@@ -31,6 +31,9 @@ type Aanmelding struct {
 	// Steps veld voor stappen tracking
 	Steps int `json:"steps" gorm:"default:0"`
 
+	// Link naar gebruikersaccount voor authenticatie
+	GebruikerID *string `json:"gebruiker_id,omitempty" gorm:"type:uuid;index"`
+
 	// Relatie met antwoorden
 	Antwoorden []AanmeldingAntwoord `json:"antwoorden,omitempty" gorm:"foreignKey:AanmeldingID"`
 }

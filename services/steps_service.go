@@ -67,6 +67,21 @@ func (s *StepsService) GetParticipantDashboard(participantID string) (*models.Aa
 	return participant, allocatedFunds, nil
 }
 
+// GetParticipantDashboardByUserID haalt dashboard data op voor een deelnemer via gebruiker ID
+func (s *StepsService) GetParticipantDashboardByUserID(userID string) (*models.Aanmelding, int, error) {
+	// Haal deelnemer op via gebruiker_id
+	var participant models.Aanmelding
+	err := s.db.Where("gebruiker_id = ?", userID).First(&participant).Error
+	if err != nil {
+		return nil, 0, fmt.Errorf("deelnemer niet gevonden: %w", err)
+	}
+
+	// Bereken allocated funds gebaseerd op afstand
+	allocatedFunds := s.CalculateAllocatedFunds(participant.Afstand)
+
+	return &participant, allocatedFunds, nil
+}
+
 // CalculateAllocatedFunds berekent toegewezen fondsen gebaseerd op afstand
 func (s *StepsService) CalculateAllocatedFunds(route string) int {
 	// Haal fondsallocatie op uit database

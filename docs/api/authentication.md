@@ -735,27 +735,86 @@ JWT_TOKEN_EXPIRY=20m    # Access token (kort voor security)
 
 ## Testing
 
-### Test Mode
-
-Voor testing zonder echte email verzending:
-
-**Via Header:**
-```http
-X-Test-Mode: true
-```
-
-**Via Body:**
-```json
-{
-    "test_mode": true
-}
-```
-
 ### Test Credentials
 
 **Default Admin:**
 - Email: `admin@dekoninklijkeloop.nl`
 - Wachtwoord: Zie database seed data
+
+## Middleware
+
+### AuthMiddleware
+
+Beschermt routes door JWT tokens te valideren.
+
+**Implementatie:** [`handlers/middleware.go:12`](../../handlers/middleware.go:12)
+
+**Gebruik:**
+```go
+// In main.go of route setup
+api := app.Group("/api")
+api.Use(handlers.AuthMiddleware(authService))
+```
+
+**Error Responses:**
+- `NO_AUTH_HEADER` - Geen Authorization header aanwezig
+- `INVALID_AUTH_HEADER` - Header heeft niet het juiste format
+- `TOKEN_EXPIRED` - Token is verlopen
+- `TOKEN_MALFORMED` - Token structuur is ongeldig
+- `TOKEN_SIGNATURE_INVALID` - Token signature klopt niet
+- `INVALID_TOKEN` - Algemene token validatie fout
+
+**Context Locals:**
+Na succesvolle validatie worden de volgende waarden in de context gezet:
+- `userID` (string) - De ID van de geauthenticeerde gebruiker
+- `token` (string) - Het gevalideerde token
+
+### AdminMiddleware
+
+Vereist dat de gebruiker de "admin" rol heeft.
+
+**Implementatie:** [`handlers/middleware.go:111`](../../handlers/middleware.go:111)
+
+**Gebruik:**
+```go
+// Alleen admins
+adminRoutes := api.Group("/admin")
+adminRoutes.Use(handlers.AuthMiddleware(authService))
+adminRoutes.Use(handlers.AdminMiddleware(authService))
+```
+
+### StaffMiddleware
+
+Staat zowel "admin" als "staff" rollen toe.
+
+**Implementatie:** [`handlers/middleware.go:73`](../../handlers/middleware.go:73)
+
+**Gebruik:**
+```go
+// Admin en staff toegang
+staffRoutes := api.Group("/staff")
+staffRoutes.Use(handlers.AuthMiddleware(authService))
+staffRoutes.Use(handlers.StaffMiddleware(authService))
+```
+
+### RateLimitMiddleware
+
+Beperkt het aantal verzoeken per IP adres.
+
+**Implementatie:** [`handlers/middleware.go:149`](../../handlers/middleware.go:149)
+
+**Gebruik:**
+```go
+// Rate limiting voor login endpoint
+auth.Post("/login",
+    handlers.RateLimitMiddleware(rateLimiter, "login"),
+    authHandler.HandleLogin,
+)
+```
+
+**Configuratie:**
+- Default: 5 pogingen per 5 minuten
+- Key format: `{prefix}:{ip}`
 
 ## Monitoring
 
@@ -771,6 +830,5 @@ Zie [Monitoring Guide](../guides/monitoring.md) voor details.
 ## Zie Ook
 
 - [REST API Overview](./rest-api.md) - Complete API overzicht
-- [Email Endpoints](./email-endpoints.md) - Email API
-- [Admin Endpoints](./admin-endpoints.md) - Admin API
-- [Authentication Architecture](../architecture/authentication-and-authorization.md) - Technische details
+- [RBAC Frontend Guide](../RBAC_FRONTEND.md) - Role-Based Access Control
+- [Authentication Architecture](../architecture/authentication-and-authorization.md) - Technische architectuur details
