@@ -7,30 +7,39 @@
 -- ========================================
 
 -- Insert nieuwe gebruikers voor deelnemers die nog geen account hebben
+-- Gebruikt DISTINCT ON om duplicaat emails te vermijden (meerdere aanmeldingen met zelfde email)
 -- Rol wordt bepaald obv de "rol" kolom in aanmeldingen: Deelnemer/Begeleider -> deelnemer/begeleider
 INSERT INTO gebruikers (id, naam, email, wachtwoord_hash, rol, is_actief, newsletter_subscribed, created_at, updated_at)
 SELECT
     gen_random_uuid() as id,
-    a.naam,
-    a.email,
+    naam,
+    email,
     '$2a$10$YPFzRKvJe5vE0H0mxPqHq.VfZ8KQqX0YXJKxJK0fYdJH3LV.qhL8K' as wachtwoord_hash,
-    -- Bepaal rol obv aanmelding.rol (Deelnemer/Begeleider) -> lowercase voor RBAC
-    CASE
-        WHEN LOWER(a.rol) = 'begeleider' THEN 'begeleider'
-        WHEN LOWER(a.rol) = 'vrijwilliger' THEN 'vrijwilliger'
-        ELSE 'deelnemer'  -- Default voor alle anderen
-    END as rol,
+    rol,
     true as is_actief,
     false as newsletter_subscribed,
     NOW() as created_at,
     NOW() as updated_at
-FROM aanmeldingen a
-WHERE NOT EXISTS (
-    SELECT 1 FROM gebruikers g WHERE LOWER(g.email) = LOWER(a.email)
-)
-AND a.email IS NOT NULL
-AND a.email != ''
-AND TRIM(a.email) != '';
+FROM (
+    -- Subquery die duplicaat emails elimineert en de meest recente aanmelding gebruikt
+    SELECT DISTINCT ON (LOWER(email))
+        naam,
+        email,
+        CASE
+            WHEN LOWER(rol) = 'begeleider' THEN 'begeleider'
+            WHEN LOWER(rol) = 'vrijwilliger' THEN 'vrijwilliger'
+            ELSE 'deelnemer'
+        END as rol,
+        created_at
+    FROM aanmeldingen
+    WHERE email IS NOT NULL
+    AND email != ''
+    AND TRIM(email) != ''
+    AND NOT EXISTS (
+        SELECT 1 FROM gebruikers g WHERE LOWER(g.email) = LOWER(aanmeldingen.email)
+    )
+    ORDER BY LOWER(email), created_at DESC  -- Laatste aanmelding per email
+) a;
 
 -- ========================================
 -- STAP 2: Link aanmeldingen aan gebruikers

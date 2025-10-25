@@ -60,39 +60,48 @@ func main() {
 		log.Fatal("Kon wachtwoord niet hashen:", err)
 	}
 
-	// Tel hoeveel aanmeldingen er zijn zonder gebruikersaccount
-	var aanmeldingenZonderAccount []Aanmelding
-	result := db.Where("gebruiker_id IS NULL AND email IS NOT NULL AND email != ''").
-		Find(&aanmeldingenZonderAccount)
-
-	if result.Error != nil {
-		log.Fatal("Kon aanmeldingen niet ophalen:", result.Error)
+	// Haal alle unieke emails op uit aanmeldingen zonder gebruikersaccount
+	var uniqueEmails []struct {
+		Email string
+		Naam  string
+		Rol   string
 	}
 
-	fmt.Printf("Gevonden %d aanmeldingen zonder gebruikersaccount\n", len(aanmeldingenZonderAccount))
+	// Gebruik DISTINCT ON om per email de meest recente aanmelding te krijgen
+	db.Raw(`
+		SELECT DISTINCT ON (LOWER(email))
+			email, naam, rol
+		FROM aanmeldingen
+		WHERE gebruiker_id IS NULL
+		AND email IS NOT NULL
+		AND email != ''
+		ORDER BY LOWER(email), created_at DESC
+	`).Scan(&uniqueEmails)
+
+	fmt.Printf("Gevonden %d unieke emails zonder gebruikersaccount\n", len(uniqueEmails))
 
 	createdCount := 0
 	linkedCount := 0
 	skippedCount := 0
 
-	for _, aanmelding := range aanmeldingenZonderAccount {
-		// Check of er al een gebruiker bestaat met dit email
+	for _, emailData := range uniqueEmails {
+		// Check of er al een gebruiker bestaat met dit email (case-insensitive)
 		var existingUser Gebruiker
-		err := db.Where("email = ?", aanmelding.Email).First(&existingUser).Error
+		err := db.Where("LOWER(email) = LOWER(?)", emailData.Email).First(&existingUser).Error
 
 		if err == gorm.ErrRecordNotFound {
 			// Bepaal rol op basis van aanmelding.Rol (Deelnemer/Begeleider)
 			rol := "deelnemer" // Default
-			if strings.ToLower(aanmelding.Rol) == "begeleider" {
+			if strings.ToLower(emailData.Rol) == "begeleider" {
 				rol = "begeleider"
-			} else if strings.ToLower(aanmelding.Rol) == "vrijwilliger" {
+			} else if strings.ToLower(emailData.Rol) == "vrijwilliger" {
 				rol = "vrijwilliger"
 			}
 
 			// Maak nieuwe gebruiker aan
 			newUser := Gebruiker{
-				Naam:                 aanmelding.Naam,
-				Email:                aanmelding.Email,
+				Naam:                 emailData.Naam,
+				Email:                emailData.Email,
 				WachtwoordHash:       string(hashedPassword),
 				Rol:                  rol,
 				IsActief:             true,
@@ -100,33 +109,43 @@ func main() {
 			}
 
 			if err := db.Create(&newUser).Error; err != nil {
-				log.Printf("Fout bij aanmaken gebruiker voor %s: %v\n", aanmelding.Email, err)
+				log.Printf("Fout bij aanmaken gebruiker voor %s: %v\n", emailData.Email, err)
 				skippedCount++
 				continue
 			}
 
-			fmt.Printf("✓ Gebruiker aangemaakt voor: %s (%s)\n", aanmelding.Naam, aanmelding.Email)
+			fmt.Printf("✓ Gebruiker aangemaakt voor: %s (%s) [%s]\n", emailData.Naam, emailData.Email, rol)
 			createdCount++
 
-			// Link aanmelding aan nieuwe gebruiker
-			if err := db.Model(&Aanmelding{}).Where("id = ?", aanmelding.ID).
-				Update("gebruiker_id", newUser.ID).Error; err != nil {
-				log.Printf("Fout bij linken aanmelding voor %s: %v\n", aanmelding.Email, err)
+			// Link ALLE aanmeldingen met dit email aan nieuwe gebruiker
+			result := db.Model(&Aanmelding{}).
+				Where("LOWER(email) = LOWER(?) AND gebruiker_id IS NULL", emailData.Email).
+				Update("gebruiker_id", newUser.ID)
+
+			if result.Error != nil {
+				log.Printf("Fout bij linken aanmeldingen voor %s: %v\n", emailData.Email, result.Error)
 			} else {
-				linkedCount++
+				linkedCount += int(result.RowsAffected)
+				if result.RowsAffected > 1 {
+					fmt.Printf("  → %d aanmeldingen gelinkt voor dit email\n", result.RowsAffected)
+				}
 			}
 		} else if err == nil {
-			// Gebruiker bestaat al, link alleen de aanmelding
-			if err := db.Model(&Aanmelding{}).Where("id = ?", aanmelding.ID).
-				Update("gebruiker_id", existingUser.ID).Error; err != nil {
-				log.Printf("Fout bij linken bestaande gebruiker voor %s: %v\n", aanmelding.Email, err)
+			// Gebruiker bestaat al, link alle aanmeldingen met dit email
+			result := db.Model(&Aanmelding{}).
+				Where("LOWER(email) = LOWER(?) AND gebruiker_id IS NULL", emailData.Email).
+				Update("gebruiker_id", existingUser.ID)
+
+			if result.Error != nil {
+				log.Printf("Fout bij linken bestaande gebruiker voor %s: %v\n", emailData.Email, result.Error)
 				skippedCount++
 			} else {
-				fmt.Printf("→ Aanmelding gelinkt aan bestaande gebruiker: %s (%s)\n", aanmelding.Naam, aanmelding.Email)
-				linkedCount++
+				linkedCount += int(result.RowsAffected)
+				fmt.Printf("→ %d aanmelding(en) gelinkt aan bestaande gebruiker: %s (%s)\n",
+					result.RowsAffected, emailData.Naam, emailData.Email)
 			}
 		} else {
-			log.Printf("Database fout voor %s: %v\n", aanmelding.Email, err)
+			log.Printf("Database fout voor %s: %v\n", emailData.Email, err)
 			skippedCount++
 		}
 	}
