@@ -50,6 +50,30 @@ func (s *StepsService) UpdateSteps(participantID string, deltaSteps int) (*model
 	return participant, nil
 }
 
+// UpdateStepsByUserID werkt stappen bij voor een deelnemer via gebruiker ID
+func (s *StepsService) UpdateStepsByUserID(userID string, deltaSteps int) (*models.Aanmelding, error) {
+	// Haal deelnemer op via gebruiker_id
+	var participant models.Aanmelding
+	err := s.db.Where("gebruiker_id = ?", userID).First(&participant).Error
+	if err != nil {
+		return nil, fmt.Errorf("deelnemer niet gevonden: %w", err)
+	}
+
+	// Update stappen (voorkom negatieve stappen)
+	newSteps := participant.Steps + deltaSteps
+	if newSteps < 0 {
+		newSteps = 0
+	}
+	participant.Steps = newSteps
+
+	// Sla wijzigingen op
+	if err := s.aanmeldingRepo.Update(nil, &participant); err != nil {
+		return nil, fmt.Errorf("kon stappen niet bijwerken: %w", err)
+	}
+
+	return &participant, nil
+}
+
 // GetParticipantDashboard haalt dashboard data op voor een deelnemer
 func (s *StepsService) GetParticipantDashboard(participantID string) (*models.Aanmelding, int, error) {
 	// Haal deelnemer op

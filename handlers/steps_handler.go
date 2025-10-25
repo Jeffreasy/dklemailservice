@@ -34,10 +34,14 @@ func (h *StepsHandler) RegisterRoutes(app *fiber.App) {
 	// Groep voor stappen routes
 	stepsGroup := app.Group("/api")
 
-	// POST /api/steps/:id - Update stappen voor deelnemer
+	// POST /api/steps - Update stappen voor ingelogde deelnemer (geen ID nodig!)
+	// POST /api/steps/:id - Update stappen voor specifieke deelnemer (admin/staff)
+	stepsGroup.Post("/steps", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "steps", "write"), h.UpdateSteps)
 	stepsGroup.Post("/steps/:id", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "steps", "write"), h.UpdateSteps)
 
-	// GET /api/participant/:id/dashboard - Dashboard voor deelnemer
+	// GET /api/participant/dashboard - Dashboard voor ingelogde deelnemer (geen ID nodig!)
+	// GET /api/participant/:id/dashboard - Dashboard voor specifieke deelnemer (admin/staff)
+	stepsGroup.Get("/participant/dashboard", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "steps", "read"), h.GetParticipantDashboard)
 	stepsGroup.Get("/participant/:id/dashboard", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "steps", "read"), h.GetParticipantDashboard)
 
 	// GET /api/total-steps - Totaal aantal stappen (admin)
@@ -71,13 +75,8 @@ func (h *StepsHandler) RegisterRoutes(app *fiber.App) {
 // @Router /api/steps/{id} [post]
 // @Security BearerAuth
 func (h *StepsHandler) UpdateSteps(c *fiber.Ctx) error {
-	// Haal ID op uit URL
-	id := c.Params("id")
-	if id == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "ID is verplicht",
-		})
-	}
+	// Probeer eerst gebruiker ID uit de context (voor ingelogde gebruikers)
+	userID, ok := c.Locals("userID").(string)
 
 	// Parse request body
 	var req struct {
@@ -89,7 +88,27 @@ func (h *StepsHandler) UpdateSteps(c *fiber.Ctx) error {
 		})
 	}
 
-	// Update stappen
+	// Als er een gebruiker is ingelogd, update dan hun stappen
+	if ok && userID != "" {
+		participant, err := h.stepsService.UpdateStepsByUserID(userID, req.Steps)
+		if err != nil {
+			logger.Error("Fout bij bijwerken stappen", "error", err, "user_id", userID)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Kon stappen niet bijwerken",
+			})
+		}
+		return c.JSON(participant)
+	}
+
+	// Fallback: gebruik ID uit URL parameter (voor admin/staff toegang)
+	id := c.Params("id")
+	if id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "ID is verplicht",
+		})
+	}
+
+	// Update stappen via aanmelding ID
 	participant, err := h.stepsService.UpdateSteps(id, req.Steps)
 	if err != nil {
 		logger.Error("Fout bij bijwerken stappen", "error", err, "id", id)
