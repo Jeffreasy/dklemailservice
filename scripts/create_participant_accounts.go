@@ -55,10 +55,15 @@ func main() {
 
 	// Standaard wachtwoord voor nieuwe accounts (gebruikers moeten dit wijzigen)
 	defaultPassword := "DKL2025!"
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(defaultPassword), bcrypt.DefaultCost)
-	if err != nil {
-		log.Fatal("Kon wachtwoord niet hashen:", err)
+	// Gebruik pre-generated hash voor consistency met SQL script
+	// Hash: $2a$10$/kWEPOMqYfcy5hNYne8J5.oJQgfaBYMDE9tClXKiHlCBd/l78Dmku
+	hashedPassword := "$2a$10$/kWEPOMqYfcy5hNYne8J5.oJQgfaBYMDE9tClXKiHlCBd/l78Dmku"
+
+	// Verifieer dat de hash correct is
+	if err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(defaultPassword)); err != nil {
+		log.Fatal("Hash verificatie gefaald:", err)
 	}
+	fmt.Println("✓ Wachtwoord hash geverifieerd")
 
 	// Haal alle unieke emails op uit aanmeldingen zonder gebruikersaccount
 	var uniqueEmails []struct {
@@ -107,6 +112,8 @@ func main() {
 				IsActief:             true,
 				NewsletterSubscribed: false,
 			}
+
+			newUser.WachtwoordHash = hashedPassword
 
 			if err := db.Create(&newUser).Error; err != nil {
 				log.Printf("Fout bij aanmaken gebruiker voor %s: %v\n", emailData.Email, err)

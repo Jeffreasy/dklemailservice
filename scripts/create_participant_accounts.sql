@@ -1,6 +1,6 @@
 -- SQL Script om gebruikersaccounts aan te maken voor alle deelnemers met RBAC rollen
 -- Wachtwoord voor alle nieuwe accounts: DKL2025!
--- Bcrypt hash (cost 10): $2a$10$YPFzRKvJe5vE0H0mxPqHq.VfZ8KQqX0YXJKxJK0fYdJH3LV.qhL8K
+-- Bcrypt hash (cost 10): $2a$10$/kWEPOMqYfcy5hNYne8J5.oJQgfaBYMDE9tClXKiHlCBd/l78Dmku
 
 -- ========================================
 -- STAP 1: Maak gebruikersaccounts aan met juiste rol
@@ -14,7 +14,7 @@ SELECT
     gen_random_uuid() as id,
     naam,
     email,
-    '$2a$10$YPFzRKvJe5vE0H0mxPqHq.VfZ8KQqX0YXJKxJK0fYdJH3LV.qhL8K' as wachtwoord_hash,
+    '$2a$10$/kWEPOMqYfcy5hNYne8J5.oJQgfaBYMDE9tClXKiHlCBd/l78Dmku' as wachtwoord_hash,
     rol,
     true as is_actief,
     false as newsletter_subscribed,
