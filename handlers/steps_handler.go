@@ -51,7 +51,7 @@ func (h *StepsHandler) RegisterRoutes(app *fiber.App) {
 	stepsGroup.Get("/funds-distribution", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "steps", "read"), h.GetFundsDistribution)
 
 	// Admin endpoints voor route fund beheer
-	adminGroup := stepsGroup.Group("/admin", PermissionMiddleware(h.permissionService, "steps", "write"))
+	adminGroup := stepsGroup.Group("/steps/admin", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "steps", "write"))
 	adminGroup.Get("/route-funds", h.GetRouteFunds)
 	adminGroup.Post("/route-funds", h.CreateRouteFund)
 	adminGroup.Put("/route-funds/:route", h.UpdateRouteFund)
