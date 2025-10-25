@@ -1,19 +1,25 @@
--- SQL Script om gebruikersaccounts aan te maken voor alle deelnemers
+-- SQL Script om gebruikersaccounts aan te maken voor alle deelnemers met RBAC rollen
 -- Wachtwoord voor alle nieuwe accounts: DKL2025!
 -- Bcrypt hash (cost 10): $2a$10$YPFzRKvJe5vE0H0mxPqHq.VfZ8KQqX0YXJKxJK0fYdJH3LV.qhL8K
 
 -- ========================================
--- STAP 1: Maak gebruikersaccounts aan
+-- STAP 1: Maak gebruikersaccounts aan met juiste rol
 -- ========================================
 
 -- Insert nieuwe gebruikers voor deelnemers die nog geen account hebben
+-- Rol wordt bepaald obv de "rol" kolom in aanmeldingen: Deelnemer/Begeleider -> deelnemer/begeleider
 INSERT INTO gebruikers (id, naam, email, wachtwoord_hash, rol, is_actief, newsletter_subscribed, created_at, updated_at)
-SELECT 
+SELECT
     gen_random_uuid() as id,
     a.naam,
     a.email,
     '$2a$10$YPFzRKvJe5vE0H0mxPqHq.VfZ8KQqX0YXJKxJK0fYdJH3LV.qhL8K' as wachtwoord_hash,
-    'deelnemer' as rol,
+    -- Bepaal rol obv aanmelding.rol (Deelnemer/Begeleider) -> lowercase voor RBAC
+    CASE
+        WHEN LOWER(a.rol) = 'begeleider' THEN 'begeleider'
+        WHEN LOWER(a.rol) = 'vrijwilliger' THEN 'vrijwilliger'
+        ELSE 'deelnemer'  -- Default voor alle anderen
+    END as rol,
     true as is_actief,
     false as newsletter_subscribed,
     NOW() as created_at,
@@ -22,7 +28,7 @@ FROM aanmeldingen a
 WHERE NOT EXISTS (
     SELECT 1 FROM gebruikers g WHERE LOWER(g.email) = LOWER(a.email)
 )
-AND a.email IS NOT NULL 
+AND a.email IS NOT NULL
 AND a.email != ''
 AND TRIM(a.email) != '';
 
@@ -41,7 +47,29 @@ AND a.email IS NOT NULL
 AND a.email != '';
 
 -- ========================================
--- STAP 3: Verificatie
+-- STAP 3: Wijs RBAC rollen toe aan gebruikers
+-- ========================================
+
+-- Wijs RBAC rol toe aan alle nieuwe gebruikers op basis van hun rol
+-- Dit maakt een entry in de user_roles tabel voor het RBAC systeem
+INSERT INTO user_roles (id, user_id, role_id, assigned_at, is_active)
+SELECT
+    gen_random_uuid() as id,
+    g.id as user_id,
+    r.id as role_id,
+    NOW() as assigned_at,
+    true as is_active
+FROM gebruikers g
+JOIN roles r ON r.name = g.rol
+WHERE g.rol IN ('deelnemer', 'begeleider', 'vrijwilliger')
+AND NOT EXISTS (
+    SELECT 1 FROM user_roles ur
+    WHERE ur.user_id = g.id AND ur.role_id = r.id
+)
+ORDER BY g.created_at DESC;
+
+-- ========================================
+-- STAP 4: Verificatie
 -- ========================================
 
 -- Tel hoeveel deelnemers een account hebben
@@ -89,7 +117,37 @@ WHERE g.rol = 'deelnemer'
 ORDER BY g.created_at DESC;
 
 -- ========================================
--- STAP 5: Check voor problemen
+-- STAP 5: Toon RBAC rollen en permissies
+-- ========================================
+
+-- Toon alle deelnemers met hun RBAC rollen
+SELECT
+    g.naam,
+    g.email,
+    g.rol as legacy_rol,
+    r.name as rbac_rol,
+    r.description as rol_beschrijving,
+    ur.assigned_at as rol_toegewezen,
+    (SELECT COUNT(*) FROM aanmeldingen WHERE gebruiker_id = g.id) as aantal_aanmeldingen
+FROM gebruikers g
+LEFT JOIN user_roles ur ON ur.user_id = g.id AND ur.is_active = true
+LEFT JOIN roles r ON r.id = ur.role_id
+WHERE g.rol IN ('deelnemer', 'begeleider', 'vrijwilliger')
+ORDER BY g.created_at DESC;
+
+-- Toon overzicht van rollen en hun aantal gebruikers
+SELECT
+    r.name as rol,
+    r.description,
+    COUNT(DISTINCT ur.user_id) as aantal_gebruikers
+FROM roles r
+LEFT JOIN user_roles ur ON ur.role_id = r.id AND ur.is_active = true
+WHERE r.name IN ('deelnemer', 'begeleider', 'vrijwilliger')
+GROUP BY r.id, r.name, r.description
+ORDER BY aantal_gebruikers DESC;
+
+-- ========================================
+-- STAP 6: Check voor problemen
 -- ========================================
 
 -- Toon aanmeldingen zonder gebruikersaccount

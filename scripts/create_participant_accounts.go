@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
@@ -25,6 +26,7 @@ type Aanmelding struct {
 	ID          string `gorm:"primaryKey;type:uuid"`
 	Naam        string
 	Email       string
+	Rol         string  // Deelnemer, Begeleider, of Vrijwilliger
 	GebruikerID *string `gorm:"type:uuid"`
 }
 
@@ -79,12 +81,20 @@ func main() {
 		err := db.Where("email = ?", aanmelding.Email).First(&existingUser).Error
 
 		if err == gorm.ErrRecordNotFound {
+			// Bepaal rol op basis van aanmelding.Rol (Deelnemer/Begeleider)
+			rol := "deelnemer" // Default
+			if strings.ToLower(aanmelding.Rol) == "begeleider" {
+				rol = "begeleider"
+			} else if strings.ToLower(aanmelding.Rol) == "vrijwilliger" {
+				rol = "vrijwilliger"
+			}
+
 			// Maak nieuwe gebruiker aan
 			newUser := Gebruiker{
 				Naam:                 aanmelding.Naam,
 				Email:                aanmelding.Email,
 				WachtwoordHash:       string(hashedPassword),
-				Rol:                  "deelnemer",
+				Rol:                  rol,
 				IsActief:             true,
 				NewsletterSubscribed: false,
 			}
