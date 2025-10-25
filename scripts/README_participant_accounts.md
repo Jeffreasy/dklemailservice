@@ -16,19 +16,33 @@ psql -d your_database -f database/migrations/V1_33__add_gebruiker_id_to_aanmeldi
 
 ### 2. Gebruikersaccounts Aanmaken
 
-Voer het Go script uit om gebruikersaccounts aan te maken voor alle deelnemers:
+**Optie A: SQL Script (Aanbevolen voor productie)**
+
+Voer het SQL script direct uit op de database:
+
+```bash
+psql -d your_database -f scripts/create_participant_accounts.sql
+```
+
+Of via database console (Render, Supabase, etc.):
+1. Open de database SQL editor
+2. Kopieer de inhoud van `scripts/create_participant_accounts.sql`
+3. Voer het script uit
+4. Bekijk de verificatie output
+
+**Optie B: Go Script (Lokaal)**
 
 ```bash
 cd scripts
 go run create_participant_accounts.go
 ```
 
-Dit script:
-- ✅ Maakt nieuwe gebruikersaccounts aan voor alle deelnemers zonder account
-- ✅ Gebruikt het standaard wachtwoord: **DKL2025!**
-- ✅ Linkt aanmeldingen aan gebruikersaccounts via email matching
-- ✅ Slaat duplicaten over (als een email al bestaat)
-- ✅ Geeft een samenvatting van de acties
+**Beide scripts:**
+- ✅ Maken nieuwe gebruikersaccounts aan voor alle deelnemers zonder account
+- ✅ Gebruiken het standaard wachtwoord: **DKL2025!**
+- ✅ Linken aanmeldingen aan gebruikersaccounts via email matching
+- ✅ Slaan duplicaten over (als een email al bestaat)
+- ✅ Geven een samenvatting van de acties
 
 ### 3. Resultaat
 
