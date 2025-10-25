@@ -190,4 +190,64 @@ ORDER BY a.created_at DESC;
 -- Body: {
 --   "email": "diesbosje@hotmail.com",
 --   "wachtwoord": "DKL2025!"
+
+-- ========================================
+-- BELANGRIJKE STAP: RBAC PERMISSIONS!
+-- ========================================
+
+-- NA het uitvoeren van dit script MOET je ook de steps permissions migratie uitvoeren:
+-- Bestand: database/migrations/V1_34__add_steps_permissions.sql
+--
+-- Dit script geeft deelnemers/begeleiders/vrijwilligers de benodigde permissions:
+-- - steps:read  (dashboard bekijken)
+-- - steps:write (stappen posten)
+--
+-- ZONDER deze permissions krijgen gebruikers 403 Permission Denied errors!
+--
+-- Voer uit in pgAdmin:
+-- 1. Open V1_34__add_steps_permissions.sql
+-- 2. Kopieer ALLE code
+-- 3. Plak in nieuwe Query Tool tab
+-- 4. Execute (▶️)
+--
+-- Of kopieer onderstaande SQL direct:
+
+-- Maak steps permissions aan
+INSERT INTO permissions (resource, action, description, is_system_permission) VALUES
+('steps', 'read', 'Eigen stappen en dashboard bekijken', true),
+('steps', 'write', 'Eigen stappen bijwerken', true)
+ON CONFLICT (resource, action) DO NOTHING;
+
+-- Wijs toe aan deelnemer rol
+INSERT INTO role_permissions (role_id, permission_id, assigned_at)
+SELECT r.id, p.id, NOW()
+FROM roles r, permissions p
+WHERE r.name = 'deelnemer' AND p.resource = 'steps' AND p.action IN ('read', 'write')
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- Wijs toe aan begeleider rol
+INSERT INTO role_permissions (role_id, permission_id, assigned_at)
+SELECT r.id, p.id, NOW()
+FROM roles r, permissions p
+WHERE r.name = 'begeleider' AND p.resource = 'steps' AND p.action IN ('read', 'write')
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- Wijs toe aan vrijwilliger rol
+INSERT INTO role_permissions (role_id, permission_id, assigned_at)
+SELECT r.id, p.id, NOW()
+FROM roles r, permissions p
+WHERE r.name = 'vrijwilliger' AND p.resource = 'steps' AND p.action IN ('read', 'write')
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- Verificatie: Toon steps permissions per rol
+SELECT 
+    r.name as rol,
+    p.action,
+    p.description
+FROM role_permissions rp
+JOIN roles r ON r.id = rp.role_id
+JOIN permissions p ON p.id = rp.permission_id
+WHERE p.resource = 'steps'
+AND r.name IN ('deelnemer', 'begeleider', 'vrijwilliger')
+ORDER BY r.name, p.action;
 -- }
