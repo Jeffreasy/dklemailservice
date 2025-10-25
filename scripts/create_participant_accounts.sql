@@ -212,31 +212,32 @@ ORDER BY a.created_at DESC;
 --
 -- Of kopieer onderstaande SQL direct:
 
--- Maak steps permissions aan
+-- Maak steps permissions aan (inclusief read_total voor totaal overzicht)
 INSERT INTO permissions (resource, action, description, is_system_permission) VALUES
 ('steps', 'read', 'Eigen stappen en dashboard bekijken', true),
-('steps', 'write', 'Eigen stappen bijwerken', true)
+('steps', 'write', 'Eigen stappen bijwerken', true),
+('steps', 'read_total', 'Totaal aantal stappen van alle deelnemers bekijken', true)
 ON CONFLICT (resource, action) DO NOTHING;
 
--- Wijs toe aan deelnemer rol
+-- Wijs toe aan deelnemer rol (inclusief read_total!)
 INSERT INTO role_permissions (role_id, permission_id, assigned_at)
 SELECT r.id, p.id, NOW()
 FROM roles r, permissions p
-WHERE r.name = 'deelnemer' AND p.resource = 'steps' AND p.action IN ('read', 'write')
+WHERE r.name = 'deelnemer' AND p.resource = 'steps' AND p.action IN ('read', 'write', 'read_total')
 ON CONFLICT (role_id, permission_id) DO NOTHING;
 
--- Wijs toe aan begeleider rol
+-- Wijs toe aan begeleider rol (inclusief read_total!)
 INSERT INTO role_permissions (role_id, permission_id, assigned_at)
 SELECT r.id, p.id, NOW()
 FROM roles r, permissions p
-WHERE r.name = 'begeleider' AND p.resource = 'steps' AND p.action IN ('read', 'write')
+WHERE r.name = 'begeleider' AND p.resource = 'steps' AND p.action IN ('read', 'write', 'read_total')
 ON CONFLICT (role_id, permission_id) DO NOTHING;
 
--- Wijs toe aan vrijwilliger rol
+-- Wijs toe aan vrijwilliger rol (inclusief read_total!)
 INSERT INTO role_permissions (role_id, permission_id, assigned_at)
 SELECT r.id, p.id, NOW()
 FROM roles r, permissions p
-WHERE r.name = 'vrijwilliger' AND p.resource = 'steps' AND p.action IN ('read', 'write')
+WHERE r.name = 'vrijwilliger' AND p.resource = 'steps' AND p.action IN ('read', 'write', 'read_total')
 ON CONFLICT (role_id, permission_id) DO NOTHING;
 
 -- Verificatie: Toon steps permissions per rol

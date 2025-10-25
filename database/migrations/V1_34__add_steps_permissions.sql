@@ -9,48 +9,49 @@
 INSERT INTO permissions (resource, action, description, is_system_permission) VALUES
 ('steps', 'read', 'Eigen stappen en dashboard bekijken', true),
 ('steps', 'write', 'Eigen stappen bijwerken', true),
+('steps', 'read_total', 'Totaal aantal stappen van alle deelnemers bekijken', true),
 ('steps', 'read_all', 'Alle deelnemers stappen bekijken (admin/staff)', true),
 ('steps', 'write_all', 'Alle deelnemers stappen bijwerken (admin/staff)', true),
 ('steps', 'manage', 'Volledige steps beheer (route funds, etc.)', true)
 ON CONFLICT (resource, action) DO NOTHING;
 
 -- ========================================
--- STAP 2: Wijs read/write permissions toe aan deelnemer rol
+-- STAP 2: Wijs read/write/read_total permissions toe aan deelnemer rol
 -- ========================================
 
--- Deelnemers kunnen hun eigen stappen lezen en schrijven
+-- Deelnemers kunnen hun eigen stappen lezen/schrijven + totaal zien
 INSERT INTO role_permissions (role_id, permission_id, assigned_at)
 SELECT r.id, p.id, NOW()
 FROM roles r, permissions p
 WHERE r.name = 'deelnemer'
 AND p.resource = 'steps'
-AND p.action IN ('read', 'write')
+AND p.action IN ('read', 'write', 'read_total')
 ON CONFLICT (role_id, permission_id) DO NOTHING;
 
 -- ========================================
--- STAP 3: Wijs read/write permissions toe aan begeleider rol
+-- STAP 3: Wijs read/write/read_total permissions toe aan begeleider rol
 -- ========================================
 
--- Begeleiders kunnen hun eigen stappen lezen en schrijven
+-- Begeleiders kunnen hun eigen stappen lezen/schrijven + totaal zien
 INSERT INTO role_permissions (role_id, permission_id, assigned_at)
 SELECT r.id, p.id, NOW()
 FROM roles r, permissions p
 WHERE r.name = 'begeleider'
 AND p.resource = 'steps'
-AND p.action IN ('read', 'write')
+AND p.action IN ('read', 'write', 'read_total')
 ON CONFLICT (role_id, permission_id) DO NOTHING;
 
 -- ========================================
--- STAP 4: Wijs read/write permissions toe aan vrijwilliger rol
+-- STAP 4: Wijs read/write/read_total permissions toe aan vrijwilliger rol
 -- ========================================
 
--- Vrijwilligers kunnen hun eigen stappen lezen en schrijven
+-- Vrijwilligers kunnen hun eigen stappen lezen/schrijven + totaal zien
 INSERT INTO role_permissions (role_id, permission_id, assigned_at)
 SELECT r.id, p.id, NOW()
 FROM roles r, permissions p
 WHERE r.name = 'vrijwilliger'
 AND p.resource = 'steps'
-AND p.action IN ('read', 'write')
+AND p.action IN ('read', 'write', 'read_total')
 ON CONFLICT (role_id, permission_id) DO NOTHING;
 
 -- ========================================
