@@ -1,5 +1,5 @@
 # Build stage for production (CGO disabled for smaller, static binaries)
-FROM golang:1.21.7-alpine3.19 AS builder-prod
+FROM golang:1.23-alpine3.19 AS builder-prod
 
 WORKDIR /app
 
@@ -19,7 +19,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o main-prod -ldflags="-w -s" .
 
 # Build stage for development/testing (CGO enabled for SQLite support)
-FROM golang:1.21.7-alpine3.19 AS builder-dev
+FROM golang:1.23-alpine3.19 AS builder-dev
 
 WORKDIR /app
 

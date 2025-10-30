@@ -1,0 +1,100 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: dkl-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-dklemailservice}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: dkl-redis
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # DKL Email Service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: dkl-email-service
+    ports:
+      - "8082:8080"
+    environment:
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-dklemailservice}
+      DB_SSL_MODE: disable
+      
+      # SMTP Configuration
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
+      
+      # Registration SMTP
+      REGISTRATION_SMTP_HOST: ${REGISTRATION_SMTP_HOST}
+      REGISTRATION_SMTP_PORT: ${REGISTRATION_SMTP_PORT:-587}
+      REGISTRATION_SMTP_USER: ${REGISTRATION_SMTP_USER}
+      REGISTRATION_SMTP_PASSWORD: ${REGISTRATION_SMTP_PASSWORD}
+      REGISTRATION_SMTP_FROM: ${REGISTRATION_SMTP_FROM}
+      
+      # Email addresses
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      REGISTRATION_EMAIL: ${REGISTRATION_EMAIL}
+      
+      # JWT
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-key-change-in-production}
+      
+      # Redis Configuration
+      REDIS_ENABLED: "true"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: 0
+      # Note: Redis runs on port 6380 on host but 6379 inside container
+      
+      # CORS
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      
+      # Environment
+      APP_ENV: dev
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      
+      # Optional - Disable auto email fetch for dev
+      DISABLE_AUTO_EMAIL_FETCH: ${DISABLE_AUTO_EMAIL_FETCH:-true}
+      
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ./templates:/app/templates:ro
+
+volumes:
+  postgres_data:
+    name: dkl_postgres_data

@@ -302,23 +302,36 @@ func checkSMTPConnections() (defaultOK bool, registrationOK bool, lastError stri
 
 // checkRedisConnection test de Redis verbinding
 func checkRedisConnection() (bool, string) {
+	// Check if Redis client is configured
 	if redisClient == nil {
 		return false, "Redis client not configured"
 	}
 
-	// Type assertion naar Redis client
+	// Type assertion naar Redis client with nil safety
 	client, ok := redisClient.(*redis.Client)
-	if !ok {
+	if !ok || client == nil {
 		return false, "Invalid Redis client type"
 	}
+
+	// Add defensive check to prevent nil pointer dereference
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("Redis health check panic recovered", "error", r)
+		}
+	}()
 
 	// Test verbinding met PING
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	_, err := client.Ping(ctx).Result()
+	result, err := client.Ping(ctx).Result()
 	if err != nil {
 		return false, "Redis ping failed: " + err.Error()
+	}
+
+	// Verify PONG response
+	if result != "PONG" {
+		return false, "Redis ping unexpected response: " + result
 	}
 
 	return true, ""

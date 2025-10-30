@@ -195,12 +195,19 @@ EMAIL_BATCH_INTERVAL=15m
 TEMPLATE_RELOAD_INTERVAL=1h
 MAX_CONCURRENT_SENDS=10
 
-# Redis Configuratie (Vereist voor RBAC en Chat features)
+# Redis Configuratie
+# Redis is VEREIST voor:
+# - RBAC permissie caching (optimale performance)
+# - Chat presence en typing indicators
+# - Rate limiting (Redis-backed voor productie)
+# - Session management
 REDIS_ENABLED=true
 REDIS_HOST=localhost
 REDIS_PORT=6379
-REDIS_PASSWORD=your_redis_password
+REDIS_PASSWORD=
 REDIS_DB=0
+# Alternative: Use REDIS_URL for cloud providers (e.g., Render)
+# REDIS_URL=redis://username:password@host:port/db
 
 # Automatische Email Ophaling
 EMAIL_FETCH_INTERVAL=15
@@ -406,6 +413,54 @@ services:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+
+### Docker Development Setup met Redis
+
+Voor lokale ontwikkeling met volledige Redis ondersteuning:
+
+```bash
+# Start alle services (PostgreSQL, Redis, App)
+docker-compose -f docker-compose.dev.yml up -d
+
+# Check container status
+docker-compose -f docker-compose.dev.yml ps
+
+# View logs
+docker logs dkl-email-service --tail 100
+
+# Stop services
+docker-compose -f docker-compose.dev.yml down
+```
+
+De development setup bevat:
+- **PostgreSQL**: Database op poort 5433 (host) → 5432 (container)
+- **Redis**: Cache op poort 6380 (host) → 6379 (container)
+- **App**: Service op poort 8082 (host) → 8080 (container)
+
+#### Redis Configuratie in Docker
+
+Redis is standaard ingeschakeld in de Docker development setup:
+
+```yaml
+environment:
+  REDIS_ENABLED: "true"
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  REDIS_PASSWORD: ""
+  REDIS_DB: 0
+```
+
+Verifieer Redis verbinding:
+```bash
+# Test Redis in container
+docker exec dkl-redis redis-cli ping
+# Verwachte output: PONG
+
+# Check health endpoint met Redis status
+curl http://localhost:8082/api/health | jq '.checks.redis'
+# Verwachte output: {"status": true}
+```
+
     command: redis-server --requirepass your_redis_password
     volumes:
       - redis_data:/data

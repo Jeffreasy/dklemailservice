@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "dkl-email-service": {
+      "command": "C:\\Users\\jeffrey\\Desktop\\Githubmains\\dklemailservice-mcp-server\\dkl-mcp-server.exe",
+      "args": [],
+      "env": {},
+      "alwaysAllow": [
+        "test_api_endpoint",
+        "list_tables",
+        "run_go_tests"
+      ]
+    }
+  }
+}
