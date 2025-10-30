@@ -199,35 +199,7 @@ WHERE is_active = TRUE;
 COMMENT ON INDEX idx_chat_participants_unread IS 'Unread message tracking per user';
 
 -- ============================================
--- SECTION 7: CONTENT MANAGEMENT OPTIMIZATIONS
--- ============================================
-
--- photos visible ordering
-CREATE INDEX IF NOT EXISTS idx_photos_visible_order 
-ON photos(order_number) 
-WHERE visible = TRUE;
-COMMENT ON INDEX idx_photos_visible_order IS 'Visible photos in display order';
-
--- albums visible ordering
-CREATE INDEX IF NOT EXISTS idx_albums_visible_order 
-ON albums(order_number) 
-WHERE visible = TRUE;
-COMMENT ON INDEX idx_albums_visible_order IS 'Visible albums in display order';
-
--- videos visible ordering
-CREATE INDEX IF NOT EXISTS idx_videos_visible_order 
-ON videos(order_number) 
-WHERE visible = TRUE;
-COMMENT ON INDEX idx_videos_visible_order IS 'Visible videos in display order';
-
--- sponsors active ordering
-CREATE INDEX IF NOT EXISTS idx_sponsors_active_order 
-ON sponsors(order_number) 
-WHERE is_active = TRUE AND visible = TRUE;
-COMMENT ON INDEX idx_sponsors_active_order IS 'Active visible sponsors in display order';
-
--- ============================================
--- SECTION 8: RBAC OPTIMIZATIONS
+-- SECTION 7: RBAC OPTIMIZATIONS
 -- ============================================
 
 -- user_roles active assignments
@@ -238,7 +210,7 @@ WHERE is_active = TRUE;
 COMMENT ON INDEX idx_user_roles_active_lookup IS 'Active user role assignments';
 
 -- ============================================
--- SECTION 9: NEWSLETTER OPTIMIZATIONS
+-- SECTION 8: NEWSLETTER OPTIMIZATIONS
 -- ============================================
 
 -- newsletters draft vs sent
@@ -247,7 +219,7 @@ ON newsletters(sent_at DESC NULLS FIRST);
 COMMENT ON INDEX idx_newsletters_status IS 'Draft newsletters first, then sent in reverse chronological order';
 
 -- ============================================
--- SECTION 10: TOKEN CLEANUP OPTIMIZATION
+-- SECTION 9: TOKEN CLEANUP OPTIMIZATION
 -- ============================================
 
 -- refresh_tokens cleanup
@@ -257,7 +229,7 @@ WHERE is_revoked = FALSE;
 COMMENT ON INDEX idx_refresh_tokens_cleanup IS 'Expired token cleanup for scheduled jobs';
 
 -- ============================================
--- SECTION 11: UPLOADED IMAGES OPTIMIZATIONS
+-- SECTION 10: UPLOADED IMAGES OPTIMIZATIONS
 -- ============================================
 
 -- uploaded_images soft delete queries
