@@ -377,10 +377,11 @@ ALTER TABLE contact_formulieren DROP CONSTRAINT IF EXISTS contact_formulieren_be
 ALTER TABLE contact_formulieren ADD CONSTRAINT contact_formulieren_bericht_not_empty 
     CHECK (LENGTH(TRIM(bericht)) > 0);
 
--- Telefoon format (optional - basic check)
-ALTER TABLE aanmeldingen DROP CONSTRAINT IF EXISTS aanmeldingen_telefoon_format;
-ALTER TABLE aanmeldingen ADD CONSTRAINT aanmeldingen_telefoon_format 
-    CHECK (telefoon IS NULL OR LENGTH(TRIM(telefoon)) >= 10);
+-- Telefoon format check - REMOVED (too restrictive for current data)
+-- Some phone numbers in database are shorter than 10 characters
+-- ALTER TABLE aanmeldingen DROP CONSTRAINT IF EXISTS aanmeldingen_telefoon_format;
+-- ALTER TABLE aanmeldingen ADD CONSTRAINT aanmeldingen_telefoon_format
+--     CHECK (telefoon IS NULL OR LENGTH(TRIM(telefoon)) >= 10);
 
 -- ============================================
 -- SECTION 9: PERFORMANCE INDEXES ON COMPUTED COLUMNS
