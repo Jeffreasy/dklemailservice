@@ -9,6 +9,42 @@
         "list_tables",
         "run_go_tests"
       ]
+    },
+    "cloudinary-asset-mgmt": {
+      "command": "npx",
+      "args": ["-y", "--package", "@cloudinary/asset-management", "--", "mcp", "start"],
+      "env": {
+        "CLOUDINARY_CLOUD_NAME": "dgfuv7wif",
+        "CLOUDINARY_API_KEY": "642321669724269",
+        "CLOUDINARY_API_SECRET": "cspOSU-ySDd7Tdn09NgwenM4Xsg"
+      }
+    },
+    "cloudinary-env-config": {
+      "command": "npx",
+      "args": ["-y", "--package", "@cloudinary/environment-config", "--", "mcp", "start"],
+      "env": {
+        "CLOUDINARY_CLOUD_NAME": "dgfuv7wif",
+        "CLOUDINARY_API_KEY": "642321669724269",
+        "CLOUDINARY_API_SECRET": "cspOSU-ySDd7Tdn09NgwenM4Xsg"
+      }
+    },
+    "cloudinary-smd": {
+      "command": "npx",
+      "args": ["-y", "--package", "@cloudinary/structured-metadata", "--", "mcp", "start"],
+      "env": {
+        "CLOUDINARY_CLOUD_NAME": "dgfuv7wif",
+        "CLOUDINARY_API_KEY": "642321669724269",
+        "CLOUDINARY_API_SECRET": "cspOSU-ySDd7Tdn09NgwenM4Xsg"
+      }
+    },
+    "cloudinary-analysis": {
+      "command": "npx",
+      "args": ["-y", "--package", "@cloudinary/analysis", "--", "mcp", "start"],
+      "env": {
+        "CLOUDINARY_CLOUD_NAME": "dgfuv7wif",
+        "CLOUDINARY_API_KEY": "642321669724269",
+        "CLOUDINARY_API_SECRET": "cspOSU-ySDd7Tdn09NgwenM4Xsg"
+      }
     }
   }
 }

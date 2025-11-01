@@ -3,10 +3,8 @@ package services
 import (
 	"dklautomationgo/logger"
 	"dklautomationgo/models"
-	"encoding/base64"
 	"fmt"
 	"io"
-	"mime/quotedprintable"
 	"net/mail"
 	"strconv"
 	"strings"
@@ -202,8 +200,6 @@ func (f *MailFetcher) fetchFromAccount(account *MailAccount, since time.Time) ([
 
 // processMessage verwerkt een imap bericht naar een IncomingEmail model
 func processMessage(msg *imap.Message, section imap.BodySectionName, accountType string) (*models.IncomingEmail, error) {
-	var contentType string
-
 	// Haal body op
 	bodyReader := msg.GetBody(&section)
 	if bodyReader == nil {
@@ -217,47 +213,36 @@ func processMessage(msg *imap.Message, section imap.BodySectionName, accountType
 	}
 
 	// Lees de headers
-	contentType = m.Header.Get("Content-Type")
-	contentEncoding := m.Header.Get("Content-Transfer-Encoding")
+	contentType := m.Header.Get("Content-Type")
 	from := m.Header.Get("From")
 	subject := m.Header.Get("Subject")
 	date := m.Header.Get("Date")
 	messageId := m.Header.Get("Message-ID")
 
-	// Maak de juiste reader aan op basis van de encoding
-	var finalBodyReader io.Reader = m.Body
-	switch strings.ToLower(contentEncoding) {
-	case "quoted-printable":
-		finalBodyReader = quotedprintable.NewReader(m.Body)
-		logger.Debug("Using quoted-printable decoder", "message_id", messageId, "uid", msg.Uid)
-	case "base64":
-		finalBodyReader = base64.NewDecoder(base64.StdEncoding, m.Body)
-		logger.Debug("Using base64 decoder", "message_id", messageId, "uid", msg.Uid)
-	case "7bit", "8bit", "binary", "":
-		// Geen decoding nodig, finalBodyReader blijft m.Body
-		logger.Debug("No transfer decoding needed", "encoding", contentEncoding, "message_id", messageId, "uid", msg.Uid)
-	default:
-		logger.Warn("Onbekende Content-Transfer-Encoding", "encoding", contentEncoding, "message_id", messageId, "uid", msg.Uid)
-		// Probeer toch direct te lezen
-	}
+	// Gebruik de nieuwe EmailDecoder voor betere email parsing
+	decoder := NewEmailDecoder()
 
-	// Lees de (mogelijk gedecodeerde) body
-	bodyBytes, err := io.ReadAll(finalBodyReader)
+	// Decode de email body (handelt multipart, charset, encoding)
+	decodedBody, err := decoder.DecodeEmailBody(m)
 	if err != nil {
-		return nil, fmt.Errorf("kan body niet lezen na decoding: %w", err)
+		logger.Warn("Fout bij decoderen email body, gebruik fallback", "error", err, "message_id", messageId)
+		// Fallback: probeer gewoon de body te lezen
+		bodyBytes, readErr := io.ReadAll(m.Body)
+		if readErr != nil {
+			return nil, fmt.Errorf("kan body niet lezen: %w", readErr)
+		}
+		decodedBody = string(bodyBytes)
 	}
-	decodedBody := string(bodyBytes) // Dit is nu de gedecodeerde body
 
-	// DEBUG: Log de gedecodeerde body
-	logger.Debug("Decoded email body content", "message_id", messageId, "uid", msg.Uid, "decoded_body_preview", getFirstNChars(decodedBody, 200)) // Log first 200 chars
+	// Decode subject en from headers (RFC 2047)
+	decodedSubject := decoder.DecodeSubject(subject)
+	decodedFrom := decoder.DecodeFrom(from)
 
-	// TODO: Overweeg charset conversie hier indien nodig, gebaseerd op contentType
-
-	// Sanitize body if content type is text/html
-	finalBody := decodedBody // Gebruik de gedecodeerde body als basis
+	// Sanitize HTML if needed
+	finalBody := decodedBody
 	if strings.Contains(strings.ToLower(contentType), "text/html") {
-		p := bluemonday.UGCPolicy()         // User Generated Content policy
-		finalBody = p.Sanitize(decodedBody) // Sanitize de gedecodeerde body
+		p := bluemonday.UGCPolicy()
+		finalBody = p.Sanitize(decodedBody)
 		logger.Debug("HTML body gesanitized", "message_id", messageId, "uid", msg.Uid)
 	}
 
@@ -268,26 +253,32 @@ func processMessage(msg *imap.Message, section imap.BodySectionName, accountType
 		if err == nil {
 			receivedAt = parsedTime
 		} else {
-			receivedAt = time.Now() // Fallback naar huidige tijd
+			receivedAt = time.Now()
 		}
 	} else {
 		receivedAt = time.Now()
 	}
 
-	// Maak een IncomingEmail model met de CORRECTE veldnamen
+	// Maak een IncomingEmail model
 	email := &models.IncomingEmail{
 		MessageID:   messageId,
-		From:        from,
-		To:          accountType + "@dekoninklijkeloop.nl", // Houd de originele logica voor To aan
-		Subject:     subject,
-		Body:        finalBody, // Sla de gedecodeerde en mogelijk gesanitized body op
+		From:        decodedFrom,
+		To:          accountType + "@dekoninklijkeloop.nl",
+		Subject:     decodedSubject,
+		Body:        finalBody,
 		ContentType: contentType,
 		ReceivedAt:  receivedAt,
 		AccountType: accountType,
 		UID:         strconv.FormatUint(uint64(msg.Uid), 10),
 		IsProcessed: false,
-		ProcessedAt: nil, // Gebruik nil, niet false
+		ProcessedAt: nil,
 	}
+
+	logger.Debug("Email processed successfully",
+		"message_id", messageId,
+		"from", decodedFrom,
+		"subject", decodedSubject,
+		"body_length", len(finalBody))
 
 	return email, nil
 }

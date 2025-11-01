@@ -1,6 +1,6 @@
 module dklautomationgo
 
-go 1.23.0
+go 1.24.0
 
 toolchain go1.24.9
 
@@ -73,9 +73,9 @@ require (
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/net v0.34.0 // indirect
-	golang.org/x/sync v0.11.0 // indirect
+	golang.org/x/sync v0.17.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/text v0.30.0 // indirect
 	google.golang.org/protobuf v1.36.1 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

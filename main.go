@@ -633,8 +633,8 @@ func main() {
 		return c.Status(recorder.Code).Send(recorder.Body.Bytes())
 	})
 
-	// Initialiseer de nieuwe admin mail handler
-	adminMailHandler := handlers.NewAdminMailHandler(serviceFactory.EmailService, serviceFactory.AuthService, serviceFactory.PermissionService)
+	// Initialiseer de nieuwe admin mail handler met email repository voor reprocessing
+	adminMailHandler := handlers.NewAdminMailHandler(serviceFactory.EmailService, serviceFactory.AuthService, serviceFactory.PermissionService, repoFactory.IncomingEmail)
 
 	// Registreer de admin mail routes
 	adminMailHandler.RegisterRoutes(app)

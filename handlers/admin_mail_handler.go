@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"dklautomationgo/logger"
+	"dklautomationgo/repository"
 	"dklautomationgo/services" // Assuming your service interfaces are here
 	"net/http"
 	"os"
@@ -13,10 +14,11 @@ import (
 
 // AdminMailHandler handles requests related to sending emails by admins.
 type AdminMailHandler struct {
-	emailService      services.EmailSender       // Use the existing EmailSender interface
-	authService       services.AuthService       // Use the existing AuthService interface
-	permissionService services.PermissionService // New RBAC permission service
-	validate          *validator.Validate        // Keep validator instance
+	emailService      services.EmailSender               // Use the existing EmailSender interface
+	authService       services.AuthService               // Use the existing AuthService interface
+	permissionService services.PermissionService         // New RBAC permission service
+	emailRepo         repository.IncomingEmailRepository // For email reprocessing
+	validate          *validator.Validate                // Keep validator instance
 }
 
 // SendMailRequest defines the expected JSON body for the send mail endpoint.
@@ -50,7 +52,7 @@ func ValidateSendMailRequest(sl validator.StructLevel) {
 }
 
 // NewAdminMailHandler creates a new AdminMailHandler instance.
-func NewAdminMailHandler(emailSvc services.EmailSender, authSvc services.AuthService, permissionSvc services.PermissionService) *AdminMailHandler {
+func NewAdminMailHandler(emailSvc services.EmailSender, authSvc services.AuthService, permissionSvc services.PermissionService, emailRepo repository.IncomingEmailRepository) *AdminMailHandler {
 	v := validator.New()
 	// Register custom validation
 	v.RegisterStructValidation(ValidateSendMailRequest, SendMailRequest{})
@@ -59,6 +61,7 @@ func NewAdminMailHandler(emailSvc services.EmailSender, authSvc services.AuthSer
 		emailService:      emailSvc,
 		authService:       authSvc,
 		permissionService: permissionSvc,
+		emailRepo:         emailRepo,
 		validate:          v,
 	}
 }
@@ -168,6 +171,31 @@ func (h *AdminMailHandler) HandleSendMail(c *fiber.Ctx) error {
 	return c.Status(http.StatusOK).JSON(fiber.Map{"success": true, "message": "Email succesvol verzonden."})
 }
 
+// HandleReprocessEmails reprocesses existing emails with better decoding
+func (h *AdminMailHandler) HandleReprocessEmails(c *fiber.Ctx) error {
+	logger.Info("Email reprocessing request received", "ip", c.IP())
+
+	ctx := c.Context()
+	reprocessor := services.NewEmailReprocessor(h.emailRepo)
+
+	processed, failed, err := reprocessor.ReprocessAllEmails(ctx)
+	if err != nil {
+		logger.Error("Error during email reprocessing", "error", err)
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"success": false,
+			"error":   "Fout bij reprocessen emails: " + err.Error(),
+		})
+	}
+
+	logger.Info("Email reprocessing completed", "processed", processed, "failed", failed)
+	return c.Status(http.StatusOK).JSON(fiber.Map{
+		"success":   true,
+		"message":   "Email reprocessing voltooid",
+		"processed": processed,
+		"failed":    failed,
+	})
+}
+
 // RegisterRoutes registers the admin mail routes, protected by authentication and authorization middleware.
 func (h *AdminMailHandler) RegisterRoutes(app *fiber.App) {
 	// Create a group for admin mail actions, protected by AuthMiddleware and PermissionMiddleware
@@ -175,6 +203,9 @@ func (h *AdminMailHandler) RegisterRoutes(app *fiber.App) {
 
 	// Register the POST route for sending mail
 	adminMailGroup.Post("/send", h.HandleSendMail)
+
+	// Register the POST route for reprocessing emails
+	adminMailGroup.Post("/reprocess", h.HandleReprocessEmails)
 
 	logger.Info("Admin mail routes registered under /api/admin/mail with RBAC permissions")
 }

@@ -1,0 +1,1 @@
+SELECT versie, naam, toegepast FROM migraties ORDER BY toegepast DESC LIMIT 10;
