@@ -1,8 +1,8 @@
 module dklautomationgo
 
-go 1.24.0
+go 1.23.0
 
-toolchain go1.24.9
+toolchain go1.23.4
 
 require (
 	github.com/cloudinary/cloudinary-go/v2 v2.3.0
