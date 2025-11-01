@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	password := "DKL2025!"
+	password := "admin"
 
 	// Genereer bcrypt hash (cost 10, zoals in de applicatie)
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)

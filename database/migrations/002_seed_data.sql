@@ -9,12 +9,12 @@ BEGIN
         -- Maak admin gebruiker aan (wachtwoord: admin)
         INSERT INTO gebruikers (naam, email, wachtwoord_hash, rol, is_actief, created_at, updated_at)
         VALUES (
-            'Admin', 
-            'admin@dekoninklijkeloop.nl', 
-            '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 
-            'admin', 
-            TRUE, 
-            CURRENT_TIMESTAMP, 
+            'Admin',
+            'admin@dekoninklijkeloop.nl',
+            '$2a$10$5Yse5i2BJV.bwTzbmywa9e/3G.XxzQPayGPlTsut/nBrZr05pKMCK',
+            'admin',
+            TRUE,
+            CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
         );
     END IF;

@@ -45,13 +45,14 @@ func (r *PostgresGebruikerRepository) GetByID(ctx context.Context, id string) (*
 	return &gebruiker, nil
 }
 
-// GetByEmail haalt een gebruiker op basis van email
+// GetByEmail haalt een gebruiker op basis van email (case-insensitive)
 func (r *PostgresGebruikerRepository) GetByEmail(ctx context.Context, email string) (*models.Gebruiker, error) {
 	ctx, cancel := r.withTimeout(ctx)
 	defer cancel()
 
 	var gebruiker models.Gebruiker
-	result := r.DB().WithContext(ctx).Where("email = ?", email).First(&gebruiker)
+	// Use LOWER() voor case-insensitive email lookup
+	result := r.DB().WithContext(ctx).Where("LOWER(email) = LOWER(?)", email).First(&gebruiker)
 	if err := r.handleError("GetByEmail", result.Error); err != nil {
 		return nil, err
 	}
