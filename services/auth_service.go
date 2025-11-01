@@ -34,8 +34,10 @@ var (
 
 // JWTClaims definieert de claims in het JWT token
 type JWTClaims struct {
-	Email string `json:"email"`
-	Role  string `json:"role"`
+	Email      string   `json:"email"`
+	Role       string   `json:"role"`        // Legacy field - deprecated, use Roles
+	Roles      []string `json:"roles"`       // RBAC roles from user_roles table
+	RBACActive bool     `json:"rbac_active"` // Indicates if RBAC system is active
 	jwt.RegisteredClaims
 }
 
@@ -43,12 +45,18 @@ type JWTClaims struct {
 type AuthServiceImpl struct {
 	gebruikerRepo    repository.GebruikerRepository
 	refreshTokenRepo repository.RefreshTokenRepository
+	userRoleRepo     repository.UserRoleRepository
 	jwtSecret        []byte
 	tokenExpiry      time.Duration
 }
 
 // NewAuthService maakt een nieuwe AuthService
 func NewAuthService(gebruikerRepo repository.GebruikerRepository, refreshTokenRepo repository.RefreshTokenRepository) AuthService {
+	return NewAuthServiceWithRBAC(gebruikerRepo, refreshTokenRepo, nil)
+}
+
+// NewAuthServiceWithRBAC maakt een nieuwe AuthService met RBAC support
+func NewAuthServiceWithRBAC(gebruikerRepo repository.GebruikerRepository, refreshTokenRepo repository.RefreshTokenRepository, userRoleRepo repository.UserRoleRepository) AuthService {
 	// Haal JWT secret uit omgevingsvariabele of gebruik een standaard waarde
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
@@ -70,6 +78,7 @@ func NewAuthService(gebruikerRepo repository.GebruikerRepository, refreshTokenRe
 	return &AuthServiceImpl{
 		gebruikerRepo:    gebruikerRepo,
 		refreshTokenRepo: refreshTokenRepo,
+		userRoleRepo:     userRoleRepo,
 		jwtSecret:        []byte(jwtSecret),
 		tokenExpiry:      tokenExpiry,
 	}
@@ -261,10 +270,15 @@ func (s *AuthServiceImpl) ResetPassword(ctx context.Context, email, nieuwWachtwo
 
 // generateToken genereert een JWT token voor een gebruiker
 func (s *AuthServiceImpl) generateToken(gebruiker *models.Gebruiker) (string, error) {
-	// Maak claims
+	// Haal RBAC roles op voor de gebruiker
+	rbacRoles := s.getUserRBACRoles(gebruiker.ID)
+
+	// Maak claims met zowel legacy als RBAC support
 	claims := JWTClaims{
-		Email: gebruiker.Email,
-		Role:  gebruiker.Rol,
+		Email:      gebruiker.Email,
+		Role:       gebruiker.Rol,      // Legacy - voor backward compatibility
+		Roles:      rbacRoles,          // RBAC - nieuwe systeem
+		RBACActive: len(rbacRoles) > 0, // Indicator dat RBAC actief is
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.tokenExpiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -284,6 +298,35 @@ func (s *AuthServiceImpl) generateToken(gebruiker *models.Gebruiker) (string, er
 	}
 
 	return signedToken, nil
+}
+
+// getUserRBACRoles haalt de RBAC role namen op voor een gebruiker
+func (s *AuthServiceImpl) getUserRBACRoles(userID string) []string {
+	// Als userRoleRepo niet beschikbaar is, return lege array
+	if s.userRoleRepo == nil {
+		return []string{}
+	}
+
+	// Gebruik context met timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Haal actieve user roles op
+	userRoles, err := s.userRoleRepo.ListActiveByUser(ctx, userID)
+	if err != nil {
+		logger.Warn("Kon RBAC roles niet ophalen voor JWT", "user_id", userID, "error", err)
+		return []string{}
+	}
+
+	// Extract role names
+	roleNames := make([]string, 0, len(userRoles))
+	for _, ur := range userRoles {
+		if ur.Role.Name != "" {
+			roleNames = append(roleNames, ur.Role.Name)
+		}
+	}
+
+	return roleNames
 }
 
 // CreateUser creates a new user with hashed password
