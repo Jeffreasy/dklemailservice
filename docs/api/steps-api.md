@@ -106,7 +106,7 @@ Authorization: Bearer <jwt-token>
 ```
 
 **Query Parameters:**
-- `year` (optioneel): Jaar om op te filteren (default: 2025)
+- `year` (optioneel): Jaar om op te filteren (default: 2026)
 
 **Response (200 OK):**
 ```json
