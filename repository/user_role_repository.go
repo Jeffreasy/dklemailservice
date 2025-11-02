@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"dklautomationgo/models"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -75,7 +76,7 @@ func (r *UserRoleRepositoryImpl) GetByUserIDWithRoles(ctx context.Context, userI
 		Preload("Role.Permissions").
 		Where("user_id = ?", userID).
 		Where("is_active = ?", true).
-		Where("expires_at IS NULL OR expires_at > ?", "NOW()").
+		Where("expires_at IS NULL OR expires_at > ?", time.Now()).
 		Order("assigned_at DESC").
 		Find(&userRoles).Error
 	return userRoles, err

@@ -52,7 +52,10 @@ func (h *UserHandler) ListUsers(c *fiber.Ctx) error {
 
 	users, err := h.authService.ListUsers(c.Context(), limit, offset)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+			"code":  "INTERNAL_ERROR",
+		})
 	}
 	return c.JSON(users)
 }
@@ -68,7 +71,10 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 	}
 
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid input"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid input",
+			"code":  "INVALID_INPUT",
+		})
 	}
 
 	gebruiker := &models.Gebruiker{
@@ -81,7 +87,10 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 
 	err := h.authService.CreateUser(c.Context(), gebruiker, req.Password)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+			"code":  "USER_CREATION_FAILED",
+		})
 	}
 	return c.JSON(gebruiker)
 }
@@ -91,7 +100,10 @@ func (h *UserHandler) GetUser(c *fiber.Ctx) error {
 
 	user, err := h.authService.GetUser(c.Context(), id)
 	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "User not found",
+			"code":  "USER_NOT_FOUND",
+		})
 	}
 	return c.JSON(user)
 }
@@ -101,7 +113,10 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 
 	user, err := h.authService.GetUser(c.Context(), id)
 	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "User not found",
+			"code":  "USER_NOT_FOUND",
+		})
 	}
 
 	var req struct {
@@ -114,7 +129,10 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	}
 
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid input"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid input",
+			"code":  "INVALID_INPUT",
+		})
 	}
 
 	if req.Email != nil {
@@ -135,7 +153,10 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 
 	err = h.authService.UpdateUser(c.Context(), user, req.Password)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+			"code":  "USER_UPDATE_FAILED",
+		})
 	}
 	return c.JSON(user)
 }
@@ -145,7 +166,10 @@ func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 
 	err := h.authService.DeleteUser(c.Context(), id)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+			"code":  "USER_DELETION_FAILED",
+		})
 	}
 	return c.JSON(fiber.Map{"success": true})
 }
@@ -159,6 +183,7 @@ func (h *UserHandler) GetUserRoles(c *fiber.Ctx) error {
 		logger.Error("Fout bij ophalen user roles", "error", err, "user_id", userID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon user roles niet ophalen",
+			"code":  "INTERNAL_ERROR",
 		})
 	}
 
@@ -177,12 +202,14 @@ func (h *UserHandler) AssignRoleToUser(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Ongeldige gegevens",
+			"code":  "INVALID_INPUT",
 		})
 	}
 
 	if req.RoleID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Role ID is verplicht",
+			"code":  "MISSING_ROLE_ID",
 		})
 	}
 
@@ -201,6 +228,7 @@ func (h *UserHandler) AssignRoleToUser(c *fiber.Ctx) error {
 		if err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "Ongeldige expires_at formaat (gebruik RFC3339)",
+				"code":  "INVALID_DATE_FORMAT",
 			})
 		}
 		ur.ExpiresAt = &t
@@ -212,11 +240,13 @@ func (h *UserHandler) AssignRoleToUser(c *fiber.Ctx) error {
 		if errors.Is(err, gorm.ErrDuplicatedKey) || strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "unique") {
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
 				"error": "User heeft deze rol al",
+				"code":  "DUPLICATE_ROLE",
 			})
 		}
 		logger.Error("Fout bij toewijzen role", "error", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon role niet toewijzen",
+			"code":  "ASSIGNMENT_FAILED",
 		})
 	}
 
@@ -238,6 +268,7 @@ func (h *UserHandler) GetUserPermissions(c *fiber.Ctx) error {
 		logger.Error("Fout bij ophalen user permissions", "error", err, "user_id", userID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon user permissions niet ophalen",
+			"code":  "INTERNAL_ERROR",
 		})
 	}
 
@@ -249,6 +280,7 @@ func (h *UserHandler) AssignRolesToUser(c *fiber.Ctx) error {
 	if targetUserID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "User ID is verplicht",
+			"code":  "MISSING_USER_ID",
 		})
 	}
 
@@ -259,12 +291,14 @@ func (h *UserHandler) AssignRolesToUser(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Ongeldige gegevens",
+			"code":  "INVALID_INPUT",
 		})
 	}
 
 	if len(req.RoleIDs) == 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Ten minste één role ID is verplicht",
+			"code":  "MISSING_ROLE_ID",
 		})
 	}
 
@@ -273,6 +307,7 @@ func (h *UserHandler) AssignRolesToUser(c *fiber.Ctx) error {
 	if !ok || currentUserID == "" {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon userID niet ophalen uit context",
+			"code":  "INTERNAL_ERROR",
 		})
 	}
 
@@ -309,6 +344,7 @@ func (h *UserHandler) RemoveRoleFromUser(c *fiber.Ctx) error {
 	if userID == "" || roleID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "User ID en Role ID zijn verplicht",
+			"code":  "MISSING_PARAMETERS",
 		})
 	}
 
@@ -320,11 +356,13 @@ func (h *UserHandler) RemoveRoleFromUser(c *fiber.Ctx) error {
 		if err == gorm.ErrRecordNotFound {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "Gebruiker heeft deze rol niet",
+				"code":  "ROLE_NOT_FOUND",
 			})
 		}
 		logger.Error("Fout bij ophalen user-role relatie", "error", err, "user_id", userID, "role_id", roleID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon user-role relatie niet controleren",
+			"code":  "INTERNAL_ERROR",
 		})
 	}
 
@@ -333,6 +371,7 @@ func (h *UserHandler) RemoveRoleFromUser(c *fiber.Ctx) error {
 		logger.Error("Fout bij verwijderen rol van user", "error", err, "user_id", userID, "role_id", roleID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon rol niet verwijderen van user",
+			"code":  "REMOVAL_FAILED",
 		})
 	}
 
