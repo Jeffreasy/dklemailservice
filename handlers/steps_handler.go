@@ -5,6 +5,7 @@ import (
 	"dklautomationgo/models"
 	"dklautomationgo/services"
 	"strconv"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -93,8 +94,16 @@ func (h *StepsHandler) UpdateSteps(c *fiber.Ctx) error {
 		participant, err := h.stepsService.UpdateStepsByUserID(userID, req.Steps)
 		if err != nil {
 			logger.Error("Fout bij bijwerken stappen", "error", err, "user_id", userID)
+			// Check if this is a "not found" error (user is not a participant)
+			if strings.Contains(err.Error(), "geen deelnemersregistratie gevonden") {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+					"error": "U bent niet geregistreerd als deelnemer. Alleen deelnemers kunnen stappen bijwerken.",
+					"code":  "NOT_A_PARTICIPANT",
+				})
+			}
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "Kon stappen niet bijwerken",
+				"code":  "INTERNAL_ERROR",
 			})
 		}
 		return c.JSON(participant)
@@ -144,8 +153,16 @@ func (h *StepsHandler) GetParticipantDashboard(c *fiber.Ctx) error {
 		participant, allocatedFunds, err := h.stepsService.GetParticipantDashboardByUserID(userID)
 		if err != nil {
 			logger.Error("Fout bij ophalen dashboard", "error", err, "id", userID)
+			// Check if this is a "not found" error (user is not a participant)
+			if strings.Contains(err.Error(), "geen deelnemersregistratie gevonden") {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+					"error": "U bent niet geregistreerd als deelnemer. Alleen deelnemers hebben toegang tot het dashboard.",
+					"code":  "NOT_A_PARTICIPANT",
+				})
+			}
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "Kon dashboard data niet ophalen",
+				"code":  "INTERNAL_ERROR",
 			})
 		}
 

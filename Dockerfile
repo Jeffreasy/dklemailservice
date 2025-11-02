@@ -43,8 +43,13 @@ FROM alpine:3.19 AS runtime
 
 WORKDIR /app
 
-# Install ca-certificates for HTTPS and SQLite for development
-RUN apk --no-cache add ca-certificates sqlite
+# Install ca-certificates for HTTPS, SQLite for development, and openssh-server for Render SSH support
+RUN apk --no-cache add ca-certificates sqlite openssh-server openssh bash && \
+    # Create .ssh directory for root user with correct permissions (required for Render SSH)
+    mkdir -p /root/.ssh && \
+    chmod 0700 /root/.ssh && \
+    # Ensure root account is not locked (required for Render SSH with Docker)
+    passwd -u root 2>/dev/null || true
 
 # Copy the binaries from builders
 COPY --from=builder-prod /app/main-prod ./main

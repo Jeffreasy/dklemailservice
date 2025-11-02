@@ -57,7 +57,10 @@ func (s *StepsService) UpdateStepsByUserID(userID string, deltaSteps int) (*mode
 	var participant models.Aanmelding
 	err := s.db.Where("gebruiker_id = ?", userID).First(&participant).Error
 	if err != nil {
-		return nil, fmt.Errorf("deelnemer niet gevonden: %w", err)
+		if err == gorm.ErrRecordNotFound {
+			return nil, fmt.Errorf("geen deelnemersregistratie gevonden voor gebruiker %s - gebruiker is mogelijk geen deelnemer", userID)
+		}
+		return nil, fmt.Errorf("fout bij ophalen deelnemer: %w", err)
 	}
 
 	// Update stappen (voorkom negatieve stappen)
@@ -98,7 +101,10 @@ func (s *StepsService) GetParticipantDashboardByUserID(userID string) (*models.A
 	var participant models.Aanmelding
 	err := s.db.Where("gebruiker_id = ?", userID).First(&participant).Error
 	if err != nil {
-		return nil, 0, fmt.Errorf("deelnemer niet gevonden: %w", err)
+		if err == gorm.ErrRecordNotFound {
+			return nil, 0, fmt.Errorf("geen deelnemersregistratie gevonden voor gebruiker %s - gebruiker is mogelijk geen deelnemer", userID)
+		}
+		return nil, 0, fmt.Errorf("fout bij ophalen deelnemer: %w", err)
 	}
 
 	// Bereken allocated funds gebaseerd op afstand
