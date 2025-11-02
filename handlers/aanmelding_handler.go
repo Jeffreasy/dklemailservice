@@ -123,15 +123,17 @@ func (h *AanmeldingHandler) ListAanmeldingen(c *fiber.Ctx) error {
 	offset := c.QueryInt("offset", 0)
 
 	// Valideer parameters
-	if limit < 1 || limit > 100 {
+	if limit < 1 || limit > 10000 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Limit moet tussen 1 en 100 liggen",
+			"error": "Limit moet tussen 1 en 10000 liggen",
+			"code":  "INVALID_LIMIT",
 		})
 	}
 
 	if offset < 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Offset mag niet negatief zijn",
+			"code":  "INVALID_OFFSET",
 		})
 	}
 
@@ -142,6 +144,7 @@ func (h *AanmeldingHandler) ListAanmeldingen(c *fiber.Ctx) error {
 		logger.Error("Fout bij ophalen aanmeldingen", "error", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon aanmeldingen niet ophalen",
+			"code":  "INTERNAL_ERROR",
 		})
 	}
 
@@ -170,6 +173,7 @@ func (h *AanmeldingHandler) GetAanmelding(c *fiber.Ctx) error {
 	if id == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "ID is verplicht",
+			"code":  "MISSING_ID",
 		})
 	}
 
@@ -180,12 +184,14 @@ func (h *AanmeldingHandler) GetAanmelding(c *fiber.Ctx) error {
 		logger.Error("Fout bij ophalen aanmelding", "error", err, "id", id)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon aanmelding niet ophalen",
+			"code":  "INTERNAL_ERROR",
 		})
 	}
 
 	if aanmelding == nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "Aanmelding niet gevonden",
+			"code":  "NOT_FOUND",
 		})
 	}
 
@@ -195,6 +201,7 @@ func (h *AanmeldingHandler) GetAanmelding(c *fiber.Ctx) error {
 		logger.Error("Fout bij ophalen antwoorden", "error", err, "aanmelding_id", id)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon antwoorden niet ophalen",
+			"code":  "INTERNAL_ERROR",
 		})
 	}
 
@@ -235,6 +242,7 @@ func (h *AanmeldingHandler) UpdateAanmelding(c *fiber.Ctx) error {
 	if id == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "ID is verplicht",
+			"code":  "MISSING_ID",
 		})
 	}
 
@@ -243,6 +251,7 @@ func (h *AanmeldingHandler) UpdateAanmelding(c *fiber.Ctx) error {
 	if !ok || gebruiker == nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon gebruiker niet ophalen uit context",
+			"code":  "INTERNAL_ERROR",
 		})
 	}
 
@@ -253,12 +262,14 @@ func (h *AanmeldingHandler) UpdateAanmelding(c *fiber.Ctx) error {
 		logger.Error("Fout bij ophalen aanmelding", "error", err, "id", id)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon aanmelding niet ophalen",
+			"code":  "INTERNAL_ERROR",
 		})
 	}
 
 	if aanmelding == nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "Aanmelding niet gevonden",
+			"code":  "NOT_FOUND",
 		})
 	}
 
@@ -271,6 +282,7 @@ func (h *AanmeldingHandler) UpdateAanmelding(c *fiber.Ctx) error {
 	if err := c.BodyParser(&updateData); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Ongeldige gegevens",
+			"code":  "INVALID_INPUT",
 		})
 	}
 
@@ -295,6 +307,7 @@ func (h *AanmeldingHandler) UpdateAanmelding(c *fiber.Ctx) error {
 		logger.Error("Fout bij bijwerken aanmelding", "error", err, "id", id)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon aanmelding niet bijwerken",
+			"code":  "UPDATE_FAILED",
 		})
 	}
 
@@ -323,6 +336,7 @@ func (h *AanmeldingHandler) DeleteAanmelding(c *fiber.Ctx) error {
 	if id == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "ID is verplicht",
+			"code":  "MISSING_ID",
 		})
 	}
 
@@ -333,12 +347,14 @@ func (h *AanmeldingHandler) DeleteAanmelding(c *fiber.Ctx) error {
 		logger.Error("Fout bij ophalen aanmelding", "error", err, "id", id)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon aanmelding niet ophalen",
+			"code":  "INTERNAL_ERROR",
 		})
 	}
 
 	if aanmelding == nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "Aanmelding niet gevonden",
+			"code":  "NOT_FOUND",
 		})
 	}
 
@@ -347,6 +363,7 @@ func (h *AanmeldingHandler) DeleteAanmelding(c *fiber.Ctx) error {
 		logger.Error("Fout bij verwijderen aanmelding", "error", err, "id", id)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon aanmelding niet verwijderen",
+			"code":  "DELETION_FAILED",
 		})
 	}
 
@@ -379,6 +396,7 @@ func (h *AanmeldingHandler) AddAanmeldingAntwoord(c *fiber.Ctx) error {
 	if aanmeldingID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Aanmelding ID is verplicht",
+			"code":  "MISSING_ID",
 		})
 	}
 
@@ -387,6 +405,7 @@ func (h *AanmeldingHandler) AddAanmeldingAntwoord(c *fiber.Ctx) error {
 	if !ok || gebruiker == nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon gebruiker niet ophalen uit context",
+			"code":  "INTERNAL_ERROR",
 		})
 	}
 
@@ -397,12 +416,14 @@ func (h *AanmeldingHandler) AddAanmeldingAntwoord(c *fiber.Ctx) error {
 		logger.Error("Fout bij ophalen aanmelding", "error", err, "id", aanmeldingID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon aanmelding niet ophalen",
+			"code":  "INTERNAL_ERROR",
 		})
 	}
 
 	if aanmelding == nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "Aanmelding niet gevonden",
+			"code":  "NOT_FOUND",
 		})
 	}
 
@@ -414,6 +435,7 @@ func (h *AanmeldingHandler) AddAanmeldingAntwoord(c *fiber.Ctx) error {
 	if err := c.BodyParser(&antwoordData); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Ongeldige gegevens",
+			"code":  "INVALID_INPUT",
 		})
 	}
 
@@ -421,6 +443,7 @@ func (h *AanmeldingHandler) AddAanmeldingAntwoord(c *fiber.Ctx) error {
 	if antwoordData.Tekst == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Tekst is verplicht",
+			"code":  "MISSING_TEXT",
 		})
 	}
 
@@ -437,6 +460,7 @@ func (h *AanmeldingHandler) AddAanmeldingAntwoord(c *fiber.Ctx) error {
 		logger.Error("Fout bij opslaan antwoord", "error", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon antwoord niet opslaan",
+			"code":  "SAVE_FAILED",
 		})
 	}
 
@@ -446,6 +470,7 @@ func (h *AanmeldingHandler) AddAanmeldingAntwoord(c *fiber.Ctx) error {
 		logger.Error("Fout bij bijwerken aanmelding", "error", err, "id", aanmeldingID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon aanmelding niet bijwerken",
+			"code":  "UPDATE_FAILED",
 		})
 	}
 
@@ -487,6 +512,7 @@ func (h *AanmeldingHandler) GetAanmeldingenByRol(c *fiber.Ctx) error {
 	if rol == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Rol is verplicht",
+			"code":  "MISSING_ROLE",
 		})
 	}
 
@@ -500,6 +526,7 @@ func (h *AanmeldingHandler) GetAanmeldingenByRol(c *fiber.Ctx) error {
 		logger.Error("Fout bij ophalen aanmeldingen op rol", "error", err, "rol", rol)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon aanmeldingen niet ophalen",
+			"code":  "INTERNAL_ERROR",
 		})
 	}
 
