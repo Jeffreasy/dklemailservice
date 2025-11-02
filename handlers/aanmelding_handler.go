@@ -39,7 +39,7 @@ func NewAanmeldingHandler(
 
 // RegisterRoutes registreert de routes voor aanmelding beheer
 func (h *AanmeldingHandler) RegisterRoutes(app *fiber.App) {
-	// Groep voor aanmelding beheer routes
+	// Groep voor aanmelding beheer routes (singular)
 	aanmeldingGroup := app.Group("/api/aanmelding")
 	aanmeldingGroup.Use(AuthMiddleware(h.authService))
 
@@ -57,6 +57,25 @@ func (h *AanmeldingHandler) RegisterRoutes(app *fiber.App) {
 	// Delete routes (require aanmelding delete)
 	deleteGroup := aanmeldingGroup.Group("", PermissionMiddleware(h.permissionService, "aanmelding", "delete"))
 	deleteGroup.Delete("/:id", h.DeleteAanmelding)
+
+	// Alias route group for plural form (/api/aanmeldingen)
+	aanmeldingenGroup := app.Group("/api/aanmeldingen")
+	aanmeldingenGroup.Use(AuthMiddleware(h.authService))
+
+	// Read-only routes (require aanmelding read)
+	readGroupPlural := aanmeldingenGroup.Group("", PermissionMiddleware(h.permissionService, "aanmelding", "read"))
+	readGroupPlural.Get("/", h.ListAanmeldingen)
+	readGroupPlural.Get("/:id", h.GetAanmelding)
+	readGroupPlural.Get("/rol/:rol", h.GetAanmeldingenByRol)
+
+	// Write routes (require aanmelding write)
+	writeGroupPlural := aanmeldingenGroup.Group("", PermissionMiddleware(h.permissionService, "aanmelding", "write"))
+	writeGroupPlural.Put("/:id", h.UpdateAanmelding)
+	writeGroupPlural.Post("/:id/antwoord", h.AddAanmeldingAntwoord)
+
+	// Delete routes (require aanmelding delete)
+	deleteGroupPlural := aanmeldingenGroup.Group("", PermissionMiddleware(h.permissionService, "aanmelding", "delete"))
+	deleteGroupPlural.Delete("/:id", h.DeleteAanmelding)
 }
 
 // ListAanmeldingen haalt een lijst van aanmeldingen op
