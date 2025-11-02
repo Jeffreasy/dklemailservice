@@ -3,7 +3,9 @@ package handlers
 import (
 	"dklautomationgo/logger"
 	"dklautomationgo/services"
+	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/websocket/v2"
@@ -104,8 +106,20 @@ func (h *StepsWebSocketHandler) HandleWebSocket(c *websocket.Conn) {
 	// Log connection count
 	logger.Info("WebSocket client connected",
 		"user_id", userID,
+		"participant_id", participantID,
 		"total_clients", h.stepsHub.GetClientCount(),
 	)
+
+	// Send welcome message met instructies
+	welcomeMsg := map[string]interface{}{
+		"type":               "welcome",
+		"message":            "Connected to StepsHub! Send {\"type\":\"subscribe\",\"channels\":[\"step_updates\",\"total_updates\",\"leaderboard_updates\"]} to receive updates",
+		"available_channels": []string{"step_updates", "total_updates", "leaderboard_updates", "badge_earned"},
+		"timestamp":          time.Now().Unix(),
+	}
+	if welcomeBytes, err := json.Marshal(welcomeMsg); err == nil {
+		client.Send <- welcomeBytes
+	}
 
 	// Start pumps
 	go client.WritePump()
