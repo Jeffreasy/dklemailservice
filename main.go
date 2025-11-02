@@ -660,7 +660,7 @@ func main() {
 	permissionHandler.RegisterRoutes(app)
 
 	// Initialiseer user handler
-	userHandler := handlers.NewUserHandler(serviceFactory.AuthService, serviceFactory.PermissionService, repoFactory.UserRole)
+	userHandler := handlers.NewUserHandler(serviceFactory.AuthService, serviceFactory.PermissionService, repoFactory.UserRole, repoFactory.RBACRole)
 	userHandler.RegisterRoutes(app)
 
 	// Initialiseer image handler

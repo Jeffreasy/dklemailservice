@@ -9,12 +9,16 @@ import (
 
 // Gebruiker representeert een gebruiker van het systeem
 type Gebruiker struct {
-	ID                   string     `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	Naam                 string     `json:"naam" gorm:"not null"`
-	Email                string     `json:"email" gorm:"not null;uniqueIndex"`
-	WachtwoordHash       string     `json:"-" gorm:"not null"`                    // Niet zichtbaar in JSON
-	Rol                  string     `json:"rol" gorm:"default:'gebruiker';index"` // Legacy field for backward compatibility
-	RoleID               *string    `json:"role_id,omitempty" gorm:"type:uuid"`   // New RBAC role reference
+	ID             string `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
+	Naam           string `json:"naam" gorm:"not null"`
+	Email          string `json:"email" gorm:"not null;uniqueIndex"`
+	WachtwoordHash string `json:"-" gorm:"not null"` // Niet zichtbaar in JSON
+
+	// DEPRECATED: Legacy role field - kept for backward compatibility only
+	// Use Roles relation (many-to-many via user_roles table) instead
+	// This field will be removed in a future version
+	Rol string `json:"rol,omitempty" gorm:"default:'';index"` // DEPRECATED - use Roles relation
+
 	IsActief             bool       `json:"is_actief" gorm:"default:true"`
 	NewsletterSubscribed bool       `json:"newsletter_subscribed" gorm:"default:false;index"`
 	LaatsteLogin         *time.Time `json:"laatste_login"`

@@ -14,26 +14,28 @@ func PermissionMiddleware(permissionService services.PermissionService, resource
 		// Get user ID from context (set by AuthMiddleware)
 		userID, ok := c.Locals("userID").(string)
 		if !ok || userID == "" {
-			logger.Warn("No user ID found in context for permission check", "resource", resource, "action", action)
+			logger.Warn("Gebruiker ID niet gevonden in context voor permission check", "resource", resource, "action", action)
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "Niet geautoriseerd",
+				"code":  "UNAUTHORIZED",
 			})
 		}
 
 		// Check permission
 		if !permissionService.HasPermission(c.Context(), userID, resource, action) {
-			logger.Warn("Permission denied",
+			logger.Warn("Toegang geweigerd - onvoldoende rechten",
 				"user_id", userID,
 				"resource", resource,
 				"action", action,
 				"path", c.Path(),
 				"method", c.Method())
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"error": "Geen toegang",
+				"error": "Geen toegang tot deze resource",
+				"code":  "FORBIDDEN",
 			})
 		}
 
-		logger.Debug("Permission granted",
+		logger.Debug("Toegang verleend",
 			"user_id", userID,
 			"resource", resource,
 			"action", action,
@@ -60,28 +62,30 @@ func ResourcePermissionMiddleware(permissionService services.PermissionService, 
 		// Get user ID from context
 		userID, ok := c.Locals("userID").(string)
 		if !ok || userID == "" {
-			logger.Warn("No user ID found in context for resource permission check")
+			logger.Warn("Gebruiker ID niet gevonden in context voor resource permission check")
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "Niet geautoriseerd",
+				"code":  "UNAUTHORIZED",
 			})
 		}
 
 		// Check all required permissions
 		for _, perm := range permissions {
 			if !permissionService.HasPermission(c.Context(), userID, perm.Resource, perm.Action) {
-				logger.Warn("Resource permission denied",
+				logger.Warn("Resource toegang geweigerd",
 					"user_id", userID,
 					"resource", perm.Resource,
 					"action", perm.Action,
 					"path", c.Path(),
 					"method", c.Method())
 				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-					"error": "Geen toegang",
+					"error": "Geen toegang tot deze resources",
+					"code":  "FORBIDDEN",
 				})
 			}
 		}
 
-		logger.Debug("All resource permissions granted",
+		logger.Debug("Alle resource permissions verleend",
 			"user_id", userID,
 			"permissions_count", len(permissions),
 			"path", c.Path())

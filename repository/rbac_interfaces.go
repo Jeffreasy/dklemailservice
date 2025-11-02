@@ -103,6 +103,9 @@ type UserRoleRepository interface {
 	// ListActiveByUser retrieves all active roles for a user
 	ListActiveByUser(ctx context.Context, userID string) ([]*models.UserRole, error)
 
+	// GetByUserIDWithRoles retrieves all active roles for a user with role and permission details preloaded
+	GetByUserIDWithRoles(ctx context.Context, userID string) ([]models.UserRole, error)
+
 	// Update updates a user-role relationship
 	Update(ctx context.Context, ur *models.UserRole) error
 

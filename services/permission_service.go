@@ -132,8 +132,23 @@ func (s *PermissionServiceImpl) GetUserRoles(ctx context.Context, userID string)
 // AssignRole kent een rol toe aan een gebruiker
 func (s *PermissionServiceImpl) AssignRole(ctx context.Context, userID, roleID string, assignedBy *string) error {
 	// Controleer of de rol bestaat
-	_, err := s.rbacRoleRepo.GetByID(ctx, roleID)
+	role, err := s.rbacRoleRepo.GetByID(ctx, roleID)
 	if err != nil {
+		// Audit: Failed role assignment
+		actorID := ""
+		if assignedBy != nil {
+			actorID = *assignedBy
+		}
+		logger.Audit(ctx, logger.AuditEvent{
+			EventType:  logger.AuditRoleAssigned,
+			ActorID:    actorID,
+			TargetID:   userID,
+			TargetType: "user",
+			ResourceID: roleID,
+			Resource:   "role",
+			Result:     logger.ResultFailed,
+			Reason:     "rol niet gevonden",
+		})
 		return fmt.Errorf("rol niet gevonden: %w", err)
 	}
 
@@ -153,13 +168,46 @@ func (s *PermissionServiceImpl) AssignRole(ctx context.Context, userID, roleID s
 	}
 
 	if err := s.userRoleRepo.Create(ctx, userRole); err != nil {
+		// Audit: Failed role assignment
+		actorID := ""
+		if assignedBy != nil {
+			actorID = *assignedBy
+		}
+		logger.Audit(ctx, logger.AuditEvent{
+			EventType:  logger.AuditRoleAssigned,
+			ActorID:    actorID,
+			TargetID:   userID,
+			TargetType: "user",
+			ResourceID: roleID,
+			Resource:   "role",
+			Result:     logger.ResultFailed,
+			Reason:     err.Error(),
+		})
 		return fmt.Errorf("fout bij toekennen rol: %w", err)
 	}
 
 	// Invalideer cache
 	s.InvalidateUserCache(userID)
 
-	logger.Info("Rol toegekend aan gebruiker", "user_id", userID, "role_id", roleID, "assigned_by", assignedBy)
+	// Audit: Successful role assignment
+	actorID := ""
+	if assignedBy != nil {
+		actorID = *assignedBy
+	}
+	logger.Audit(ctx, logger.AuditEvent{
+		EventType:  logger.AuditRoleAssigned,
+		ActorID:    actorID,
+		TargetID:   userID,
+		TargetType: "user",
+		ResourceID: roleID,
+		Resource:   "role",
+		Result:     logger.ResultSuccess,
+		Metadata: map[string]interface{}{
+			"role_name": role.Name,
+		},
+	})
+
+	logger.Info("Rol toegekend aan gebruiker", "user_id", userID, "role_id", roleID, "role_name", role.Name, "assigned_by", assignedBy)
 	return nil
 }
 
@@ -178,6 +226,19 @@ func (s *PermissionServiceImpl) RevokeRole(ctx context.Context, userID, roleID s
 
 	// Invalideer cache
 	s.InvalidateUserCache(userID)
+
+	// Audit: Role revoked
+	logger.Audit(ctx, logger.AuditEvent{
+		EventType:  logger.AuditRoleRevoked,
+		TargetID:   userID,
+		TargetType: "user",
+		ResourceID: roleID,
+		Resource:   "role",
+		Result:     logger.ResultSuccess,
+		Metadata: map[string]interface{}{
+			"role_name": existing.Role.Name,
+		},
+	})
 
 	logger.Info("Rol verwijderd van gebruiker", "user_id", userID, "role_id", roleID)
 	return nil
@@ -310,13 +371,31 @@ func (s *PermissionServiceImpl) RevokePermissionFromRole(ctx context.Context, ro
 	return nil
 }
 
-// GetRoles haalt alle rollen op
+// GetRoles haalt alle rollen op met validatie
 func (s *PermissionServiceImpl) GetRoles(ctx context.Context, limit, offset int) ([]*models.RBACRole, error) {
+	// Valideer en normaliseer limit
+	if limit <= 0 {
+		limit = 100 // Default
+	}
+	if limit > 1000 {
+		limit = 1000 // Max voor performance
+		logger.Warn("GetRoles limit overschreden, beperkt tot 1000", "requested", limit)
+	}
+
 	return s.rbacRoleRepo.List(ctx, limit, offset)
 }
 
-// GetPermissions haalt alle permissies op
+// GetPermissions haalt alle permissies op met validatie
 func (s *PermissionServiceImpl) GetPermissions(ctx context.Context, limit, offset int) ([]*models.Permission, error) {
+	// Valideer en normaliseer limit
+	if limit <= 0 {
+		limit = 100 // Default
+	}
+	if limit > 1000 {
+		limit = 1000 // Max voor performance
+		logger.Warn("GetPermissions limit overschreden, beperkt tot 1000", "requested", limit)
+	}
+
 	return s.permissionRepo.List(ctx, limit, offset)
 }
 

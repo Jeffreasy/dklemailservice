@@ -56,22 +56,35 @@ func (h *AuthHandler) HandleLogin(c *fiber.Ctx) error {
 	// Authenticeer gebruiker
 	token, refreshToken, err := h.authService.Login(c.Context(), loginData.Email, loginData.Wachtwoord)
 	if err != nil {
+		// Audit: Failed login
+		logger.Audit(c.Context(), logger.AuditEvent{
+			EventType:  logger.AuditLoginFailed,
+			ActorEmail: loginData.Email,
+			IPAddress:  c.IP(),
+			UserAgent:  c.Get("User-Agent"),
+			Result:     logger.ResultFailed,
+			Reason:     err.Error(),
+		})
+
 		// Specifieke foutafhandeling
 		switch err {
 		case services.ErrInvalidCredentials:
-			logger.Warn("Ongeldige inloggegevens", "email", loginData.Email)
+			logger.Warn("Ongeldige inloggegevens", "email", loginData.Email, "ip", c.IP())
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "Ongeldige inloggegevens",
+				"code":  "INVALID_CREDENTIALS",
 			})
 		case services.ErrUserInactive:
-			logger.Warn("Inactieve gebruiker", "email", loginData.Email)
+			logger.Warn("Inactieve gebruiker", "email", loginData.Email, "ip", c.IP())
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 				"error": "Gebruiker is inactief",
+				"code":  "USER_INACTIVE",
 			})
 		default:
-			logger.Error("Fout bij login", "email", loginData.Email, "error", err)
+			logger.Error("Fout bij login", "email", loginData.Email, "ip", c.IP(), "error", err)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "Er is een fout opgetreden bij het inloggen",
+				"code":  "LOGIN_ERROR",
 			})
 		}
 	}
@@ -113,6 +126,23 @@ func (h *AuthHandler) HandleLogin(c *fiber.Ctx) error {
 	}
 	c.Cookie(&cookie)
 
+	// Haal RBAC roles op voor response
+	userRoles, err := h.permissionService.GetUserRoles(c.Context(), gebruiker.ID)
+	if err != nil {
+		logger.Error("Fout bij ophalen rollen na login", "user_id", gebruiker.ID, "error", err)
+		userRoles = []*models.UserRole{} // Fallback naar lege array
+	}
+
+	// Converteer rollen naar frontend format
+	roleList := make([]map[string]interface{}, len(userRoles))
+	for i, userRole := range userRoles {
+		roleList[i] = map[string]interface{}{
+			"id":          userRole.Role.ID,
+			"name":        userRole.Role.Name,
+			"description": userRole.Role.Description,
+		}
+	}
+
 	// Stuur complete user data terug met refresh token
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"success":       true,
@@ -122,11 +152,28 @@ func (h *AuthHandler) HandleLogin(c *fiber.Ctx) error {
 			"id":          gebruiker.ID,
 			"email":       gebruiker.Email,
 			"naam":        gebruiker.Naam,
-			"rol":         gebruiker.Rol,
 			"permissions": permissionList,
+			"roles":       roleList,
 			"is_actief":   gebruiker.IsActief,
+			// DEPRECATED: rol field removed - use roles array instead
 		},
 	})
+
+	// Audit: Successful login
+	logger.Audit(c.Context(), logger.AuditEvent{
+		EventType:  logger.AuditLoginSuccess,
+		ActorID:    gebruiker.ID,
+		ActorEmail: gebruiker.Email,
+		IPAddress:  c.IP(),
+		UserAgent:  c.Get("User-Agent"),
+		Result:     logger.ResultSuccess,
+		Metadata: map[string]interface{}{
+			"roles_count":       len(roleList),
+			"permissions_count": len(permissionList),
+		},
+	})
+
+	return nil
 }
 
 // HandleRefreshToken handelt token refresh verzoeken af
@@ -169,6 +216,20 @@ func (h *AuthHandler) HandleRefreshToken(c *fiber.Ctx) error {
 
 // HandleLogout handelt logout verzoeken af
 func (h *AuthHandler) HandleLogout(c *fiber.Ctx) error {
+	// Haal user ID op als beschikbaar
+	userID, _ := c.Locals("userID").(string)
+
+	// Audit: Logout
+	if userID != "" {
+		logger.Audit(c.Context(), logger.AuditEvent{
+			EventType: logger.AuditLogout,
+			ActorID:   userID,
+			IPAddress: c.IP(),
+			UserAgent: c.Get("User-Agent"),
+			Result:    logger.ResultSuccess,
+		})
+	}
+
 	// Verwijder cookie
 	c.ClearCookie("auth_token")
 
@@ -306,11 +367,11 @@ func (h *AuthHandler) HandleGetProfile(c *fiber.Ctx) error {
 		"id":            gebruiker.ID,
 		"naam":          gebruiker.Naam,
 		"email":         gebruiker.Email,
-		"rol":           gebruiker.Rol, // Legacy field voor backward compatibility
 		"permissions":   permissionList,
 		"roles":         roleList,
 		"is_actief":     gebruiker.IsActief,
 		"laatste_login": gebruiker.LaatsteLogin,
 		"created_at":    gebruiker.CreatedAt,
+		// DEPRECATED: rol field removed - use roles array instead
 	})
 }

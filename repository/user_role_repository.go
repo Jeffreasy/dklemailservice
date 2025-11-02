@@ -67,6 +67,20 @@ func (r *UserRoleRepositoryImpl) ListActiveByUser(ctx context.Context, userID st
 	return userRoles, err
 }
 
+// GetByUserIDWithRoles retrieves all active roles for a user with role and permission details preloaded
+func (r *UserRoleRepositoryImpl) GetByUserIDWithRoles(ctx context.Context, userID string) ([]models.UserRole, error) {
+	var userRoles []models.UserRole
+	err := r.db.WithContext(ctx).
+		Preload("Role").
+		Preload("Role.Permissions").
+		Where("user_id = ?", userID).
+		Where("is_active = ?", true).
+		Where("expires_at IS NULL OR expires_at > ?", "NOW()").
+		Order("assigned_at DESC").
+		Find(&userRoles).Error
+	return userRoles, err
+}
+
 // Update updates a user-role relationship
 func (r *UserRoleRepositoryImpl) Update(ctx context.Context, ur *models.UserRole) error {
 	return r.db.WithContext(ctx).Save(ur).Error

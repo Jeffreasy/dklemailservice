@@ -34,10 +34,12 @@ var (
 
 // JWTClaims definieert de claims in het JWT token
 type JWTClaims struct {
-	Email      string   `json:"email"`
-	Role       string   `json:"role"`        // Legacy field - deprecated, use Roles
-	Roles      []string `json:"roles"`       // RBAC roles from user_roles table
-	RBACActive bool     `json:"rbac_active"` // Indicates if RBAC system is active
+	Email string `json:"email"`
+	// DEPRECATED: Legacy field - will be removed in future version
+	// Frontend should only use Roles array
+	Role       string   `json:"role,omitempty"` // DEPRECATED - use Roles instead
+	Roles      []string `json:"roles"`          // RBAC roles from user_roles table
+	RBACActive bool     `json:"rbac_active"`    // Indicates if RBAC system is active
 	jwt.RegisteredClaims
 }
 
@@ -57,11 +59,15 @@ func NewAuthService(gebruikerRepo repository.GebruikerRepository, refreshTokenRe
 
 // NewAuthServiceWithRBAC maakt een nieuwe AuthService met RBAC support
 func NewAuthServiceWithRBAC(gebruikerRepo repository.GebruikerRepository, refreshTokenRepo repository.RefreshTokenRepository, userRoleRepo repository.UserRoleRepository) AuthService {
-	// Haal JWT secret uit omgevingsvariabele of gebruik een standaard waarde
+	// Haal JWT secret uit omgevingsvariabele - VERPLICHT
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		logger.Warn("JWT_SECRET omgevingsvariabele niet gevonden, gebruik standaard waarde")
-		jwtSecret = "default_jwt_secret_change_in_production"
+		logger.Fatal("JWT_SECRET omgevingsvariabele is niet ingesteld. Dit is verplicht voor security.")
+	}
+
+	// Valideer minimale lengte voor security
+	if len(jwtSecret) < 32 {
+		logger.Fatal("JWT_SECRET moet minimaal 32 karakters bevatten voor adequate security", "length", len(jwtSecret))
 	}
 
 	// Haal token expiry uit omgevingsvariabele of gebruik een standaard waarde (20 minuten)
@@ -273,12 +279,18 @@ func (s *AuthServiceImpl) generateToken(gebruiker *models.Gebruiker) (string, er
 	// Haal RBAC roles op voor de gebruiker
 	rbacRoles := s.getUserRBACRoles(gebruiker.ID)
 
-	// Maak claims met zowel legacy als RBAC support
+	// Fallback: als geen RBAC roles, gebruik eerste role name of lege string
+	legacyRole := ""
+	if len(rbacRoles) > 0 {
+		legacyRole = rbacRoles[0] // Eerste role voor backward compatibility
+	}
+
+	// Maak claims - RBAC is de primary bron van truth
 	claims := JWTClaims{
 		Email:      gebruiker.Email,
-		Role:       gebruiker.Rol,      // Legacy - voor backward compatibility
-		Roles:      rbacRoles,          // RBAC - nieuwe systeem
-		RBACActive: len(rbacRoles) > 0, // Indicator dat RBAC actief is
+		Role:       legacyRole,         // DEPRECATED - alleen voor backward compatibility
+		Roles:      rbacRoles,          // RBAC - primary bron
+		RBACActive: len(rbacRoles) > 0, // True als RBAC roles aanwezig
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.tokenExpiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

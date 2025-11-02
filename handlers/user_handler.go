@@ -5,7 +5,10 @@ import (
 	"dklautomationgo/models"
 	"dklautomationgo/repository"
 	"dklautomationgo/services"
+	"errors"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -15,13 +18,15 @@ type UserHandler struct {
 	authService       services.AuthService
 	permissionService services.PermissionService
 	userRoleRepo      repository.UserRoleRepository
+	roleRepo          repository.RBACRoleRepository
 }
 
-func NewUserHandler(authService services.AuthService, permissionService services.PermissionService, userRoleRepo repository.UserRoleRepository) *UserHandler {
+func NewUserHandler(authService services.AuthService, permissionService services.PermissionService, userRoleRepo repository.UserRoleRepository, roleRepo repository.RBACRoleRepository) *UserHandler {
 	return &UserHandler{
 		authService:       authService,
 		permissionService: permissionService,
 		userRoleRepo:      userRoleRepo,
+		roleRepo:          roleRepo,
 	}
 }
 
@@ -30,8 +35,14 @@ func (h *UserHandler) RegisterRoutes(app *fiber.App) {
 	app.Get("/api/users/:id", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "read"), h.GetUser)
 	app.Post("/api/users", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "write"), h.CreateUser)
 	app.Put("/api/users/:id", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "write"), h.UpdateUser)
+
+	// RBAC User-Role Management
+	app.Get("/api/users/:id/roles", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "read"), h.GetUserRoles)
+	app.Post("/api/users/:id/roles", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "manage_roles"), h.AssignRoleToUser)
 	app.Put("/api/users/:id/roles", AuthMiddleware(h.authService), AdminPermissionMiddleware(h.permissionService), h.AssignRolesToUser)
-	app.Delete("/api/users/:id/roles/:roleId", AuthMiddleware(h.authService), AdminPermissionMiddleware(h.permissionService), h.RemoveRoleFromUser)
+	app.Delete("/api/users/:id/roles/:roleId", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "manage_roles"), h.RemoveRoleFromUser)
+	app.Get("/api/users/:id/permissions", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "read"), h.GetUserPermissions)
+
 	app.Delete("/api/users/:id", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "delete"), h.DeleteUser)
 }
 
@@ -137,6 +148,100 @@ func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.JSON(fiber.Map{"success": true})
+}
+
+// GetUserRoles retrieves all roles for a user
+func (h *UserHandler) GetUserRoles(c *fiber.Ctx) error {
+	userID := c.Params("id")
+
+	userRoles, err := h.userRoleRepo.GetByUserIDWithRoles(c.Context(), userID)
+	if err != nil {
+		logger.Error("Fout bij ophalen user roles", "error", err, "user_id", userID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon user roles niet ophalen",
+		})
+	}
+
+	return c.JSON(userRoles)
+}
+
+// AssignRoleToUser assigns a single role to a user
+func (h *UserHandler) AssignRoleToUser(c *fiber.Ctx) error {
+	userID := c.Params("id")
+
+	var req struct {
+		RoleID    string  `json:"role_id"`
+		ExpiresAt *string `json:"expires_at,omitempty"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Ongeldige gegevens",
+		})
+	}
+
+	if req.RoleID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Role ID is verplicht",
+		})
+	}
+
+	currentUserID, _ := c.Locals("userID").(string)
+
+	ur := &models.UserRole{
+		UserID:     userID,
+		RoleID:     req.RoleID,
+		AssignedBy: &currentUserID,
+		IsActive:   true,
+	}
+
+	// Parse expires_at if provided
+	if req.ExpiresAt != nil && *req.ExpiresAt != "" {
+		t, err := time.Parse(time.RFC3339, *req.ExpiresAt)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Ongeldige expires_at formaat (gebruik RFC3339)",
+			})
+		}
+		ur.ExpiresAt = &t
+	}
+
+	// Create user-role relationship
+	if err := h.userRoleRepo.Create(c.Context(), ur); err != nil {
+		// Check for duplicate
+		if errors.Is(err, gorm.ErrDuplicatedKey) || strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "unique") {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"error": "User heeft deze rol al",
+			})
+		}
+		logger.Error("Fout bij toewijzen role", "error", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon role niet toewijzen",
+		})
+	}
+
+	// Load full role object for response
+	role, err := h.roleRepo.GetByID(c.Context(), req.RoleID)
+	if err == nil {
+		ur.Role = *role
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(ur)
+}
+
+// GetUserPermissions retrieves effective permissions for a user
+func (h *UserHandler) GetUserPermissions(c *fiber.Ctx) error {
+	userID := c.Params("id")
+
+	permissions, err := h.permissionService.GetUserPermissions(c.Context(), userID)
+	if err != nil {
+		logger.Error("Fout bij ophalen user permissions", "error", err, "user_id", userID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon user permissions niet ophalen",
+		})
+	}
+
+	return c.JSON(permissions)
 }
 
 func (h *UserHandler) AssignRolesToUser(c *fiber.Ctx) error {
