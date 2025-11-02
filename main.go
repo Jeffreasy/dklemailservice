@@ -481,10 +481,6 @@ func main() {
 	authProtected.Get("/profile", authHandler.HandleGetProfile)
 	authProtected.Post("/reset-password", authHandler.HandleResetPassword)
 
-	// Admin routes (vereisen admin rol)
-	// Commentaar: admin routes worden momenteel niet gebruikt, maar kunnen later worden toegevoegd
-	// admin := api.Group("/admin", handlers.AuthMiddleware(serviceFactory.AuthService), handlers.AdminMiddleware(serviceFactory.AuthService))
-
 	// Metrics endpoints direct onder /api/metrics/... (vereisen API key)
 	api.Get("/metrics/email", metricsHandler.HandleGetEmailMetrics)
 	api.Get("/metrics/rate-limits", metricsHandler.HandleGetRateLimits)
@@ -662,16 +658,6 @@ func main() {
 		serviceFactory.PermissionService,
 	)
 	permissionHandler.RegisterRoutes(app)
-
-	// RoleHandler uitgecommentarieerd om dubbele route registratie te voorkomen
-	// PermissionHandler bevat alle benodigde endpoints via /api/rbac/roles/*
-	// roleHandler := handlers.NewRoleHandler(
-	// 	repoFactory.RBACRole,
-	// 	repoFactory.RolePermission,
-	// 	serviceFactory.AuthService,
-	// 	serviceFactory.PermissionService,
-	// )
-	// roleHandler.RegisterRoutes(app)
 
 	// Initialiseer user handler
 	userHandler := handlers.NewUserHandler(serviceFactory.AuthService, serviceFactory.PermissionService, repoFactory.UserRole)
