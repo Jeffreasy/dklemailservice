@@ -1,6 +1,8 @@
 -- Migration: V1_51__add_gamification_tables.sql
 -- Description: Voegt tabellen toe voor badges, achievements en leaderboard functionaliteit
 -- Date: 2025-01-02
+--
+-- IDEMPOTENT: Deze migratie kan veilig meerdere keren worden uitgevoerd
 
 -- =====================================================
 -- 1. BADGES TABLE
@@ -30,10 +32,16 @@ CREATE TRIGGER update_badges_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
-COMMENT ON TABLE badges IS 'Badges die deelnemers kunnen verdienen (admin-beheerd)';
-COMMENT ON COLUMN badges.criteria IS 'JSON criteria voor badge verdienen, bijv: {"min_steps": 10000, "min_days": 7}';
-COMMENT ON COLUMN badges.points IS 'Punten die deelnemer krijgt bij verdienen van badge';
-COMMENT ON COLUMN badges.display_order IS 'Volgorde waarin badges worden getoond';
+-- Comments (alleen als tabel bestaat)
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'badges') THEN
+        COMMENT ON TABLE badges IS 'Badges die deelnemers kunnen verdienen (admin-beheerd)';
+        COMMENT ON COLUMN badges.criteria IS 'JSON criteria voor badge verdienen, bijv: {"min_steps": 10000, "min_days": 7}';
+        COMMENT ON COLUMN badges.points IS 'Punten die deelnemer krijgt bij verdienen van badge';
+        COMMENT ON COLUMN badges.display_order IS 'Volgorde waarin badges worden getoond';
+    END IF;
+END $$;
 
 -- =====================================================
 -- 2. PARTICIPANT ACHIEVEMENTS TABLE
@@ -44,19 +52,57 @@ CREATE TABLE IF NOT EXISTS participant_achievements (
     participant_id UUID NOT NULL,
     badge_id UUID NOT NULL,
     earned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_participant FOREIGN KEY (participant_id) REFERENCES aanmeldingen(id) ON DELETE CASCADE,
-    CONSTRAINT fk_badge FOREIGN KEY (badge_id) REFERENCES badges(id) ON DELETE CASCADE,
-    CONSTRAINT unique_participant_badge UNIQUE(participant_id, badge_id)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Voeg constraints toe (alleen als ze nog niet bestaan)
+DO $$
+BEGIN
+    -- Foreign key naar aanmeldingen
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'fk_participant' 
+        AND table_name = 'participant_achievements'
+    ) THEN
+        ALTER TABLE participant_achievements
+        ADD CONSTRAINT fk_participant 
+        FOREIGN KEY (participant_id) REFERENCES aanmeldingen(id) ON DELETE CASCADE;
+    END IF;
+    
+    -- Foreign key naar badges
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'fk_badge' 
+        AND table_name = 'participant_achievements'
+    ) THEN
+        ALTER TABLE participant_achievements
+        ADD CONSTRAINT fk_badge 
+        FOREIGN KEY (badge_id) REFERENCES badges(id) ON DELETE CASCADE;
+    END IF;
+    
+    -- Unique constraint
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'unique_participant_badge' 
+        AND table_name = 'participant_achievements'
+    ) THEN
+        ALTER TABLE participant_achievements
+        ADD CONSTRAINT unique_participant_badge UNIQUE(participant_id, badge_id);
+    END IF;
+END $$;
 
 -- Indexes voor snelle queries
 CREATE INDEX IF NOT EXISTS idx_participant_achievements_participant ON participant_achievements(participant_id);
 CREATE INDEX IF NOT EXISTS idx_participant_achievements_badge ON participant_achievements(badge_id);
 CREATE INDEX IF NOT EXISTS idx_participant_achievements_earned_at ON participant_achievements(earned_at DESC);
 
-COMMENT ON TABLE participant_achievements IS 'Verdiende badges per deelnemer';
-COMMENT ON CONSTRAINT unique_participant_badge ON participant_achievements IS 'Deelnemer kan zelfde badge maar 1x verdienen';
+-- Comments
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'participant_achievements') THEN
+        COMMENT ON TABLE participant_achievements IS 'Verdiende badges per deelnemer';
+    END IF;
+END $$;
 
 -- =====================================================
 -- 3. LEADERBOARD VIEW
@@ -84,7 +130,7 @@ COMMENT ON VIEW leaderboard_view IS 'Leaderboard met ranking gebaseerd op steps 
 -- =====================================================
 -- 4. SEED DATA - DEFAULT BADGES
 -- =====================================================
--- Voeg enkele standaard badges toe
+-- Voeg enkele standaard badges toe (ON CONFLICT DO NOTHING zorgt voor idempotency)
 INSERT INTO badges (name, description, icon_url, criteria, points, display_order) VALUES
 ('First Steps', 'Je eerste 1000 stappen gezet', '/icons/badges/first-steps.svg', '{"min_steps": 1000}', 10, 1),
 ('5K Champion', '5000 stappen bereikt', '/icons/badges/5k-champion.svg', '{"min_steps": 5000}', 50, 2),
