@@ -1,4 +1,8 @@
+# Environment files
 .env
+.env.local
+
+# Binaries & Executables
 *.exe
 *.exe~
 *.dll
@@ -6,6 +10,33 @@
 *.dylib
 *.test
 *.out
+dklemailservice
+dklemailservice-*
+dkl_test
+server
+mcp_server
+
+# Dependencies
 /vendor/
+node_modules/
+
+# Temporary files
 /tmp/
-.DS_Store 
+*.tmp
+*.log
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build artifacts
+/dist/
+/build/
+
+# Test coverage
+coverage/
+*.cover
+*.coverage
