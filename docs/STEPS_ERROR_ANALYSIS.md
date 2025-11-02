@@ -1,3 +1,19 @@
+# Steps Service Error Analysis & Fix - "deelnemer niet gevonden"
+
+## 🔄 UPDATE: Admin Access Fixed (2025-11-02)
+
+**Second Issue Discovered:** Admins konden geen stappen bijwerken voor participanten omdat de handler eerst checkte of de ingelogde gebruiker een participant was.
+
+**Root Cause:** De logica prioriteerde `userID` (participant flow) boven `id` parameter (admin flow), waardoor admins altijd de "NOT_A_PARTICIPANT" error kregen.
+
+**Solution Implemented:** Prioriteit omgedraaid in [`handlers/steps_handler.go`](../handlers/steps_handler.go):
+- ✅ ID parameter (admin flow) heeft nu voorrang
+- ✅ POST `/api/steps/:id` - admin werkt stappen bij voor specifieke participant
+- ✅ POST `/api/steps` - participant werkt eigen stappen bij (geen ID nodig)
+- ✅ Zelfde logica voor dashboard endpoints
+
+---
+
 # Steps Service Error Analysis - "deelnemer niet gevonden"
 
 ## 📋 Probleemanalyse
@@ -168,31 +184,33 @@ if ok && userID != "" {
 
 ## 🧪 Testing Scenarios
 
-### Test 1: Staff Gebruiker Probeert Steps Bij Te Werken
+### Test 1: Admin Werkt Steps Bij Voor Participant (✅ WERKT NU)
 ```bash
-# Login als staff
+# Login als admin
 POST /api/auth/login
 {
-  "email": "staff@example.com",
+  "email": "admin@example.com",
   "wachtwoord": "password"
 }
 
-# Probeer steps bij te werken
-POST /api/steps
-Authorization: Bearer <token>
+# Update steps voor specifieke participant via ID
+POST /api/steps/<participant-aanmelding-id>
+Authorization: Bearer <admin-token>
 {
   "steps": 1000
 }
 
 # Verwacht resultaat:
-HTTP 404 Not Found
+HTTP 200 OK
 {
-  "error": "U bent niet geregistreerd als deelnemer. Alleen deelnemers kunnen stappen bijwerken.",
-  "code": "NOT_A_PARTICIPANT"
+  "id": "<participant-aanmelding-id>",
+  "steps": 1000,
+  "naam": "Participant Naam",
+  ...
 }
 ```
 
-### Test 2: Deelnemer Werkt Steps Bij
+### Test 2: Participant Werkt Eigen Steps Bij
 ```bash
 # Login als participant (heeft aanmelding)
 POST /api/auth/login
@@ -217,16 +235,43 @@ HTTP 200 OK
 }
 ```
 
-### Test 3: Dashboard Ophalen Als Niet-Deelnemer
+### Test 3: Staff Probeert Eigen Steps Bij Te Werken (Zonder ID)
 ```bash
-GET /api/participant/dashboard
+# Login als staff (geen participant)
+POST /api/auth/login
+{
+  "email": "staff@example.com",
+  "wachtwoord": "password"
+}
+
+# Probeer eigen steps bij te werken (GEEN ID parameter)
+POST /api/steps
 Authorization: Bearer <staff-token>
+{
+  "steps": 1000
+}
 
 # Verwacht resultaat:
 HTTP 404 Not Found
 {
-  "error": "U bent niet geregistreerd als deelnemer. Alleen deelnemers hebben toegang tot het dashboard.",
+  "error": "U bent niet geregistreerd als deelnemer. Alleen deelnemers kunnen hun eigen stappen bijwerken.",
   "code": "NOT_A_PARTICIPANT"
+}
+```
+
+### Test 4: Admin Haalt Dashboard Op Voor Participant
+```bash
+GET /api/participant/<participant-aanmelding-id>/dashboard
+Authorization: Bearer <admin-token>
+
+# Verwacht resultaat:
+HTTP 200 OK
+{
+  "steps": 1000,
+  "route": "10 KM",
+  "allocatedFunds": 75,
+  "naam": "Participant Naam",
+  "email": "participant@example.com"
 }
 ```
 
@@ -297,6 +342,9 @@ ALTER TABLE gebruikers ADD CONSTRAINT check_participant_has_aanmelding
 Bij verdere vragen of problemen, neem contact op met het development team.
 
 ---
-**Last Updated:** 2025-11-02  
-**Author:** Development Team  
-**Status:** ✅ Resolved
+**Last Updated:** 2025-11-02 18:18 CET
+**Author:** Development Team
+**Status:** ✅ Fully Resolved
+**Commits:**
+- Initial fix: `20f510c` - Better error handling for non-participants
+- Admin flow fix: `e0b1e0c` - Admin can now update participant steps via ID parameter
