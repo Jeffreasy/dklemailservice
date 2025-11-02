@@ -65,16 +65,14 @@ func (s *ImageService) UploadImage(ctx context.Context, file multipart.File, fil
 		PublicID:     publicID,
 		Folder:       folder,
 		ResourceType: "image",
-		Format:       "auto", // Auto-detect format
+		Format:       "auto",                       // Auto-detect format
+		Eager:        "w_200,h_200,c_thumb,g_face", // Generate thumbnail with face detection
 	}
 
 	// Add upload preset if configured
 	if s.config.UploadPreset != "" {
 		uploadParams.UploadPreset = s.config.UploadPreset
 	}
-
-	// TODO: Add eager transformations for thumbnails in Phase 2
-	// uploadParams.Eager = "w_200,h_200,c_thumb,g_face"
 
 	// Perform upload
 	resp, err := s.cld.Upload.Upload(ctx, file, uploadParams)
@@ -97,10 +95,13 @@ func (s *ImageService) UploadImage(ctx context.Context, file multipart.File, fil
 		Bytes:     resp.Bytes,
 	}
 
-	// TODO: Generate thumbnail URL if eager transformation exists (Phase 2)
-	// if len(resp.Eager) > 0 {
-	//     result.ThumbnailURL = resp.Eager[0].SecureURL
-	// }
+	// Generate thumbnail URL from eager transformation if available
+	if len(resp.Eager) > 0 && resp.Eager[0].SecureURL != "" {
+		result.ThumbnailURL = resp.Eager[0].SecureURL
+		logger.Info("Thumbnail generated via eager transformation",
+			"public_id", result.PublicID,
+			"thumbnail_url", result.ThumbnailURL)
+	}
 
 	// Create database record for tracking
 	uploadedImage := &models.UploadedImage{
@@ -243,6 +244,10 @@ func (s *ImageService) DeleteImage(ctx context.Context, publicID string) error {
 		"public_id", publicID)
 
 	return nil
+}
+
+func (s *ImageService) GetImageByPublicID(ctx context.Context, publicID string) (*models.UploadedImage, error) {
+	return s.repo.GetByPublicID(ctx, publicID)
 }
 
 func (s *ImageService) GetImageURL(publicID string, transformations map[string]string) string {

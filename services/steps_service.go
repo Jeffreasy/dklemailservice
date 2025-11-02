@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"dklautomationgo/models"
 	"dklautomationgo/repository"
 	"fmt"
@@ -27,7 +28,7 @@ func NewStepsService(db *gorm.DB, aanmeldingRepo repository.AanmeldingRepository
 // UpdateSteps werkt stappen bij voor een deelnemer (delta toevoegen)
 func (s *StepsService) UpdateSteps(participantID string, deltaSteps int) (*models.Aanmelding, error) {
 	// Haal deelnemer op
-	participant, err := s.aanmeldingRepo.GetByID(nil, participantID)
+	participant, err := s.aanmeldingRepo.GetByID(context.TODO(), participantID)
 	if err != nil {
 		return nil, fmt.Errorf("deelnemer niet gevonden: %w", err)
 	}
@@ -43,7 +44,7 @@ func (s *StepsService) UpdateSteps(participantID string, deltaSteps int) (*model
 	participant.Steps = newSteps
 
 	// Sla wijzigingen op
-	if err := s.aanmeldingRepo.Update(nil, participant); err != nil {
+	if err := s.aanmeldingRepo.Update(context.TODO(), participant); err != nil {
 		return nil, fmt.Errorf("kon stappen niet bijwerken: %w", err)
 	}
 
@@ -67,7 +68,7 @@ func (s *StepsService) UpdateStepsByUserID(userID string, deltaSteps int) (*mode
 	participant.Steps = newSteps
 
 	// Sla wijzigingen op
-	if err := s.aanmeldingRepo.Update(nil, &participant); err != nil {
+	if err := s.aanmeldingRepo.Update(context.TODO(), &participant); err != nil {
 		return nil, fmt.Errorf("kon stappen niet bijwerken: %w", err)
 	}
 
@@ -77,7 +78,7 @@ func (s *StepsService) UpdateStepsByUserID(userID string, deltaSteps int) (*mode
 // GetParticipantDashboard haalt dashboard data op voor een deelnemer
 func (s *StepsService) GetParticipantDashboard(participantID string) (*models.Aanmelding, int, error) {
 	// Haal deelnemer op
-	participant, err := s.aanmeldingRepo.GetByID(nil, participantID)
+	participant, err := s.aanmeldingRepo.GetByID(context.TODO(), participantID)
 	if err != nil {
 		return nil, 0, fmt.Errorf("deelnemer niet gevonden: %w", err)
 	}
@@ -109,7 +110,7 @@ func (s *StepsService) GetParticipantDashboardByUserID(userID string) (*models.A
 // CalculateAllocatedFunds berekent toegewezen fondsen gebaseerd op afstand
 func (s *StepsService) CalculateAllocatedFunds(route string) int {
 	// Haal fondsallocatie op uit database
-	routeFund, err := s.routeFundRepo.GetByRoute(nil, route)
+	routeFund, err := s.routeFundRepo.GetByRoute(context.TODO(), route)
 	if err != nil {
 		// Fallback naar standaard waarden als route niet gevonden wordt
 		switch route {
@@ -162,7 +163,7 @@ func (s *StepsService) GetFundsDistribution() (map[string]int, error) {
 // GetFundsDistributionProportional haalt proportionele fondsverdeling op gebaseerd op aantal deelnemers
 func (s *StepsService) GetFundsDistributionProportional() (map[string]int, int, error) {
 	// Haal alle route funds op
-	routeFunds, err := s.routeFundRepo.GetAll(nil)
+	routeFunds, err := s.routeFundRepo.GetAll(context.TODO())
 	if err != nil {
 		return nil, 0, fmt.Errorf("kon route funds niet ophalen: %w", err)
 	}
@@ -202,19 +203,19 @@ func (s *StepsService) GetFundsDistributionProportional() (map[string]int, int, 
 
 // GetRouteFunds haalt alle route fondsallocaties op
 func (s *StepsService) GetRouteFunds() ([]*models.RouteFund, error) {
-	return s.routeFundRepo.GetAll(nil)
+	return s.routeFundRepo.GetAll(context.TODO())
 }
 
 // UpdateRouteFund werkt een route fondsallocatie bij
 func (s *StepsService) UpdateRouteFund(route string, amount int) (*models.RouteFund, error) {
 	// Controleer of route bestaat
-	existing, err := s.routeFundRepo.GetByRoute(nil, route)
+	existing, err := s.routeFundRepo.GetByRoute(context.TODO(), route)
 	if err != nil {
 		return nil, fmt.Errorf("route niet gevonden: %w", err)
 	}
 
 	existing.Amount = amount
-	if err := s.routeFundRepo.Update(nil, existing); err != nil {
+	if err := s.routeFundRepo.Update(context.TODO(), existing); err != nil {
 		return nil, fmt.Errorf("kon route fund niet bijwerken: %w", err)
 	}
 
@@ -228,7 +229,7 @@ func (s *StepsService) CreateRouteFund(route string, amount int) (*models.RouteF
 		Amount: amount,
 	}
 
-	if err := s.routeFundRepo.Create(nil, routeFund); err != nil {
+	if err := s.routeFundRepo.Create(context.TODO(), routeFund); err != nil {
 		return nil, fmt.Errorf("kon route fund niet aanmaken: %w", err)
 	}
 
@@ -237,5 +238,5 @@ func (s *StepsService) CreateRouteFund(route string, amount int) (*models.RouteF
 
 // DeleteRouteFund verwijdert een route fondsallocatie
 func (s *StepsService) DeleteRouteFund(route string) error {
-	return s.routeFundRepo.Delete(nil, route)
+	return s.routeFundRepo.Delete(context.TODO(), route)
 }

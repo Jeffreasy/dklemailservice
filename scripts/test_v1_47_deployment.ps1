@@ -47,7 +47,7 @@ Write-Host ""
 # Test 3: Check if application responds (indicates successful start)
 Write-Host "3. Verifying application started successfully..." -ForegroundColor Yellow
 try {
-    $metricsResponse = Invoke-RestMethod -Uri "$ApiUrl/api/metrics" -Method Get -TimeoutSec 10 -ErrorAction SilentlyContinue
+    Invoke-RestMethod -Uri "$ApiUrl/api/metrics" -Method Get -TimeoutSec 10 -ErrorAction SilentlyContinue | Out-Null
     Write-Host "✅ Metrics endpoint responding!" -ForegroundColor Green
 } catch {
     Write-Host "⚠️  Metrics endpoint not accessible (might be protected)" -ForegroundColor Yellow

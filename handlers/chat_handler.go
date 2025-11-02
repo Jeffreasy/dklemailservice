@@ -24,18 +24,26 @@ type ChatHandler struct {
 	hub               *services.Hub // global, if needed
 	mutex             sync.Mutex
 	channelHubs       map[string]*services.Hub
+	typingUsers       map[string]map[string]time.Time // channelID -> userID -> expiry time
+	typingMutex       sync.RWMutex
 }
 
 // NewChatHandler creates a new ChatHandler
 func NewChatHandler(chatService services.ChatService, authService services.AuthService, permissionService services.PermissionService, imageService *services.ImageService, hub *services.Hub) *ChatHandler {
-	return &ChatHandler{
+	h := &ChatHandler{
 		chatService:       chatService,
 		authService:       authService,
 		permissionService: permissionService,
 		imageService:      imageService,
 		hub:               hub,
 		channelHubs:       make(map[string]*services.Hub),
+		typingUsers:       make(map[string]map[string]time.Time),
 	}
+
+	// Start cleanup goroutine for expired typing indicators
+	go h.cleanupExpiredTypingIndicators()
+
+	return h
 }
 
 func (h *ChatHandler) getChannelHub(channelID string) *services.Hub {
@@ -694,20 +702,113 @@ func (h *ChatHandler) ListUsers(c *fiber.Ctx) error {
 	return c.JSON(users)
 }
 
-// StartTyping, StopTyping, GetTypingUsers would require additional logic for typing indicators, perhaps using memory or DB
-// MarkAsRead, GetUnreadCount similarly need tracking of read status, which is not in schema, so would need additional tables or logic
-
-// For now, implement stubs or leave as TODO
+// StartTyping indicates that the user is typing in a channel
 func (h *ChatHandler) StartTyping(c *fiber.Ctx) error {
+	channelID := c.Params("channel_id")
+	userID := c.Locals("userID").(string)
+
+	if channelID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Channel ID required"})
+	}
+
+	// Verify user is a participant
+	role, err := h.chatService.GetParticipantRole(c.Context(), channelID, userID)
+	if err != nil || role == "" {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Not authorized"})
+	}
+
+	h.typingMutex.Lock()
+	if h.typingUsers[channelID] == nil {
+		h.typingUsers[channelID] = make(map[string]time.Time)
+	}
+	// Set expiry to 5 seconds from now
+	h.typingUsers[channelID][userID] = time.Now().Add(5 * time.Second)
+	h.typingMutex.Unlock()
+
+	logger.Info("User started typing", "user_id", userID, "channel_id", channelID)
+
 	return c.JSON(fiber.Map{"success": true})
 }
 
+// StopTyping indicates that the user stopped typing in a channel
 func (h *ChatHandler) StopTyping(c *fiber.Ctx) error {
+	channelID := c.Params("channel_id")
+	userID := c.Locals("userID").(string)
+
+	if channelID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Channel ID required"})
+	}
+
+	h.typingMutex.Lock()
+	if h.typingUsers[channelID] != nil {
+		delete(h.typingUsers[channelID], userID)
+		// Clean up empty channel maps
+		if len(h.typingUsers[channelID]) == 0 {
+			delete(h.typingUsers, channelID)
+		}
+	}
+	h.typingMutex.Unlock()
+
+	logger.Info("User stopped typing", "user_id", userID, "channel_id", channelID)
+
 	return c.JSON(fiber.Map{"success": true})
 }
 
+// GetTypingUsers returns the list of users currently typing in a channel
 func (h *ChatHandler) GetTypingUsers(c *fiber.Ctx) error {
-	return c.JSON([]string{})
+	channelID := c.Params("channel_id")
+	userID := c.Locals("userID").(string)
+
+	if channelID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Channel ID required"})
+	}
+
+	// Verify user is a participant
+	role, err := h.chatService.GetParticipantRole(c.Context(), channelID, userID)
+	if err != nil || role == "" {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Not authorized"})
+	}
+
+	h.typingMutex.RLock()
+	typingUserIDs := make([]string, 0)
+	now := time.Now()
+
+	if channelUsers, ok := h.typingUsers[channelID]; ok {
+		for uid, expiry := range channelUsers {
+			// Only include users whose typing indicator hasn't expired
+			if uid != userID && expiry.After(now) {
+				typingUserIDs = append(typingUserIDs, uid)
+			}
+		}
+	}
+	h.typingMutex.RUnlock()
+
+	return c.JSON(typingUserIDs)
+}
+
+// cleanupExpiredTypingIndicators periodically removes expired typing indicators
+func (h *ChatHandler) cleanupExpiredTypingIndicators() {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		h.typingMutex.Lock()
+		now := time.Now()
+
+		for channelID, users := range h.typingUsers {
+			for userID, expiry := range users {
+				if expiry.Before(now) {
+					delete(users, userID)
+				}
+			}
+
+			// Clean up empty channel maps
+			if len(users) == 0 {
+				delete(h.typingUsers, channelID)
+			}
+		}
+		h.typingMutex.Unlock()
+	}
 }
 
 func (h *ChatHandler) MarkAsRead(c *fiber.Ctx) error {

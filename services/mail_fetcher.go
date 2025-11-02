@@ -296,11 +296,3 @@ func (f *MailFetcher) SetLastFetchTime(t time.Time) {
 	defer f.mu.Unlock()
 	f.lastFetch = t
 }
-
-// Helper function to get first N characters of a string
-func getFirstNChars(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	return s[:n] + "..."
-}

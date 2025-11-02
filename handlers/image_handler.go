@@ -294,13 +294,30 @@ func (h *ImageHandler) DeleteImage(c *fiber.Ctx) error {
 		})
 	}
 
-	// TODO: Check ownership via database if tracking images
-	// For now, allow authenticated users to delete their own images
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	err := h.imageService.DeleteImage(ctx, publicID)
+	// Check ownership via database
+	image, err := h.imageService.GetImageByPublicID(ctx, publicID)
+	if err != nil {
+		logger.Warn("Image not found in database", "public_id", publicID, "error", err)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Image not found",
+		})
+	}
+
+	// Verify ownership
+	if image.UserID != userID {
+		logger.Warn("Unauthorized image deletion attempt",
+			"public_id", publicID,
+			"requester_id", userID,
+			"owner_id", image.UserID)
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "You are not authorized to delete this image",
+		})
+	}
+
+	err = h.imageService.DeleteImage(ctx, publicID)
 	if err != nil {
 		logger.Error("Image deletion failed", "error", err, "public_id", publicID, "user_id", userID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
