@@ -758,6 +758,14 @@ func main() {
 	)
 	titleSectionHandler.RegisterRoutes(app)
 
+	// Initialiseer gamification handler
+	gamificationHandler := handlers.NewGamificationHandler(
+		serviceFactory.GamificationService,
+		serviceFactory.AuthService,
+		serviceFactory.PermissionService,
+	)
+	gamificationHandler.RegisterRoutes(app)
+
 	// Start server
 	port := os.Getenv("PORT")
 	if port == "" {

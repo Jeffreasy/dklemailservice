@@ -37,6 +37,11 @@ type Repository struct {
 	TitleSection           TitleSectionRepository
 	RouteFund              RouteFundRepository
 
+	// Gamification repositories
+	Badge       BadgeRepository
+	Achievement AchievementRepository
+	Leaderboard LeaderboardRepository
+
 	// RBAC repositories
 	RBACRole       RBACRoleRepository
 	Permission     PermissionRepository
@@ -81,6 +86,9 @@ func NewRepository(db *gorm.DB) *Repository {
 		TitleSection:           NewPostgresTitleSectionRepository(db),
 		RouteFund:              NewRouteFundRepository(db),
 
+		// Gamification repositories (Note: Badge moet eerst omdat Achievement het nodig heeft)
+		Badge: NewBadgeRepository(db),
+
 		// RBAC repositories
 		RBACRole:       NewRBACRoleRepository(db),
 		Permission:     NewPermissionRepository(db),
@@ -88,6 +96,10 @@ func NewRepository(db *gorm.DB) *Repository {
 		UserRole:       NewUserRoleRepository(db),
 		RefreshToken:   NewPostgresRefreshTokenRepository(baseRepo),
 	}
+
+	// Initialize Achievement and Leaderboard repositories that depend on Badge
+	repo.Achievement = NewAchievementRepository(db, repo.Badge)
+	repo.Leaderboard = NewLeaderboardRepository(db)
 
 	return repo
 }
