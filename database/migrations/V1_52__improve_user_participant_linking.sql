@@ -1,16 +1,33 @@
 -- Migration: V1_52__improve_user_participant_linking.sql
 -- Description: Verbetert de koppeling tussen gebruikers en aanmeldingen voor gamification
 -- Date: 2026-01-02
+--
+-- IDEMPOTENT: Deze migratie kan veilig meerdere keren worden uitgevoerd
 
 -- =====================================================
 -- 1. VOEG FOREIGN KEY TOE VOOR GEBRUIKER_ID
 -- =====================================================
--- Zorg dat GebruikerID correct verwijst naar gebruikers tabel
-ALTER TABLE aanmeldingen 
-ADD CONSTRAINT fk_aanmelding_gebruiker 
-FOREIGN KEY (gebruiker_id) REFERENCES gebruikers(id) ON DELETE SET NULL;
+-- Zorg dat GebruikerID correct verwijst naar gebruikers tabel (alleen als constraint nog niet bestaat)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'fk_aanmelding_gebruiker' 
+        AND table_name = 'aanmeldingen'
+    ) THEN
+        ALTER TABLE aanmeldingen 
+        ADD CONSTRAINT fk_aanmelding_gebruiker 
+        FOREIGN KEY (gebruiker_id) REFERENCES gebruikers(id) ON DELETE SET NULL;
+    END IF;
+END $$;
 
-COMMENT ON COLUMN aanmeldingen.gebruiker_id IS 'Optionele link naar gebruikersaccount - voor participants die ook een user account hebben';
+-- Comment alleen als tabel bestaat
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'aanmeldingen') THEN
+        COMMENT ON COLUMN aanmeldingen.gebruiker_id IS 'Optionele link naar gebruikersaccount - voor participants die ook een user account hebben';
+    END IF;
+END $$;
 
 -- Index voor snelle lookups
 CREATE INDEX IF NOT EXISTS idx_aanmeldingen_gebruiker_id ON aanmeldingen(gebruiker_id);
@@ -130,6 +147,7 @@ $$ LANGUAGE plpgsql;
 -- Trigger aanmaken (alleen als je automatische sync wilt)
 -- UNCOMMENT onderstaande regels als je dit wilt:
 /*
+DROP TRIGGER IF EXISTS sync_user_email_trigger ON gebruikers;
 CREATE TRIGGER sync_user_email_trigger
     AFTER UPDATE OF email ON gebruikers
     FOR EACH ROW
@@ -160,10 +178,20 @@ GROUP BY g.id, g.naam, g.email, g.rol, g.is_actief, g.created_at;
 COMMENT ON VIEW users_without_participation IS 'Users die nog geen participant/aanmelding hebben';
 
 -- =====================================================
--- 8. DOCUMENTATIE COMMENTS
+-- 8. ADD COMMENT TO CONSTRAINT (IDEMPOTENT)
 -- =====================================================
-COMMENT ON CONSTRAINT fk_aanmelding_gebruiker ON aanmeldingen IS 
-'Foreign key naar gebruikers - een participant kan een gebruikersaccount hebben voor inloggen';
+-- Comment alleen als constraint bestaat
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'fk_aanmelding_gebruiker' 
+        AND table_name = 'aanmeldingen'
+    ) THEN
+        COMMENT ON CONSTRAINT fk_aanmelding_gebruiker ON aanmeldingen IS 
+        'Foreign key naar gebruikers - een participant kan een gebruikersaccount hebben voor inloggen';
+    END IF;
+END $$;
 
 -- =====================================================
 -- MIGRATION NOTES
