@@ -134,7 +134,7 @@ func (s *StepsService) GetTotalSteps(year int) (int, error) {
 	var total int
 	err := s.db.Model(&models.Aanmelding{}).
 		Where("EXTRACT(YEAR FROM created_at) = ?", year).
-		Select("SUM(steps)").Scan(&total).Error
+		Select("COALESCE(SUM(steps), 0)").Scan(&total).Error
 	if err != nil {
 		return 0, fmt.Errorf("kon totaal stappen niet ophalen: %w", err)
 	}
