@@ -56,4 +56,71 @@ Content-Type: application/json
   "geboortedatum": "1990-01-01",
   "afstand": "10km",
   "privacy_akkoord": true
-} 
+}
+
+### ============================================
+### STEPS API - Stappen Tracking
+### ============================================
+
+### [PUBLIC] Totaal aantal gelopen stappen (ALLE deelnemers)
+GET http://localhost:8080/api/total-steps
+
+### [PUBLIC] Totaal aantal stappen voor specifiek jaar
+GET http://localhost:8080/api/total-steps?year=2025
+
+### [PUBLIC] Fondsverdeling over routes ophalen
+GET http://localhost:8080/api/funds-distribution
+
+### Participant: Eigen dashboard ophalen
+GET http://localhost:8080/api/participant/dashboard
+Authorization: Bearer {{auth_token}}
+
+### Participant: Eigen stappen bijwerken (+1000 stappen)
+POST http://localhost:8080/api/steps
+Content-Type: application/json
+Authorization: Bearer {{auth_token}}
+
+{
+  "steps": 1000
+}
+
+### Admin: Stappen bijwerken voor specifieke deelnemer
+POST http://localhost:8080/api/steps/{{participant_id}}
+Content-Type: application/json
+Authorization: Bearer {{auth_token}}
+
+{
+  "steps": 500
+}
+
+### Admin: Dashboard ophalen voor specifieke deelnemer
+GET http://localhost:8080/api/participant/{{participant_id}}/dashboard
+Authorization: Bearer {{auth_token}}
+
+### Admin: Route funds ophalen
+GET http://localhost:8080/api/steps/admin/route-funds
+Authorization: Bearer {{auth_token}}
+
+### Admin: Route fund aanmaken
+POST http://localhost:8080/api/steps/admin/route-funds
+Content-Type: application/json
+Authorization: Bearer {{auth_token}}
+
+{
+  "route": "5 KM",
+  "amount": 40
+}
+
+### Admin: Route fund bijwerken
+PUT http://localhost:8080/api/steps/admin/route-funds/6%20KM
+Content-Type: application/json
+Authorization: Bearer {{auth_token}}
+
+{
+  "route": "6 KM",
+  "amount": 60
+}
+
+### Admin: Route fund verwijderen
+DELETE http://localhost:8080/api/steps/admin/route-funds/5%20KM
+Authorization: Bearer {{auth_token}}

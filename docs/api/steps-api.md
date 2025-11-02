@@ -98,26 +98,31 @@ Authorization: Bearer <jwt-token>
 
 ### GET /api/total-steps
 
-Haalt het totaal aantal stappen op voor een specifiek jaar.
-
-**Headers:**
-```http
-Authorization: Bearer <jwt-token>
-```
+Haalt het totaal aantal gelopen stappen op van ALLE deelnemers (PUBLIC endpoint - geen authenticatie vereist).
 
 **Query Parameters:**
-- `year` (optioneel): Jaar om op te filteren (default: 2026)
+- `year` (optioneel): Jaar om op te filteren. Als niet opgegeven (of 0), worden ALLE stappen van ALLE deelnemers geteld.
+
+**Voorbeelden:**
+```bash
+# Alle stappen van alle deelnemers
+GET /api/total-steps
+
+# Alleen stappen van deelnemers die zich in 2025 aanmeldden
+GET /api/total-steps?year=2025
+```
 
 **Response (200 OK):**
 ```json
 {
-    "total_steps": 150000
+    "total_steps": 150000,
+    "year": 0
 }
 ```
 
-**Permissions:** `steps:read`
+**Permissions:** PUBLIC (geen authenticatie vereist)
 
-**Implementatie:** [`handlers/steps_handler.go:149`](../../handlers/steps_handler.go:149)
+**Implementatie:** [`handlers/steps_handler.go:218`](../../handlers/steps_handler.go:218)
 
 ### GET /api/funds-distribution
 

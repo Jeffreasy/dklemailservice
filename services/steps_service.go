@@ -135,12 +135,20 @@ func (s *StepsService) CalculateAllocatedFunds(route string) int {
 	return routeFund.Amount
 }
 
-// GetTotalSteps haalt totaal aantal stappen op voor een jaar
+// GetTotalSteps haalt totaal aantal stappen op
+// Als year = 0, tel dan alle stappen op (ongeacht jaar van aanmelding)
+// Anders filter op jaar van aanmelding
 func (s *StepsService) GetTotalSteps(year int) (int, error) {
 	var total int
-	err := s.db.Model(&models.Aanmelding{}).
-		Where("EXTRACT(YEAR FROM created_at) = ?", year).
-		Select("COALESCE(SUM(steps), 0)").Scan(&total).Error
+	query := s.db.Model(&models.Aanmelding{})
+
+	// Als year > 0, filter op jaar van aanmelding
+	if year > 0 {
+		query = query.Where("EXTRACT(YEAR FROM created_at) = ?", year)
+	}
+	// Anders: tel ALLE stappen op van ALLE deelnemers
+
+	err := query.Select("COALESCE(SUM(steps), 0)").Scan(&total).Error
 	if err != nil {
 		return 0, fmt.Errorf("kon totaal stappen niet ophalen: %w", err)
 	}

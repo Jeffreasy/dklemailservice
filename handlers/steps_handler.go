@@ -216,8 +216,9 @@ func (h *StepsHandler) GetParticipantDashboard(c *fiber.Ctx) error {
 // @Router /api/total-steps [get]
 // @Security BearerAuth
 func (h *StepsHandler) GetTotalSteps(c *fiber.Ctx) error {
-	// Haal jaar op uit query parameter
-	yearStr := c.Query("year", "2026")
+	// Haal jaar op uit query parameter (optioneel)
+	// Als geen jaar opgegeven: year = 0 = ALLE stappen van ALLE deelnemers
+	yearStr := c.Query("year", "0")
 	year, err := strconv.Atoi(yearStr)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -236,6 +237,7 @@ func (h *StepsHandler) GetTotalSteps(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"total_steps": totalSteps,
+		"year":        year,
 	})
 }
 
