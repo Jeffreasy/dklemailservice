@@ -32,8 +32,7 @@ func (m *MockWebSocketConn) Close() error {
 
 // TestStepsHub_NewStepsHub tests the constructor
 func TestStepsHub_NewStepsHub(t *testing.T) {
-	var gamificationService services.GamificationService
-	hub := services.NewStepsHub(nil, gamificationService)
+	hub := services.NewStepsHub(nil, nil)
 
 	assert.NotNil(t, hub)
 	assert.NotNil(t, hub.Clients)

@@ -88,7 +88,7 @@ type StepsHub struct {
 
 	// Services (optional, voor future use)
 	StepsService        *StepsService
-	GamificationService GamificationService
+	GamificationService interface{}
 }
 
 // StepsClient represents een WebSocket client
@@ -102,7 +102,7 @@ type StepsClient struct {
 }
 
 // NewStepsHub creates een nieuwe StepsHub
-func NewStepsHub(stepsService *StepsService, gamificationService GamificationService) *StepsHub {
+func NewStepsHub(stepsService *StepsService, gamificationService interface{}) *StepsHub {
 	return &StepsHub{
 		Clients:             make(map[*StepsClient]bool),
 		StepUpdate:          make(chan *StepUpdateMessage, 256),

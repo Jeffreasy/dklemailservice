@@ -209,6 +209,16 @@ func main() {
 	// Initialiseer steps service
 	stepsService := services.NewStepsService(db, repoFactory.Aanmelding, repoFactory.RouteFund)
 
+	// ✨ NIEUWE: Initialize StepsHub voor WebSocket real-time updates
+	stepsHub := services.NewStepsHub(stepsService, serviceFactory.GamificationService)
+
+	// ✨ NIEUWE: Link hub to service voor broadcasts
+	stepsService.SetStepsHub(stepsHub)
+
+	// ✨ NIEUWE: Start hub in background goroutine
+	go stepsHub.Run()
+	logger.Info("StepsHub started successfully - WebSocket support enabled")
+
 	// Start Newsletter service indien geconfigureerd
 	if serviceFactory.NewsletterService != nil {
 		serviceFactory.NewsletterService.Start()
@@ -491,6 +501,18 @@ func main() {
 
 	// Registreer routes voor stappen beheer
 	stepsHandler.RegisterRoutes(app)
+
+	// ✨ NIEUWE: Initialiseer en registreer WebSocket handler voor steps
+	stepsWsHandler := handlers.NewStepsWebSocketHandler(stepsHub, serviceFactory.AuthService)
+	stepsWsHandler.RegisterRoutes(app)
+	logger.Info("WebSocket routes registered - /ws/steps endpoint active")
+
+	// ✨ NIEUWE: WebSocket stats endpoint (admin only)
+	app.Get("/api/ws/stats",
+		handlers.AuthMiddleware(serviceFactory.AuthService),
+		handlers.PermissionMiddleware(serviceFactory.PermissionService, "admin", "read"),
+		stepsWsHandler.GetStats,
+	)
 
 	// Registreer routes voor newsletter beheer
 	newsletterHandler.RegisterRoutes(app)
