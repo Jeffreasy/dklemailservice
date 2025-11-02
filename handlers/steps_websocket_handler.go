@@ -29,7 +29,7 @@ func NewStepsWebSocketHandler(
 // RegisterRoutes registreert WebSocket routes
 func (h *StepsWebSocketHandler) RegisterRoutes(app *fiber.App) {
 	// WebSocket upgrade check middleware
-	app.Use("/ws/steps", func(c *fiber.Ctx) error {
+	app.Use("/api/ws/steps", func(c *fiber.Ctx) error {
 		if websocket.IsWebSocketUpgrade(c) {
 			// Optioneel: JWT validatie voor WebSocket
 			// Token kan komen van query parameter of header
@@ -41,17 +41,19 @@ func (h *StepsWebSocketHandler) RegisterRoutes(app *fiber.App) {
 				}
 			}
 
-			// Als token aanwezig is, valideer het
+			// Als token aanwezig is, valideer het (maar sta ook anonymous toe)
 			if token != "" {
 				userID, err := h.authService.ValidateToken(token)
 				if err != nil {
-					logger.Error("WebSocket auth failed", "error", err)
-					return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-						"error": "Invalid token",
-					})
+					logger.Error("WebSocket auth failed", "error", err, "token_length", len(token))
+					// Don't reject - allow anonymous connections voor public leaderboard
+					// return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+					// 	"error": "Invalid token",
+					// })
+				} else {
+					// Store user info in context voor gebruik in handler
+					c.Locals("userID", userID)
 				}
-				// Store user info in context voor gebruik in handler
-				c.Locals("userID", userID)
 			}
 
 			return c.Next()
@@ -60,7 +62,9 @@ func (h *StepsWebSocketHandler) RegisterRoutes(app *fiber.App) {
 	})
 
 	// WebSocket endpoint
-	app.Get("/ws/steps", websocket.New(h.HandleWebSocket))
+	app.Get("/api/ws/steps", websocket.New(h.HandleWebSocket))
+
+	logger.Info("WebSocket endpoint registered", "path", "/api/ws/steps")
 }
 
 // HandleWebSocket handles de WebSocket connectie
