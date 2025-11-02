@@ -35,6 +35,10 @@ func (h *ProgramScheduleHandler) RegisterRoutes(app *fiber.App) {
 	public := app.Group("/api/program-schedule")
 	public.Get("/", h.ListVisibleProgramSchedules)
 
+	// Alias route for frontend compatibility
+	programAlias := app.Group("/api/program")
+	programAlias.Get("/", h.ListVisibleProgramSchedules)
+
 	// Admin routes (require authentication and permissions)
 	admin := app.Group("/api/program-schedule", AuthMiddleware(h.authService))
 

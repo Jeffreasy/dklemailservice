@@ -44,11 +44,11 @@ func (h *StepsHandler) RegisterRoutes(app *fiber.App) {
 	stepsGroup.Get("/participant/dashboard", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "steps", "read"), h.GetParticipantDashboard)
 	stepsGroup.Get("/participant/:id/dashboard", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "steps", "read"), h.GetParticipantDashboard)
 
-	// GET /api/total-steps - Totaal aantal stappen (alle deelnemers mogen dit zien)
-	stepsGroup.Get("/total-steps", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "steps", "read_total"), h.GetTotalSteps)
+	// GET /api/total-steps - Totaal aantal stappen (PUBLIC - geen authenticatie vereist)
+	stepsGroup.Get("/total-steps", h.GetTotalSteps)
 
-	// GET /api/funds-distribution - Fondsverdeling (admin)
-	stepsGroup.Get("/funds-distribution", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "steps", "read"), h.GetFundsDistribution)
+	// GET /api/funds-distribution - Fondsverdeling (PUBLIC)
+	stepsGroup.Get("/funds-distribution", h.GetFundsDistribution)
 
 	// Admin endpoints voor route fund beheer
 	adminGroup := stepsGroup.Group("/steps/admin", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "steps", "write"))
