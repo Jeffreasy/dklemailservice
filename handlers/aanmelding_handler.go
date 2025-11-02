@@ -39,43 +39,67 @@ func NewAanmeldingHandler(
 
 // RegisterRoutes registreert de routes voor aanmelding beheer
 func (h *AanmeldingHandler) RegisterRoutes(app *fiber.App) {
-	// Groep voor aanmelding beheer routes (singular)
-	aanmeldingGroup := app.Group("/api/aanmelding")
-	aanmeldingGroup.Use(AuthMiddleware(h.authService))
+	// Singular routes (/api/aanmelding)
+	app.Get("/api/aanmelding",
+		AuthMiddleware(h.authService),
+		PermissionMiddleware(h.permissionService, "aanmelding", "read"),
+		h.ListAanmeldingen)
 
-	// Read-only routes (require aanmelding read)
-	readGroup := aanmeldingGroup.Group("", PermissionMiddleware(h.permissionService, "aanmelding", "read"))
-	readGroup.Get("/", h.ListAanmeldingen)
-	readGroup.Get("/:id", h.GetAanmelding)
-	readGroup.Get("/rol/:rol", h.GetAanmeldingenByRol)
+	app.Get("/api/aanmelding/:id",
+		AuthMiddleware(h.authService),
+		PermissionMiddleware(h.permissionService, "aanmelding", "read"),
+		h.GetAanmelding)
 
-	// Write routes (require aanmelding write)
-	writeGroup := aanmeldingGroup.Group("", PermissionMiddleware(h.permissionService, "aanmelding", "write"))
-	writeGroup.Put("/:id", h.UpdateAanmelding)
-	writeGroup.Post("/:id/antwoord", h.AddAanmeldingAntwoord)
+	app.Get("/api/aanmelding/rol/:rol",
+		AuthMiddleware(h.authService),
+		PermissionMiddleware(h.permissionService, "aanmelding", "read"),
+		h.GetAanmeldingenByRol)
 
-	// Delete routes (require aanmelding delete)
-	deleteGroup := aanmeldingGroup.Group("", PermissionMiddleware(h.permissionService, "aanmelding", "delete"))
-	deleteGroup.Delete("/:id", h.DeleteAanmelding)
+	app.Put("/api/aanmelding/:id",
+		AuthMiddleware(h.authService),
+		PermissionMiddleware(h.permissionService, "aanmelding", "write"),
+		h.UpdateAanmelding)
 
-	// Alias route group for plural form (/api/aanmeldingen)
-	aanmeldingenGroup := app.Group("/api/aanmeldingen")
-	aanmeldingenGroup.Use(AuthMiddleware(h.authService))
+	app.Post("/api/aanmelding/:id/antwoord",
+		AuthMiddleware(h.authService),
+		PermissionMiddleware(h.permissionService, "aanmelding", "write"),
+		h.AddAanmeldingAntwoord)
 
-	// Read-only routes (require aanmelding read)
-	readGroupPlural := aanmeldingenGroup.Group("", PermissionMiddleware(h.permissionService, "aanmelding", "read"))
-	readGroupPlural.Get("/", h.ListAanmeldingen)
-	readGroupPlural.Get("/:id", h.GetAanmelding)
-	readGroupPlural.Get("/rol/:rol", h.GetAanmeldingenByRol)
+	app.Delete("/api/aanmelding/:id",
+		AuthMiddleware(h.authService),
+		PermissionMiddleware(h.permissionService, "aanmelding", "delete"),
+		h.DeleteAanmelding)
 
-	// Write routes (require aanmelding write)
-	writeGroupPlural := aanmeldingenGroup.Group("", PermissionMiddleware(h.permissionService, "aanmelding", "write"))
-	writeGroupPlural.Put("/:id", h.UpdateAanmelding)
-	writeGroupPlural.Post("/:id/antwoord", h.AddAanmeldingAntwoord)
+	// Plural routes (/api/aanmeldingen) - aliases
+	app.Get("/api/aanmeldingen",
+		AuthMiddleware(h.authService),
+		PermissionMiddleware(h.permissionService, "aanmelding", "read"),
+		h.ListAanmeldingen)
 
-	// Delete routes (require aanmelding delete)
-	deleteGroupPlural := aanmeldingenGroup.Group("", PermissionMiddleware(h.permissionService, "aanmelding", "delete"))
-	deleteGroupPlural.Delete("/:id", h.DeleteAanmelding)
+	app.Get("/api/aanmeldingen/:id",
+		AuthMiddleware(h.authService),
+		PermissionMiddleware(h.permissionService, "aanmelding", "read"),
+		h.GetAanmelding)
+
+	app.Get("/api/aanmeldingen/rol/:rol",
+		AuthMiddleware(h.authService),
+		PermissionMiddleware(h.permissionService, "aanmelding", "read"),
+		h.GetAanmeldingenByRol)
+
+	app.Put("/api/aanmeldingen/:id",
+		AuthMiddleware(h.authService),
+		PermissionMiddleware(h.permissionService, "aanmelding", "write"),
+		h.UpdateAanmelding)
+
+	app.Post("/api/aanmeldingen/:id/antwoord",
+		AuthMiddleware(h.authService),
+		PermissionMiddleware(h.permissionService, "aanmelding", "write"),
+		h.AddAanmeldingAntwoord)
+
+	app.Delete("/api/aanmeldingen/:id",
+		AuthMiddleware(h.authService),
+		PermissionMiddleware(h.permissionService, "aanmelding", "delete"),
+		h.DeleteAanmelding)
 }
 
 // ListAanmeldingen haalt een lijst van aanmeldingen op
