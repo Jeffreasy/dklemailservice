@@ -76,9 +76,6 @@ func (h *StepsHandler) RegisterRoutes(app *fiber.App) {
 // @Router /api/steps/{id} [post]
 // @Security BearerAuth
 func (h *StepsHandler) UpdateSteps(c *fiber.Ctx) error {
-	// Probeer eerst gebruiker ID uit de context (voor ingelogde gebruikers)
-	userID, ok := c.Locals("userID").(string)
-
 	// Parse request body
 	var req struct {
 		Steps int `json:"steps"`
@@ -89,18 +86,13 @@ func (h *StepsHandler) UpdateSteps(c *fiber.Ctx) error {
 		})
 	}
 
-	// Als er een gebruiker is ingelogd, update dan hun stappen
-	if ok && userID != "" {
-		participant, err := h.stepsService.UpdateStepsByUserID(userID, req.Steps)
+	// Check eerst of er een ID parameter is (admin/staff flow - heeft prioriteit)
+	id := c.Params("id")
+	if id != "" {
+		// Update stappen via aanmelding ID (admin/staff toegang)
+		participant, err := h.stepsService.UpdateSteps(id, req.Steps)
 		if err != nil {
-			logger.Error("Fout bij bijwerken stappen", "error", err, "user_id", userID)
-			// Check if this is a "not found" error (user is not a participant)
-			if strings.Contains(err.Error(), "geen deelnemersregistratie gevonden") {
-				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-					"error": "U bent niet geregistreerd als deelnemer. Alleen deelnemers kunnen stappen bijwerken.",
-					"code":  "NOT_A_PARTICIPANT",
-				})
-			}
+			logger.Error("Fout bij bijwerken stappen", "error", err, "id", id)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "Kon stappen niet bijwerken",
 				"code":  "INTERNAL_ERROR",
@@ -109,23 +101,31 @@ func (h *StepsHandler) UpdateSteps(c *fiber.Ctx) error {
 		return c.JSON(participant)
 	}
 
-	// Fallback: gebruik ID uit URL parameter (voor admin/staff toegang)
-	id := c.Params("id")
-	if id == "" {
+	// Geen ID parameter: gebruik userID uit context (participant flow)
+	userID, ok := c.Locals("userID").(string)
+	if !ok || userID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "ID is verplicht",
+			"error": "Geen deelnemer ID opgegeven en geen ingelogde gebruiker",
+			"code":  "MISSING_ID",
 		})
 	}
 
-	// Update stappen via aanmelding ID
-	participant, err := h.stepsService.UpdateSteps(id, req.Steps)
+	// Update stappen voor ingelogde deelnemer
+	participant, err := h.stepsService.UpdateStepsByUserID(userID, req.Steps)
 	if err != nil {
-		logger.Error("Fout bij bijwerken stappen", "error", err, "id", id)
+		logger.Error("Fout bij bijwerken stappen", "error", err, "user_id", userID)
+		// Check if this is a "not found" error (user is not a participant)
+		if strings.Contains(err.Error(), "geen deelnemersregistratie gevonden") {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "U bent niet geregistreerd als deelnemer. Alleen deelnemers kunnen hun eigen stappen bijwerken.",
+				"code":  "NOT_A_PARTICIPANT",
+			})
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon stappen niet bijwerken",
+			"code":  "INTERNAL_ERROR",
 		})
 	}
-
 	return c.JSON(participant)
 }
 
@@ -145,21 +145,13 @@ func (h *StepsHandler) UpdateSteps(c *fiber.Ctx) error {
 // @Router /api/participant/{id}/dashboard [get]
 // @Security BearerAuth
 func (h *StepsHandler) GetParticipantDashboard(c *fiber.Ctx) error {
-	// Probeer eerst gebruiker ID uit de context (voor ingelogde gebruikers)
-	userID, ok := c.Locals("userID").(string)
-
-	// Als er een gebruiker is ingelogd, gebruik dan hun dashboard
-	if ok && userID != "" {
-		participant, allocatedFunds, err := h.stepsService.GetParticipantDashboardByUserID(userID)
+	// Check eerst of er een ID parameter is (admin/staff flow - heeft prioriteit)
+	id := c.Params("id")
+	if id != "" {
+		// Haal dashboard data op via aanmelding ID (admin/staff toegang)
+		participant, allocatedFunds, err := h.stepsService.GetParticipantDashboard(id)
 		if err != nil {
-			logger.Error("Fout bij ophalen dashboard", "error", err, "id", userID)
-			// Check if this is a "not found" error (user is not a participant)
-			if strings.Contains(err.Error(), "geen deelnemersregistratie gevonden") {
-				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-					"error": "U bent niet geregistreerd als deelnemer. Alleen deelnemers hebben toegang tot het dashboard.",
-					"code":  "NOT_A_PARTICIPANT",
-				})
-			}
+			logger.Error("Fout bij ophalen dashboard", "error", err, "id", id)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "Kon dashboard data niet ophalen",
 				"code":  "INTERNAL_ERROR",
@@ -175,20 +167,29 @@ func (h *StepsHandler) GetParticipantDashboard(c *fiber.Ctx) error {
 		})
 	}
 
-	// Fallback: gebruik ID uit URL parameter (voor admin/staff toegang)
-	id := c.Params("id")
-	if id == "" {
+	// Geen ID parameter: gebruik userID uit context (participant flow)
+	userID, ok := c.Locals("userID").(string)
+	if !ok || userID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "ID is verplicht",
+			"error": "Geen deelnemer ID opgegeven en geen ingelogde gebruiker",
+			"code":  "MISSING_ID",
 		})
 	}
 
-	// Haal dashboard data op
-	participant, allocatedFunds, err := h.stepsService.GetParticipantDashboard(id)
+	// Haal dashboard voor ingelogde deelnemer op
+	participant, allocatedFunds, err := h.stepsService.GetParticipantDashboardByUserID(userID)
 	if err != nil {
-		logger.Error("Fout bij ophalen dashboard", "error", err, "id", id)
+		logger.Error("Fout bij ophalen dashboard", "error", err, "id", userID)
+		// Check if this is a "not found" error (user is not a participant)
+		if strings.Contains(err.Error(), "geen deelnemersregistratie gevonden") {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "U bent niet geregistreerd als deelnemer. Alleen deelnemers hebben toegang tot hun eigen dashboard.",
+				"code":  "NOT_A_PARTICIPANT",
+			})
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon dashboard data niet ophalen",
+			"code":  "INTERNAL_ERROR",
 		})
 	}
 
