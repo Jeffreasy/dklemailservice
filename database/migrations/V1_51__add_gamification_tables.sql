@@ -24,6 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_badges_active ON badges(is_active, display_order)
 CREATE INDEX IF NOT EXISTS idx_badges_points ON badges(points);
 
 -- Trigger voor updated_at
+DROP TRIGGER IF EXISTS update_badges_updated_at ON badges;
 CREATE TRIGGER update_badges_updated_at
     BEFORE UPDATE ON badges
     FOR EACH ROW
