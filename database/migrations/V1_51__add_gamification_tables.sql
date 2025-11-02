@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS badges (
 );
 
 -- Index voor actieve badges query
-CREATE INDEX idx_badges_active ON badges(is_active, display_order);
-CREATE INDEX idx_badges_points ON badges(points);
+CREATE INDEX IF NOT EXISTS idx_badges_active ON badges(is_active, display_order);
+CREATE INDEX IF NOT EXISTS idx_badges_points ON badges(points);
 
 -- Trigger voor updated_at
 CREATE TRIGGER update_badges_updated_at
@@ -50,9 +50,9 @@ CREATE TABLE IF NOT EXISTS participant_achievements (
 );
 
 -- Indexes voor snelle queries
-CREATE INDEX idx_participant_achievements_participant ON participant_achievements(participant_id);
-CREATE INDEX idx_participant_achievements_badge ON participant_achievements(badge_id);
-CREATE INDEX idx_participant_achievements_earned_at ON participant_achievements(earned_at DESC);
+CREATE INDEX IF NOT EXISTS idx_participant_achievements_participant ON participant_achievements(participant_id);
+CREATE INDEX IF NOT EXISTS idx_participant_achievements_badge ON participant_achievements(badge_id);
+CREATE INDEX IF NOT EXISTS idx_participant_achievements_earned_at ON participant_achievements(earned_at DESC);
 
 COMMENT ON TABLE participant_achievements IS 'Verdiende badges per deelnemer';
 COMMENT ON CONSTRAINT unique_participant_badge ON participant_achievements IS 'Deelnemer kan zelfde badge maar 1x verdienen';
