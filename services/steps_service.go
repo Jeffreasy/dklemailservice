@@ -5,6 +5,7 @@ import (
 	"dklautomationgo/models"
 	"dklautomationgo/repository"
 	"fmt"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -14,6 +15,7 @@ type StepsService struct {
 	db             *gorm.DB
 	aanmeldingRepo repository.AanmeldingRepository
 	routeFundRepo  repository.RouteFundRepository
+	stepsHub       *StepsHub // WebSocket hub voor real-time updates
 }
 
 // NewStepsService maakt een nieuwe steps service
@@ -22,7 +24,13 @@ func NewStepsService(db *gorm.DB, aanmeldingRepo repository.AanmeldingRepository
 		db:             db,
 		aanmeldingRepo: aanmeldingRepo,
 		routeFundRepo:  routeFundRepo,
+		stepsHub:       nil, // Wordt later gezet via SetStepsHub
 	}
+}
+
+// SetStepsHub sets de StepsHub voor real-time updates
+func (s *StepsService) SetStepsHub(hub *StepsHub) {
+	s.stepsHub = hub
 }
 
 // UpdateSteps werkt stappen bij voor een deelnemer (delta toevoegen)
@@ -47,6 +55,9 @@ func (s *StepsService) UpdateSteps(participantID string, deltaSteps int) (*model
 	if err := s.aanmeldingRepo.Update(context.TODO(), participant); err != nil {
 		return nil, fmt.Errorf("kon stappen niet bijwerken: %w", err)
 	}
+
+	// ✨ Broadcast WebSocket update
+	s.broadcastStepUpdate(participant, deltaSteps)
 
 	return participant, nil
 }
@@ -74,6 +85,9 @@ func (s *StepsService) UpdateStepsByUserID(userID string, deltaSteps int) (*mode
 	if err := s.aanmeldingRepo.Update(context.TODO(), &participant); err != nil {
 		return nil, fmt.Errorf("kon stappen niet bijwerken: %w", err)
 	}
+
+	// ✨ Broadcast WebSocket update
+	s.broadcastStepUpdate(&participant, deltaSteps)
 
 	return &participant, nil
 }
@@ -253,4 +267,73 @@ func (s *StepsService) CreateRouteFund(route string, amount int) (*models.RouteF
 // DeleteRouteFund verwijdert een route fondsallocatie
 func (s *StepsService) DeleteRouteFund(route string) error {
 	return s.routeFundRepo.Delete(context.TODO(), route)
+}
+
+// broadcastStepUpdate broadcast een stappen update via WebSocket
+func (s *StepsService) broadcastStepUpdate(participant *models.Aanmelding, delta int) {
+	if s.stepsHub == nil {
+		return // WebSocket niet geïnitialiseerd
+	}
+
+	allocatedFunds := s.CalculateAllocatedFunds(participant.Afstand)
+
+	// Broadcast step update
+	s.stepsHub.StepUpdate <- &StepUpdateMessage{
+		Type:           MessageTypeStepUpdate,
+		ParticipantID:  participant.ID,
+		Naam:           participant.Naam,
+		Steps:          participant.Steps,
+		Delta:          delta,
+		Route:          participant.Afstand,
+		AllocatedFunds: allocatedFunds,
+		Timestamp:      time.Now().Unix(),
+	}
+
+	// Update totaal stappen in background
+	go s.broadcastTotalSteps()
+
+	// Update leaderboard in background
+	go s.broadcastLeaderboard()
+}
+
+// broadcastTotalSteps broadcast totaal stappen update
+func (s *StepsService) broadcastTotalSteps() {
+	if s.stepsHub == nil {
+		return
+	}
+
+	totalSteps, err := s.GetTotalSteps(0)
+	if err != nil {
+		return
+	}
+
+	s.stepsHub.TotalUpdate <- &TotalUpdateMessage{
+		Type:       MessageTypeTotalUpdate,
+		TotalSteps: totalSteps,
+		Year:       0,
+		Timestamp:  time.Now().Unix(),
+	}
+}
+
+// broadcastLeaderboard broadcast leaderboard update (top 10)
+func (s *StepsService) broadcastLeaderboard() {
+	if s.stepsHub == nil {
+		return
+	}
+
+	var entries []LeaderboardEntry
+	err := s.db.Table("leaderboard_view").
+		Limit(10).
+		Find(&entries).Error
+
+	if err != nil {
+		return
+	}
+
+	s.stepsHub.LeaderboardUpdate <- &LeaderboardUpdateMessage{
+		Type:      MessageTypeLeaderboardUpdate,
+		TopN:      10,
+		Entries:   entries,
+		Timestamp: time.Now().Unix(),
+	}
 }
