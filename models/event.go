@@ -6,20 +6,52 @@ import (
 	"time"
 )
 
+// EventConfig is een custom type voor event configuratie JSONB
+type EventConfig map[string]interface{}
+
+// Scan implementeert sql.Scanner interface voor database reading
+func (ec *EventConfig) Scan(value interface{}) error {
+	if value == nil {
+		*ec = EventConfig{}
+		return nil
+	}
+
+	bytes, ok := value.([]byte)
+	if !ok {
+		return nil
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(bytes, &result); err != nil {
+		return err
+	}
+
+	*ec = EventConfig(result)
+	return nil
+}
+
+// Value implementeert driver.Valuer interface voor database writing
+func (ec EventConfig) Value() (driver.Value, error) {
+	if len(ec) == 0 {
+		return []byte("{}"), nil
+	}
+	return json.Marshal(ec)
+}
+
 // Event representeert een loopwedstrijd event
 type Event struct {
-	ID          string                 `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	Name        string                 `json:"name" gorm:"not null"`
-	Description string                 `json:"description,omitempty" gorm:"type:text"`
-	StartTime   time.Time              `json:"start_time" gorm:"not null"`
-	EndTime     *time.Time             `json:"end_time,omitempty"`
-	Status      string                 `json:"status" gorm:"default:'upcoming'"`
-	Geofences   Geofences              `json:"geofences" gorm:"type:jsonb;default:'[]'"`
-	EventConfig map[string]interface{} `json:"event_config,omitempty" gorm:"type:jsonb;default:'{}'"`
-	IsActive    bool                   `json:"is_active" gorm:"default:true"`
-	CreatedAt   time.Time              `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt   time.Time              `json:"updated_at" gorm:"autoUpdateTime"`
-	CreatedBy   *string                `json:"created_by,omitempty" gorm:"type:uuid"`
+	ID          string      `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
+	Name        string      `json:"name" gorm:"not null"`
+	Description string      `json:"description,omitempty" gorm:"type:text"`
+	StartTime   time.Time   `json:"start_time" gorm:"not null"`
+	EndTime     *time.Time  `json:"end_time,omitempty"`
+	Status      string      `json:"status" gorm:"default:'upcoming'"`
+	Geofences   Geofences   `json:"geofences" gorm:"type:jsonb;default:'[]'"`
+	EventConfig EventConfig `json:"event_config,omitempty" gorm:"type:jsonb;default:'{}'"`
+	IsActive    bool        `json:"is_active" gorm:"default:true"`
+	CreatedAt   time.Time   `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt   time.Time   `json:"updated_at" gorm:"autoUpdateTime"`
+	CreatedBy   *string     `json:"created_by,omitempty" gorm:"type:uuid"`
 }
 
 // TableName specificeert de tabelnaam voor GORM
@@ -88,15 +120,15 @@ func (EventParticipant) TableName() string {
 
 // EventResponse is de response structuur voor API endpoints
 type EventResponse struct {
-	ID          string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Description string                 `json:"description,omitempty"`
-	StartTime   string                 `json:"start_time"` // ISO 8601 format
-	EndTime     string                 `json:"end_time,omitempty"`
-	Status      string                 `json:"status"`
-	Geofences   []Geofence             `json:"geofences"`
-	EventConfig map[string]interface{} `json:"event_config,omitempty"`
-	IsActive    bool                   `json:"is_active"`
+	ID          string      `json:"id"`
+	Name        string      `json:"name"`
+	Description string      `json:"description,omitempty"`
+	StartTime   string      `json:"start_time"` // ISO 8601 format
+	EndTime     string      `json:"end_time,omitempty"`
+	Status      string      `json:"status"`
+	Geofences   []Geofence  `json:"geofences"`
+	EventConfig EventConfig `json:"event_config,omitempty"`
+	IsActive    bool        `json:"is_active"`
 }
 
 // ToResponse converteert Event naar EventResponse
@@ -121,26 +153,26 @@ func (e *Event) ToResponse() *EventResponse {
 
 // EventCreateRequest is de request structuur voor het aanmaken van events
 type EventCreateRequest struct {
-	Name        string                 `json:"name" validate:"required"`
-	Description string                 `json:"description,omitempty"`
-	StartTime   string                 `json:"start_time" validate:"required"` // ISO 8601 format
-	EndTime     string                 `json:"end_time,omitempty"`
-	Status      string                 `json:"status,omitempty"`
-	Geofences   []Geofence             `json:"geofences" validate:"required"`
-	EventConfig map[string]interface{} `json:"event_config,omitempty"`
-	IsActive    bool                   `json:"is_active"`
+	Name        string      `json:"name" validate:"required"`
+	Description string      `json:"description,omitempty"`
+	StartTime   string      `json:"start_time" validate:"required"` // ISO 8601 format
+	EndTime     string      `json:"end_time,omitempty"`
+	Status      string      `json:"status,omitempty"`
+	Geofences   []Geofence  `json:"geofences" validate:"required"`
+	EventConfig EventConfig `json:"event_config,omitempty"`
+	IsActive    bool        `json:"is_active"`
 }
 
 // EventUpdateRequest is de request structuur voor het bijwerken van events
 type EventUpdateRequest struct {
-	Name        string                 `json:"name,omitempty"`
-	Description string                 `json:"description,omitempty"`
-	StartTime   string                 `json:"start_time,omitempty"`
-	EndTime     string                 `json:"end_time,omitempty"`
-	Status      string                 `json:"status,omitempty"`
-	Geofences   []Geofence             `json:"geofences,omitempty"`
-	EventConfig map[string]interface{} `json:"event_config,omitempty"`
-	IsActive    *bool                  `json:"is_active,omitempty"`
+	Name        string      `json:"name,omitempty"`
+	Description string      `json:"description,omitempty"`
+	StartTime   string      `json:"start_time,omitempty"`
+	EndTime     string      `json:"end_time,omitempty"`
+	Status      string      `json:"status,omitempty"`
+	Geofences   []Geofence  `json:"geofences,omitempty"`
+	EventConfig EventConfig `json:"event_config,omitempty"`
+	IsActive    *bool       `json:"is_active,omitempty"`
 }
 
 // EventParticipantResponse is de response voor event participant data
