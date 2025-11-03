@@ -151,6 +151,8 @@ HTTP Response
 - `contact` - Contact forms
 - `rbac_*` - RBAC system
 - `chat_*` - Chat system
+- `events` - Event tracking & geofencing
+- `event_participants` - Event participant tracking
 - Content tables (albums, photos, videos, etc.)
 
 ## 🔌 External Integrations
@@ -222,11 +224,15 @@ HTTP Response
 - `GET /api/health` - Health check
 - `GET /api/program` - Program schedule
 - `GET /api/total-steps` - Steps counter
+- `GET /api/events` - Events overview
+- `GET /api/events/active` - Active event details
 
 ### Protected Endpoints (require auth):
 - `/api/auth/*` - Authentication
 - `/api/admin/*` - Admin operations
 - `/api/rbac/*` - RBAC management
+- `/api/events/*` - Event management (admin)
+- `/api/events/:id/participants` - Event tracking
 - Content management endpoints
 
 ## 🔧 Configuration

@@ -465,6 +465,13 @@ func main() {
 				{"path": "/api/participant/:id/dashboard", "method": "GET", "description": "Get participant dashboard (requires steps read permission)"},
 				{"path": "/api/total-steps", "method": "GET", "description": "Get total steps for year (requires steps read permission)"},
 				{"path": "/api/funds-distribution", "method": "GET", "description": "Get funds distribution (requires steps read permission)"},
+				{"path": "/api/events", "method": "GET", "description": "List events (public)"},
+				{"path": "/api/events/active", "method": "GET", "description": "Get active event (public)"},
+				{"path": "/api/events/:id", "method": "GET", "description": "Get event details (public)"},
+				{"path": "/api/events", "method": "POST", "description": "Create event (requires events write permission)"},
+				{"path": "/api/events/:id", "method": "PUT", "description": "Update event (requires events write permission)"},
+				{"path": "/api/events/:id", "method": "DELETE", "description": "Delete event (requires events write permission)"},
+				{"path": "/api/events/:id/participants", "method": "GET", "description": "Get event participants (requires events read permission)"},
 				{"path": "/metrics", "method": "GET", "description": "Prometheus metrics"},
 			},
 		})
@@ -787,6 +794,14 @@ func main() {
 		serviceFactory.PermissionService,
 	)
 	gamificationHandler.RegisterRoutes(app)
+
+	// Initialiseer event handler
+	eventHandler := handlers.NewEventHandler(
+		repoFactory.Event,
+		serviceFactory.AuthService,
+		serviceFactory.PermissionService,
+	)
+	eventHandler.RegisterRoutes(app)
 
 	// Start server
 	port := os.Getenv("PORT")

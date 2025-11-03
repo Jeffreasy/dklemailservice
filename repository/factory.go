@@ -36,6 +36,7 @@ type Repository struct {
 	UnderConstruction      UnderConstructionRepository
 	TitleSection           TitleSectionRepository
 	RouteFund              RouteFundRepository
+	Event                  EventRepository
 
 	// Gamification repositories
 	Badge       BadgeRepository
@@ -85,6 +86,7 @@ func NewRepository(db *gorm.DB) *Repository {
 		UnderConstruction:      NewPostgresUnderConstructionRepository(db),
 		TitleSection:           NewPostgresTitleSectionRepository(db),
 		RouteFund:              NewRouteFundRepository(db),
+		Event:                  NewPostgresEventRepository(baseRepo),
 
 		// Gamification repositories (Note: Badge moet eerst omdat Achievement het nodig heeft)
 		Badge: NewBadgeRepository(db),

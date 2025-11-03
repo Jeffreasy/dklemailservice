@@ -1,5 +1,8 @@
-### Gezondheidscheck
-GET http://localhost:8080/api/health
+### Gezondheidscheck (Local Docker)
+GET http://localhost:8082/api/health
+
+### Gezondheidscheck (Production)
+GET https://dklemailservice.onrender.com/api/health
 
 ### Login
 POST http://localhost:8080/api/auth/login
@@ -124,3 +127,114 @@ Authorization: Bearer {{auth_token}}
 ### Admin: Route fund verwijderen
 DELETE http://localhost:8080/api/steps/admin/route-funds/5%20KM
 Authorization: Bearer {{auth_token}}
+
+### ============================================
+### EVENTS API - Event Management & Tracking
+### ============================================
+
+### [PUBLIC] Haal actief event op (Local Docker)
+GET http://localhost:8082/api/events/active
+
+### [PUBLIC] Haal actief event op (Production)
+GET https://dklemailservice.onrender.com/api/events/active
+
+### [PUBLIC] Haal alle events op
+GET http://localhost:8082/api/events
+
+### [PUBLIC] Haal alleen actieve events op
+GET http://localhost:8082/api/events?active_only=true
+
+### [PUBLIC] Haal events op met paginatie
+GET http://localhost:8082/api/events?limit=10&offset=0
+
+### [PUBLIC] Haal specifiek event op (vervang met echte UUID na aanmaken)
+GET http://localhost:8082/api/events/{{event_id}}
+
+### Admin: Nieuw event aanmaken
+POST http://localhost:8082/api/events
+Content-Type: application/json
+Authorization: Bearer {{auth_token}}
+
+{
+  "name": "De Koninklijke Loop 2026",
+  "description": "Test event voor development",
+  "start_time": "2026-05-15T09:00:00Z",
+  "end_time": "2026-05-15T16:00:00Z",
+  "status": "upcoming",
+  "geofences": [
+    {
+      "type": "start",
+      "lat": 52.0907,
+      "long": 5.1214,
+      "radius": 50,
+      "name": "Start Locatie"
+    },
+    {
+      "type": "checkpoint",
+      "lat": 52.0950,
+      "long": 5.1300,
+      "radius": 30,
+      "name": "Checkpoint 5KM"
+    },
+    {
+      "type": "finish",
+      "lat": 52.0907,
+      "long": 5.1214,
+      "radius": 50,
+      "name": "Finish Locatie"
+    }
+  ],
+  "event_config": {
+    "minStepsInterval": 10,
+    "requireGeofenceCheckin": true,
+    "distanceThreshold": 100,
+    "accuracyLevel": "balanced"
+  },
+  "is_active": true
+}
+
+### Admin: Event bijwerken
+PUT http://localhost:8082/api/events/{{event_id}}
+Content-Type: application/json
+Authorization: Bearer {{auth_token}}
+
+{
+  "name": "De Koninklijke Loop 2026 - UPDATED",
+  "status": "active"
+}
+
+### Admin: Event status wijzigen
+PUT http://localhost:8082/api/events/{{event_id}}
+Content-Type: application/json
+Authorization: Bearer {{auth_token}}
+
+{
+  "status": "completed"
+}
+
+### Admin: Event deactiveren
+PUT http://localhost:8082/api/events/{{event_id}}
+Content-Type: application/json
+Authorization: Bearer {{auth_token}}
+
+{
+  "is_active": false
+}
+
+### Admin: Event participants ophalen
+GET http://localhost:8082/api/events/{{event_id}}/participants
+Authorization: Bearer {{auth_token}}
+
+### Admin: Event verwijderen
+DELETE http://localhost:8082/api/events/{{event_id}}
+Authorization: Bearer {{auth_token}}
+
+### ============================================
+### EVENT TRACKING - Mobile App Use Case
+### ============================================
+
+### Step 1: Mobile app haalt actief event op (PUBLIC - Production)
+GET https://dklemailservice.onrender.com/api/events/active
+
+### Step 2: Mobile app checkt geofences (client-side met event.geofences data)
+### Step 3: Mobile app update stappen wanneer in geofence (zie STEPS API hierboven)
