@@ -69,6 +69,7 @@ type AuthService interface {
 
 	CreateUser(ctx context.Context, gebruiker *models.Gebruiker, password string) error
 	ListUsers(ctx context.Context, limit, offset int) ([]*models.Gebruiker, error)
+	SearchUsers(ctx context.Context, query string, limit int) ([]*models.Gebruiker, error)
 	GetUser(ctx context.Context, id string) (*models.Gebruiker, error)
 	UpdateUser(ctx context.Context, gebruiker *models.Gebruiker, password *string) error
 	DeleteUser(ctx context.Context, id string) error

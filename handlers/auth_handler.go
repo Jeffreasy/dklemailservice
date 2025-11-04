@@ -143,6 +143,20 @@ func (h *AuthHandler) HandleLogin(c *fiber.Ctx) error {
 		}
 	}
 
+	// Audit: Successful login
+	logger.Audit(c.Context(), logger.AuditEvent{
+		EventType:  logger.AuditLoginSuccess,
+		ActorID:    gebruiker.ID,
+		ActorEmail: gebruiker.Email,
+		IPAddress:  c.IP(),
+		UserAgent:  c.Get("User-Agent"),
+		Result:     logger.ResultSuccess,
+		Metadata: map[string]interface{}{
+			"roles_count":       len(roleList),
+			"permissions_count": len(permissionList),
+		},
+	})
+
 	// Stuur complete user data terug met refresh token
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"success":       true,
@@ -158,22 +172,6 @@ func (h *AuthHandler) HandleLogin(c *fiber.Ctx) error {
 			// DEPRECATED: rol field removed - use roles array instead
 		},
 	})
-
-	// Audit: Successful login
-	logger.Audit(c.Context(), logger.AuditEvent{
-		EventType:  logger.AuditLoginSuccess,
-		ActorID:    gebruiker.ID,
-		ActorEmail: gebruiker.Email,
-		IPAddress:  c.IP(),
-		UserAgent:  c.Get("User-Agent"),
-		Result:     logger.ResultSuccess,
-		Metadata: map[string]interface{}{
-			"roles_count":       len(roleList),
-			"permissions_count": len(permissionList),
-		},
-	})
-
-	return nil
 }
 
 // HandleRefreshToken handelt token refresh verzoeken af

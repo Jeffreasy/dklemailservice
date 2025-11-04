@@ -215,6 +215,11 @@ func (m *MockUserRoleRepository) Deactivate(ctx context.Context, id string) erro
 	return args.Error(0)
 }
 
+func (m *MockUserRoleRepository) GetByUserIDWithRoles(ctx context.Context, userID string) ([]models.UserRole, error) {
+	args := m.Called(ctx, userID)
+	return args.Get(0).([]models.UserRole), args.Error(1)
+}
+
 func (m *MockUserRoleRepository) GetUserPermissions(ctx context.Context, userID string) ([]*models.UserPermission, error) {
 	args := m.Called(ctx, userID)
 	return args.Get(0).([]*models.UserPermission), args.Error(1)

@@ -382,6 +382,11 @@ func (s *AuthServiceImpl) DeleteUser(ctx context.Context, id string) error {
 	return s.gebruikerRepo.Delete(ctx, id)
 }
 
+// SearchUsers searches for users by name or email
+func (s *AuthServiceImpl) SearchUsers(ctx context.Context, query string, limit int) ([]*models.Gebruiker, error) {
+	return s.gebruikerRepo.Search(ctx, query, limit)
+}
+
 // GenerateRefreshToken genereert een refresh token voor een gebruiker
 func (s *AuthServiceImpl) GenerateRefreshToken(ctx context.Context, userID string) (string, error) {
 	// Genereer random token (32 bytes)

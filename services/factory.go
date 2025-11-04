@@ -32,6 +32,7 @@ type ServiceFactory struct {
 	ImageService        *ImageService
 	RedisClient         *redis.Client
 	GamificationService *GamificationService
+	NotulenService      *NotulenService
 }
 
 // GetRateLimiter retourneert de RateLimiter als het concrete type
@@ -137,6 +138,9 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 		repoFactory.Aanmelding,
 	)
 
+	// Initialize NotulenService
+	notulenService := NewNotulenService(repoFactory.Notulen.(*repository.PostgresNotulenRepository), &authService)
+
 	return &ServiceFactory{
 		EmailService:        emailService,
 		SMTPClient:          smtpClient,
@@ -155,6 +159,7 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 		ImageService:        imageService,
 		RedisClient:         redisClient,
 		GamificationService: gamificationService,
+		NotulenService:      notulenService,
 	}
 }
 

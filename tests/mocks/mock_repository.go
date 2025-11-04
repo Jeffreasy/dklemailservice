@@ -4,6 +4,7 @@ import (
 	"context"
 	"dklautomationgo/models"
 	"errors"
+	"strings"
 	"sync"
 	"time"
 )
@@ -630,6 +631,29 @@ func (r *MockGebruikerRepository) UpdateLastLogin(ctx context.Context, id string
 	gebruiker.LaatsteLogin = &now
 	r.db.gebruikers[id] = gebruiker
 	return nil
+}
+
+// Search zoekt gebruikers op basis van naam of email
+func (r *MockGebruikerRepository) Search(ctx context.Context, query string, limit int) ([]*models.Gebruiker, error) {
+	r.db.mu.RLock()
+	defer r.db.mu.RUnlock()
+
+	var result []*models.Gebruiker
+	for _, gebruiker := range r.db.gebruikers {
+		// Simple search implementation - check if query matches name or email (case insensitive)
+		queryLower := strings.ToLower(query)
+		nameLower := strings.ToLower(gebruiker.Naam)
+		emailLower := strings.ToLower(gebruiker.Email)
+
+		if strings.Contains(nameLower, queryLower) || strings.Contains(emailLower, queryLower) {
+			result = append(result, gebruiker)
+			if limit > 0 && len(result) >= limit {
+				break
+			}
+		}
+	}
+
+	return result, nil
 }
 
 // GetNewsletterSubscribers haalt actieve subscribers op

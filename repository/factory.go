@@ -49,6 +49,9 @@ type Repository struct {
 	RolePermission RolePermissionRepository
 	UserRole       UserRoleRepository
 	RefreshToken   RefreshTokenRepository
+
+	// Notulen repository
+	Notulen NotulenRepository
 }
 
 // NewRepository maakt een nieuwe Repository met concrete implementaties
@@ -97,6 +100,9 @@ func NewRepository(db *gorm.DB) *Repository {
 		RolePermission: NewRolePermissionRepository(db),
 		UserRole:       NewUserRoleRepository(db),
 		RefreshToken:   NewPostgresRefreshTokenRepository(baseRepo),
+
+		// Notulen repository
+		Notulen: NewPostgresNotulenRepository(baseRepo),
 	}
 
 	// Initialize Achievement and Leaderboard repositories that depend on Badge

@@ -115,6 +115,25 @@ func (r *PostgresGebruikerRepository) UpdateLastLogin(ctx context.Context, id st
 	return r.handleError("UpdateLastLogin", result.Error)
 }
 
+// Search zoekt gebruikers op basis van naam of email
+func (r *PostgresGebruikerRepository) Search(ctx context.Context, query string, limit int) ([]*models.Gebruiker, error) {
+	ctx, cancel := r.withTimeout(ctx)
+	defer cancel()
+
+	var users []*models.Gebruiker
+	result := r.DB().WithContext(ctx).
+		Where("is_actief = ?", true).
+		Where("LOWER(naam) LIKE LOWER(?) OR LOWER(email) LIKE LOWER(?)", "%"+query+"%", "%"+query+"%").
+		Limit(limit).
+		Order("naam ASC").
+		Find(&users)
+
+	if err := r.handleError("Search", result.Error); err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
 // GetNewsletterSubscribers haalt actieve subscribers op
 func (r *PostgresGebruikerRepository) GetNewsletterSubscribers(ctx context.Context) ([]*models.Gebruiker, error) {
 	ctx, cancel := r.withTimeout(ctx)

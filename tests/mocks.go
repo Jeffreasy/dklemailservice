@@ -636,3 +636,8 @@ func (m *MockAuthService) RevokeAllUserRefreshTokens(ctx context.Context, userID
 	args := m.Called(ctx, userID)
 	return args.Error(0)
 }
+
+func (m *MockAuthService) SearchUsers(ctx context.Context, query string, limit int) ([]*models.Gebruiker, error) {
+	args := m.Called(ctx, query, limit)
+	return args.Get(0).([]*models.Gebruiker), args.Error(1)
+}

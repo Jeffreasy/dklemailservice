@@ -1,0 +1,58 @@
+# Environment files - don't copy into Docker image
+.env
+.env.local
+.env.*.local
+
+# Git files
+.git
+.gitignore
+
+# Documentation
+*.md
+README.md
+docs/
+
+# Test files
+*_test.go
+tests/
+testscripts/
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+main
+main-dev
+main-prod
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Backup files
+*.sql
+*.backup
+
+# Scripts (not needed in container)
+scripts/
+
+# Docker files (not needed in image)
+Dockerfile*
+docker-compose*.yml
+
+# Force directory (not needed)
+-Force/
+
+# Kilo code directory
+.kilocode/

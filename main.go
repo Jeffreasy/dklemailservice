@@ -803,6 +803,10 @@ func main() {
 	)
 	eventHandler.RegisterRoutes(app)
 
+	// Initialiseer notulen handler
+	notulenHandler := handlers.NewNotulenHandler(serviceFactory.NotulenService, serviceFactory.AuthService, serviceFactory.PermissionService)
+	notulenHandler.RegisterRoutes(app)
+
 	// Start server
 	port := os.Getenv("PORT")
 	if port == "" {

@@ -32,6 +32,7 @@ func NewUserHandler(authService services.AuthService, permissionService services
 
 func (h *UserHandler) RegisterRoutes(app *fiber.App) {
 	app.Get("/api/users", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "read"), h.ListUsers)
+	app.Get("/api/users/search", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "read"), h.SearchUsers)
 	app.Get("/api/users/:id", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "read"), h.GetUser)
 	app.Post("/api/users", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "write"), h.CreateUser)
 	app.Put("/api/users/:id", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "user", "write"), h.UpdateUser)
@@ -379,4 +380,31 @@ func (h *UserHandler) RemoveRoleFromUser(c *fiber.Ctx) error {
 		"success": true,
 		"message": "Rol verwijderd van user",
 	})
+}
+
+// SearchUsers searches for users by name or email
+func (h *UserHandler) SearchUsers(c *fiber.Ctx) error {
+	query := c.Query("q")
+	if query == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Search query is required",
+			"code":  "MISSING_QUERY",
+		})
+	}
+
+	limit, _ := strconv.Atoi(c.Query("limit", "10"))
+	if limit > 50 {
+		limit = 50 // Max limit
+	}
+
+	users, err := h.authService.SearchUsers(c.Context(), query, limit)
+	if err != nil {
+		logger.Error("Fout bij zoeken naar gebruikers", "query", query, "error", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon gebruikers niet zoeken",
+			"code":  "SEARCH_FAILED",
+		})
+	}
+
+	return c.JSON(users)
 }

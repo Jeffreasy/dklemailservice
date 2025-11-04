@@ -137,6 +137,7 @@ func BenchmarkRefreshAccessToken_Flow(b *testing.B) {
 	mockRefreshRepo.On("Create", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 	mockRefreshRepo.On("RevokeToken", mock.Anything, "bench-refresh-token").Return(nil)
 	mockUserRoleRepo.On("ListActiveByUser", mock.Anything, "refresh-bench").Return([]*models.UserRole{}, nil)
+	mockUserRoleRepo.On("GetByUserIDWithRoles", mock.Anything, "refresh-bench").Return([]*models.UserRole{}, nil)
 
 	authService := services.NewAuthServiceWithRBAC(mockUserRepo, mockRefreshRepo, mockUserRoleRepo)
 	ctx := context.Background()

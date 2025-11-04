@@ -152,6 +152,9 @@ type GebruikerRepository interface {
 	// List haalt een lijst van gebruikers op
 	List(ctx context.Context, limit, offset int) ([]*models.Gebruiker, error)
 
+	// Search zoekt gebruikers op basis van naam of email
+	Search(ctx context.Context, query string, limit int) ([]*models.Gebruiker, error)
+
 	// Update werkt een bestaande gebruiker bij
 	Update(ctx context.Context, gebruiker *models.Gebruiker) error
 

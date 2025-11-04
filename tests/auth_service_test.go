@@ -75,6 +75,14 @@ func (m *AuthMockGebruikerRepository) GetNewsletterSubscribers(ctx context.Conte
 	return args.Get(0).([]*models.Gebruiker), args.Error(1)
 }
 
+func (m *AuthMockGebruikerRepository) Search(ctx context.Context, query string, limit int) ([]*models.Gebruiker, error) {
+	args := m.Called(ctx, query, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.Gebruiker), args.Error(1)
+}
+
 type AuthMockRefreshTokenRepository struct {
 	mock.Mock
 }
