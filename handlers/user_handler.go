@@ -50,8 +50,19 @@ func (h *UserHandler) RegisterRoutes(app *fiber.App) {
 func (h *UserHandler) ListUsers(c *fiber.Ctx) error {
 	limit, _ := strconv.Atoi(c.Query("limit", "50"))
 	offset, _ := strconv.Atoi(c.Query("offset", "0"))
+	query := c.Query("q") // Support search query parameter
 
-	users, err := h.authService.ListUsers(c.Context(), limit, offset)
+	var users []*models.Gebruiker
+	var err error
+
+	if query != "" {
+		// Use search functionality if query parameter is provided
+		users, err = h.authService.SearchUsers(c.Context(), query, limit)
+	} else {
+		// Use regular list functionality
+		users, err = h.authService.ListUsers(c.Context(), limit, offset)
+	}
+
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),
