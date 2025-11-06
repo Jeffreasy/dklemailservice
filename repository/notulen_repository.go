@@ -70,25 +70,29 @@ func (r *PostgresNotulenRepository) Update(ctx context.Context, notulen *models.
 
 	// Explicitly update all fields including updated_by using a map to ensure all fields are included
 	updateData := map[string]interface{}{
-		"titel":             notulen.Titel,
-		"vergadering_datum": notulen.VergaderingDatum,
-		"locatie":           notulen.Locatie,
-		"voorzitter":        notulen.Voorzitter,
-		"notulist":          notulen.Notulist,
-		"aanwezigen":        notulen.Aanwezigen,
-		"afwezigen":         notulen.Afwezigen,
-		"agenda_items":      notulen.AgendaItems,
-		"besluiten":         notulen.Besluiten,
-		"actiepunten":       notulen.Actiepunten,
-		"notities":          notulen.Notities,
-		"status":            notulen.Status,
-		"versie":            notulen.Versie,
-		"created_by":        notulen.CreatedBy,
-		"created_at":        notulen.CreatedAt,
-		"updated_at":        notulen.UpdatedAt,
-		"updated_by":        notulen.UpdatedBy,
-		"finalized_at":      notulen.FinalizedAt,
-		"finalized_by":      notulen.FinalizedBy,
+		"titel":                 notulen.Titel,
+		"vergadering_datum":     notulen.VergaderingDatum,
+		"locatie":               notulen.Locatie,
+		"voorzitter":            notulen.Voorzitter,
+		"notulist":              notulen.Notulist,
+		"aanwezigen":            notulen.Aanwezigen,
+		"afwezigen":             notulen.Afwezigen,
+		"aanwezigen_gebruikers": notulen.AanwezigenGebruikers, // UUID array for registered users
+		"afwezigen_gebruikers":  notulen.AfwezigenGebruikers,  // UUID array for registered users
+		"aanwezigen_gasten":     notulen.AanwezigenGasten,     // Text array for guest names
+		"afwezigen_gasten":      notulen.AfwezigenGasten,      // Text array for guest names
+		"agenda_items":          notulen.AgendaItems,
+		"besluiten":             notulen.Besluiten,
+		"actiepunten":           notulen.Actiepunten,
+		"notities":              notulen.Notities,
+		"status":                notulen.Status,
+		"versie":                notulen.Versie,
+		"created_by":            notulen.CreatedBy,
+		"created_at":            notulen.CreatedAt,
+		"updated_at":            notulen.UpdatedAt,
+		"updated_by":            notulen.UpdatedBy,
+		"finalized_at":          notulen.FinalizedAt,
+		"finalized_by":          notulen.FinalizedBy,
 	}
 
 	result := r.DB().WithContext(ctx).Model(notulen).Updates(updateData)

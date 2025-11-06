@@ -198,10 +198,11 @@ func main() {
 		logger.Fatal("Database migratie fout", "error", err)
 	}
 
-	// Seed database met initiële data
-	if err := migrationManager.SeedDatabase(); err != nil {
-		logger.Fatal("Database seeding fout", "error", err)
-	}
+	// [GEMINI] VERWIJDERD: De 'SeedDatabase' aanroep is nu overbodig.
+	// Onze SQL-migraties (V02, V03, etc.) hebben dit al gedaan.
+	// if err := migrationManager.SeedDatabase(); err != nil {
+	// 	 logger.Fatal("Database seeding fout", "error", err)
+	// }
 
 	// Initialiseer service factory
 	serviceFactory := services.NewServiceFactory(repoFactory)
@@ -806,6 +807,11 @@ func main() {
 	// Initialiseer notulen handler
 	notulenHandler := handlers.NewNotulenHandler(serviceFactory.NotulenService, serviceFactory.AuthService, serviceFactory.PermissionService)
 	notulenHandler.RegisterRoutes(app)
+
+	// Initialiseer notulen WebSocket handler
+	notulenWsHandler := handlers.NewNotulenWebSocketHandler(serviceFactory.NotulenService.Hub(), serviceFactory.AuthService)
+	notulenWsHandler.RegisterRoutes(app)
+	logger.Info("Notulen WebSocket routes registered - /api/ws/notulen endpoint active")
 
 	// Start server
 	port := os.Getenv("PORT")

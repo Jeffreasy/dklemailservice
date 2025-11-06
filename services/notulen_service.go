@@ -17,13 +17,15 @@ import (
 type NotulenService struct {
 	repo        *repository.PostgresNotulenRepository
 	userService *AuthService
+	hub         *NotulenHub
 }
 
 // NewNotulenService creates a new notulen service
-func NewNotulenService(repo *repository.PostgresNotulenRepository, userService *AuthService) *NotulenService {
+func NewNotulenService(repo *repository.PostgresNotulenRepository, userService *AuthService, hub *NotulenHub) *NotulenService {
 	return &NotulenService{
 		repo:        repo,
 		userService: userService,
+		hub:         hub,
 	}
 }
 
@@ -35,32 +37,32 @@ func (s *NotulenService) CreateNotulen(ctx context.Context, userID uuid.UUID, re
 		return nil, fmt.Errorf("ongeldige vergadering datum: %w", err)
 	}
 
-	// Convert string UUIDs to pq.GenericArray for registered users
-	var aanwezigenGebruikers pq.GenericArray
-	var afwezigenGebruikers pq.GenericArray
+	// Convert string UUIDs to UUIDArray for registered users
+	var aanwezigenGebruikers models.UUIDArray
+	var afwezigenGebruikers models.UUIDArray
 
 	if req.AanwezigenGebruikers != nil {
-		var uuids []uuid.UUID
+		uuids := make([]uuid.UUID, 0, len(req.AanwezigenGebruikers))
 		for _, userUUIDStr := range req.AanwezigenGebruikers {
 			if userUUID, err := uuid.Parse(userUUIDStr); err == nil {
 				uuids = append(uuids, userUUID)
 			}
 		}
-		aanwezigenGebruikers = pq.GenericArray{A: uuids}
+		aanwezigenGebruikers = uuids
 	} else {
-		aanwezigenGebruikers = pq.GenericArray{A: []uuid.UUID{}}
+		aanwezigenGebruikers = models.UUIDArray{}
 	}
 
 	if req.AfwezigenGebruikers != nil {
-		var uuids []uuid.UUID
+		uuids := make([]uuid.UUID, 0, len(req.AfwezigenGebruikers))
 		for _, userUUIDStr := range req.AfwezigenGebruikers {
 			if userUUID, err := uuid.Parse(userUUIDStr); err == nil {
 				uuids = append(uuids, userUUID)
 			}
 		}
-		afwezigenGebruikers = pq.GenericArray{A: uuids}
+		afwezigenGebruikers = uuids
 	} else {
-		afwezigenGebruikers = pq.GenericArray{A: []uuid.UUID{}}
+		afwezigenGebruikers = models.UUIDArray{}
 	}
 
 	// Create notulen object
@@ -150,22 +152,22 @@ func (s *NotulenService) UpdateNotulen(ctx context.Context, userID uuid.UUID, id
 
 	// Handle new UUID participant fields
 	if req.AanwezigenGebruikers != nil {
-		var uuids []uuid.UUID
+		uuids := make([]uuid.UUID, 0, len(req.AanwezigenGebruikers))
 		for _, userUUIDStr := range req.AanwezigenGebruikers {
 			if userUUID, err := uuid.Parse(userUUIDStr); err == nil {
 				uuids = append(uuids, userUUID)
 			}
 		}
-		notulen.AanwezigenGebruikers = pq.GenericArray{A: uuids}
+		notulen.AanwezigenGebruikers = uuids
 	}
 	if req.AfwezigenGebruikers != nil {
-		var uuids []uuid.UUID
+		uuids := make([]uuid.UUID, 0, len(req.AfwezigenGebruikers))
 		for _, userUUIDStr := range req.AfwezigenGebruikers {
 			if userUUID, err := uuid.Parse(userUUIDStr); err == nil {
 				uuids = append(uuids, userUUID)
 			}
 		}
-		notulen.AfwezigenGebruikers = pq.GenericArray{A: uuids}
+		notulen.AfwezigenGebruikers = uuids
 	}
 	if req.AanwezigenGasten != nil {
 		notulen.AanwezigenGasten = req.AanwezigenGasten
@@ -195,6 +197,12 @@ func (s *NotulenService) UpdateNotulen(ctx context.Context, userID uuid.UUID, id
 		return nil, fmt.Errorf("failed to update notulen: %w", err)
 	}
 
+	// Broadcast update to WebSocket clients
+	if s.hub != nil {
+		response := s.convertToNotulenResponse(notulen)
+		s.hub.BroadcastNotulenUpdate(notulen.ID, userID, response)
+	}
+
 	return notulen, nil
 }
 
@@ -216,7 +224,16 @@ func (s *NotulenService) FinalizeNotulen(ctx context.Context, userID uuid.UUID, 
 	}
 
 	// Finalize
-	return s.repo.Finalize(ctx, id, userID)
+	if err := s.repo.Finalize(ctx, id, userID); err != nil {
+		return err
+	}
+
+	// Broadcast finalization to WebSocket clients
+	if s.hub != nil {
+		s.hub.BroadcastNotulenFinalized(id, userID)
+	}
+
+	return nil
 }
 
 // ArchiveNotulen archives a notulen document
@@ -236,7 +253,17 @@ func (s *NotulenService) ArchiveNotulen(ctx context.Context, userID uuid.UUID, i
 		return fmt.Errorf("geen toestemming om notulen te archiveren")
 	}
 
-	return s.repo.Archive(ctx, id)
+	// Archive
+	if err := s.repo.Archive(ctx, id); err != nil {
+		return err
+	}
+
+	// Broadcast archiving to WebSocket clients
+	if s.hub != nil {
+		s.hub.BroadcastNotulenArchived(id, userID)
+	}
+
+	return nil
 }
 
 // DeleteNotulen deletes a notulen (soft delete)
@@ -256,7 +283,17 @@ func (s *NotulenService) DeleteNotulen(ctx context.Context, userID uuid.UUID, id
 		return fmt.Errorf("geen toestemming om notulen te verwijderen")
 	}
 
-	return s.repo.Delete(ctx, id)
+	// Delete
+	if err := s.repo.Delete(ctx, id); err != nil {
+		return err
+	}
+
+	// Broadcast deletion to WebSocket clients
+	if s.hub != nil {
+		s.hub.BroadcastNotulenDeleted(id, userID)
+	}
+
+	return nil
 }
 
 // ListNotulen lists notulen with filtering and pagination
@@ -302,15 +339,13 @@ func (s *NotulenService) GetNotulenVersions(ctx context.Context, notulenID uuid.
 	for i := range versions {
 		version := &versions[i]
 
-		if version.AanwezigenGebruikers.A != nil {
-			userUUIDs := version.AanwezigenGebruikers.A.([]uuid.UUID)
-			userNames := s.resolveUserNames(userUUIDs)
+		if len(version.AanwezigenGebruikers) > 0 {
+			userNames := s.resolveUserNames(version.AanwezigenGebruikers)
 			version.Aanwezigen = append(userNames, version.AanwezigenGasten...)
 		}
 
-		if version.AfwezigenGebruikers.A != nil {
-			userUUIDs := version.AfwezigenGebruikers.A.([]uuid.UUID)
-			userNames := s.resolveUserNames(userUUIDs)
+		if len(version.AfwezigenGebruikers) > 0 {
+			userNames := s.resolveUserNames(version.AfwezigenGebruikers)
 			version.Afwezigen = append(userNames, version.AfwezigenGasten...)
 		}
 	}
@@ -327,15 +362,13 @@ func (s *NotulenService) GetNotulenVersion(ctx context.Context, notulenID uuid.U
 
 	// Resolve user names for display instead of UUIDs
 	// This ensures version history shows proper names instead of raw UUIDs
-	if version.AanwezigenGebruikers.A != nil {
-		userUUIDs := version.AanwezigenGebruikers.A.([]uuid.UUID)
-		userNames := s.resolveUserNames(userUUIDs)
+	if len(version.AanwezigenGebruikers) > 0 {
+		userNames := s.resolveUserNames(version.AanwezigenGebruikers)
 		version.Aanwezigen = append(userNames, version.AanwezigenGasten...)
 	}
 
-	if version.AfwezigenGebruikers.A != nil {
-		userUUIDs := version.AfwezigenGebruikers.A.([]uuid.UUID)
-		userNames := s.resolveUserNames(userUUIDs)
+	if len(version.AfwezigenGebruikers) > 0 {
+		userNames := s.resolveUserNames(version.AfwezigenGebruikers)
 		version.Afwezigen = append(userNames, version.AfwezigenGasten...)
 	}
 
@@ -354,11 +387,11 @@ func (s *NotulenService) RenderMarkdown(notulen *models.Notulen) (string, error)
 	}
 
 	// Resolve user names from UUIDs for display
-	if notulen.AanwezigenGebruikers.A != nil {
-		templateData.AanwezigenResolved = s.resolveUserNames(notulen.AanwezigenGebruikers.A.([]uuid.UUID))
+	if len(notulen.AanwezigenGebruikers) > 0 {
+		templateData.AanwezigenResolved = s.resolveUserNames(notulen.AanwezigenGebruikers)
 	}
-	if notulen.AfwezigenGebruikers.A != nil {
-		templateData.AfwezigenResolved = s.resolveUserNames(notulen.AfwezigenGebruikers.A.([]uuid.UUID))
+	if len(notulen.AfwezigenGebruikers) > 0 {
+		templateData.AfwezigenResolved = s.resolveUserNames(notulen.AfwezigenGebruikers)
 	}
 
 	// Combine with guest names
@@ -419,6 +452,38 @@ func (s *NotulenService) convertToNotulenResponse(notulen *models.Notulen) *mode
 		}
 	}
 
+	// ✅ NIEUW: Resolve participant UUIDs en combineer met guests voor backwards compatibility
+	var aanwezigenCombined pq.StringArray
+	var afwezigenCombined pq.StringArray
+
+	// Resolve aanwezigen gebruikers UUIDs naar namen
+	if len(notulen.AanwezigenGebruikers) > 0 {
+		resolvedNames := s.resolveUserNames(notulen.AanwezigenGebruikers)
+		aanwezigenCombined = append(aanwezigenCombined, resolvedNames...)
+	}
+	// Voeg gasten toe
+	if len(notulen.AanwezigenGasten) > 0 {
+		aanwezigenCombined = append(aanwezigenCombined, notulen.AanwezigenGasten...)
+	}
+	// Fallback naar oude data indien nieuw systeem leeg is
+	if len(aanwezigenCombined) == 0 && len(notulen.Aanwezigen) > 0 {
+		aanwezigenCombined = notulen.Aanwezigen
+	}
+
+	// Resolve afwezigen gebruikers UUIDs naar namen
+	if len(notulen.AfwezigenGebruikers) > 0 {
+		resolvedNames := s.resolveUserNames(notulen.AfwezigenGebruikers)
+		afwezigenCombined = append(afwezigenCombined, resolvedNames...)
+	}
+	// Voeg gasten toe
+	if len(notulen.AfwezigenGasten) > 0 {
+		afwezigenCombined = append(afwezigenCombined, notulen.AfwezigenGasten...)
+	}
+	// Fallback naar oude data indien nieuw systeem leeg is
+	if len(afwezigenCombined) == 0 && len(notulen.Afwezigen) > 0 {
+		afwezigenCombined = notulen.Afwezigen
+	}
+
 	// Create response with resolved names
 	response := &models.NotulenResponse{
 		ID:                   notulen.ID,
@@ -427,12 +492,12 @@ func (s *NotulenService) convertToNotulenResponse(notulen *models.Notulen) *mode
 		Locatie:              notulen.Locatie,
 		Voorzitter:           notulen.Voorzitter,
 		Notulist:             notulen.Notulist,
-		Aanwezigen:           notulen.Aanwezigen,
-		Afwezigen:            notulen.Afwezigen,
-		AanwezigenGebruikers: notulen.AanwezigenGebruikers,
-		AfwezigenGebruikers:  notulen.AfwezigenGebruikers,
-		AanwezigenGasten:     notulen.AanwezigenGasten,
-		AfwezigenGasten:      notulen.AfwezigenGasten,
+		Aanwezigen:           aanwezigenCombined,           // ✅ GEFIXED: Gecombineerde namen (users + guests)
+		Afwezigen:            afwezigenCombined,            // ✅ GEFIXED: Gecombineerde namen (users + guests)
+		AanwezigenGebruikers: notulen.AanwezigenGebruikers, // UUID arrays blijven beschikbaar
+		AfwezigenGebruikers:  notulen.AfwezigenGebruikers,  // UUID arrays blijven beschikbaar
+		AanwezigenGasten:     notulen.AanwezigenGasten,     // Guest namen blijven beschikbaar
+		AfwezigenGasten:      notulen.AfwezigenGasten,      // Guest namen blijven beschikbaar
 		AgendaItems:          notulen.AgendaItems,
 		Besluiten:            notulen.Besluiten,
 		Actiepunten:          notulen.Actiepunten,
@@ -497,6 +562,11 @@ func (s *NotulenService) resolveUserNames(userUUIDs []uuid.UUID) []string {
 	}
 
 	return names
+}
+
+// Hub returns the WebSocket hub for external access
+func (s *NotulenService) Hub() *NotulenHub {
+	return s.hub
 }
 
 // ValidateNotulen validates notulen data

@@ -2,6 +2,7 @@
 package services
 
 import (
+	"context"
 	"dklautomationgo/config"
 	"dklautomationgo/logger"
 	"dklautomationgo/models"
@@ -138,8 +139,12 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 		repoFactory.Aanmelding,
 	)
 
+	// Initialize NotulenHub for WebSocket support
+	notulenHub := NewNotulenHub()
+	go notulenHub.Run(context.Background())
+
 	// Initialize NotulenService
-	notulenService := NewNotulenService(repoFactory.Notulen.(*repository.PostgresNotulenRepository), &authService)
+	notulenService := NewNotulenService(repoFactory.Notulen.(*repository.PostgresNotulenRepository), &authService, notulenHub)
 
 	return &ServiceFactory{
 		EmailService:        emailService,

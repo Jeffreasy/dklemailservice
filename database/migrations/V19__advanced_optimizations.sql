@@ -1,0 +1,406 @@
+-- GECONSOLIDEERDE V19 - GEAVANCEERDE OPTIMALISATIES
+-- Logica van V1_48.
+-- OUDE 'INSERT INTO migraties' is verwijderd.
+-- OPTIMALISATIE: De generieke trigger-functie wordt nu ook toegepast op 'route_funds' (van V17).
+
+-- ============================================
+-- SECTION 0: DATA CLEANUP BEFORE CONSTRAINTS
+-- ============================================
+-- Fix invalid data that would violate new constraints
+UPDATE contact_formulieren
+SET status = 'nieuw'
+WHERE status NOT IN ('nieuw', 'in_behandeling', 'beantwoord', 'gesloten');
+
+UPDATE aanmeldingen
+SET status = 'nieuw'
+WHERE status NOT IN ('nieuw', 'bevestigd', 'geannuleerd', 'voltooid');
+
+-- Fix invalid emails
+UPDATE gebruikers
+SET email = 'fixed_' || id || '@placeholder.invalid'
+WHERE email !~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$';
+
+UPDATE contact_formulieren
+SET email = 'fixed_' || id || '@placeholder.invalid'
+WHERE email !~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$';
+
+UPDATE aanmeldingen
+SET email = 'fixed_' || id || '@placeholder.invalid'
+WHERE email !~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$';
+
+-- Fix empty names
+UPDATE gebruikers
+SET naam = 'Onbekend_' || id::text
+WHERE LENGTH(TRIM(naam)) = 0;
+
+UPDATE contact_formulieren
+SET naam = 'Onbekend_' || id::text
+WHERE LENGTH(TRIM(naam)) = 0;
+
+UPDATE aanmeldingen
+SET naam = 'Onbekend_' || id::text
+WHERE LENGTH(TRIM(naam)) = 0;
+
+-- Fix empty messages
+UPDATE contact_formulieren
+SET bericht = 'Geen bericht opgegeven'
+WHERE LENGTH(TRIM(bericht)) = 0;
+
+-- Fix negative steps
+UPDATE aanmeldingen
+SET steps = 0
+WHERE steps < 0;
+
+-- Fix email consistency
+UPDATE contact_formulieren
+SET email_verzonden_op = created_at
+WHERE email_verzonden = TRUE AND email_verzonden_op IS NULL;
+
+UPDATE aanmeldingen
+SET email_verzonden_op = created_at
+WHERE email_verzonden = TRUE AND email_verzonden_op IS NULL;
+
+-- ============================================
+-- SECTION 1: CLEANUP DUPLICATE CONSTRAINTS
+-- ============================================
+-- (Deze waren al opgeschoond in onze V1, maar 'IF EXISTS' is veilig)
+ALTER TABLE contact_antwoorden DROP CONSTRAINT IF EXISTS fk_contact_antwoorden_contact_id CASCADE;
+ALTER TABLE aanmelding_antwoorden DROP CONSTRAINT IF EXISTS fk_aanmelding_antwoorden_aanmelding_id CASCADE;
+
+-- ============================================
+-- SECTION 2: AUTO UPDATE_AT TRIGGERS
+-- ============================================
+-- Create generic trigger function
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+COMMENT ON FUNCTION update_updated_at_column() IS 'Generic trigger function to update updated_at timestamp';
+
+-- Apply to all tables with updated_at column
+DROP TRIGGER IF EXISTS trigger_gebruikers_updated_at ON gebruikers;
+CREATE TRIGGER trigger_gebruikers_updated_at
+    BEFORE UPDATE ON gebruikers
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS trigger_contact_formulieren_updated_at ON contact_formulieren;
+CREATE TRIGGER trigger_contact_formulieren_updated_at
+    BEFORE UPDATE ON contact_formulieren
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS trigger_contact_antwoorden_updated_at ON contact_antwoorden;
+CREATE TRIGGER trigger_contact_antwoorden_updated_at
+    BEFORE UPDATE ON contact_antwoorden
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS trigger_aanmeldingen_updated_at ON aanmeldingen;
+CREATE TRIGGER trigger_aanmeldingen_updated_at
+    BEFORE UPDATE ON aanmeldingen
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS trigger_aanmelding_antwoorden_updated_at ON aanmelding_antwoorden;
+CREATE TRIGGER trigger_aanmelding_antwoorden_updated_at
+    BEFORE UPDATE ON aanmelding_antwoorden
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS trigger_email_templates_updated_at ON email_templates;
+CREATE TRIGGER trigger_email_templates_updated_at
+    BEFORE UPDATE ON email_templates
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS trigger_verzonden_emails_updated_at ON verzonden_emails;
+CREATE TRIGGER trigger_verzonden_emails_updated_at
+    BEFORE UPDATE ON verzonden_emails
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS trigger_incoming_emails_updated_at ON incoming_emails;
+CREATE TRIGGER trigger_incoming_emails_updated_at
+    BEFORE UPDATE ON incoming_emails
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Chat tables
+DROP TRIGGER IF EXISTS trigger_chat_channels_updated_at ON chat_channels;
+CREATE TRIGGER trigger_chat_channels_updated_at
+    BEFORE UPDATE ON chat_channels
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS trigger_chat_messages_updated_at ON chat_messages;
+CREATE TRIGGER trigger_chat_messages_updated_at
+    BEFORE UPDATE ON chat_messages
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS trigger_chat_user_presence_updated_at ON chat_user_presence;
+CREATE TRIGGER trigger_chat_user_presence_updated_at
+    BEFORE UPDATE ON chat_user_presence
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Content tables
+DROP TRIGGER IF EXISTS trigger_newsletters_updated_at ON newsletters;
+CREATE TRIGGER trigger_newsletters_updated_at
+    BEFORE UPDATE ON newsletters
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS trigger_uploaded_images_updated_at ON uploaded_images;
+CREATE TRIGGER trigger_uploaded_images_updated_at
+    BEFORE UPDATE ON uploaded_images
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS trigger_photos_updated_at ON photos;
+CREATE TRIGGER trigger_photos_updated_at
+    BEFORE UPDATE ON photos
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS trigger_albums_updated_at ON albums;
+CREATE TRIGGER trigger_albums_updated_at
+    BEFORE UPDATE ON albums
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS trigger_videos_updated_at ON videos;
+CREATE TRIGGER trigger_videos_updated_at
+    BEFORE UPDATE ON videos
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS trigger_sponsors_updated_at ON sponsors;
+CREATE TRIGGER trigger_sponsors_updated_at
+    BEFORE UPDATE ON sponsors
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- ** NIEUWE TOEVOEGING: Pas ook toe op route_funds (van V17) **
+-- (Verwijdert de specifieke trigger van V1_46)
+DROP TRIGGER IF EXISTS trigger_route_funds_updated_at ON route_funds;
+CREATE TRIGGER trigger_route_funds_updated_at
+    BEFORE UPDATE ON route_funds
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- SECTION 3: DATA VALIDATION CONSTRAINTS
+-- ============================================
+-- Add constraints for data integrity
+ALTER TABLE gebruikers DROP CONSTRAINT IF EXISTS gebruikers_email_check;
+ALTER TABLE gebruikers ADD CONSTRAINT gebruikers_email_check 
+    CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$');
+
+ALTER TABLE contact_formulieren DROP CONSTRAINT IF EXISTS contact_formulieren_email_check;
+ALTER TABLE contact_formulieren ADD CONSTRAINT contact_formulieren_email_check 
+    CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$');
+
+ALTER TABLE aanmeldingen DROP CONSTRAINT IF EXISTS aanmeldingen_email_check;
+ALTER TABLE aanmeldingen ADD CONSTRAINT aanmeldingen_email_check 
+    CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$');
+
+-- Steps must be non-negative
+ALTER TABLE aanmeldingen DROP CONSTRAINT IF EXISTS aanmeldingen_steps_check;
+ALTER TABLE aanmeldingen ADD CONSTRAINT aanmeldingen_steps_check
+    CHECK (steps >= 0);
+
+-- ============================================
+-- SECTION 4: MISSING UPDATED_AT DEFAULT
+-- ============================================
+ALTER TABLE gebruikers ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE contact_formulieren ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE contact_antwoorden ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE aanmeldingen ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE aanmelding_antwoorden ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE email_templates ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE verzonden_emails ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE incoming_emails ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;
+
+-- ============================================
+-- SECTION 5: PERFORMANCE HINTS FOR QUERY PLANNER
+-- ============================================
+ALTER TABLE gebruikers ALTER COLUMN email SET STATISTICS 1000;
+ALTER TABLE contact_formulieren ALTER COLUMN email SET STATISTICS 1000;
+ALTER TABLE aanmeldingen ALTER COLUMN email SET STATISTICS 1000;
+ALTER TABLE contact_formulieren ALTER COLUMN status SET STATISTICS 500;
+ALTER TABLE aanmeldingen ALTER COLUMN status SET STATISTICS 500;
+ALTER TABLE verzonden_emails ALTER COLUMN status SET STATISTICS 500;
+ALTER TABLE verzonden_emails ALTER COLUMN contact_id SET STATISTICS 500;
+ALTER TABLE verzonden_emails ALTER COLUMN aanmelding_id SET STATISTICS 500;
+ALTER TABLE contact_antwoorden ALTER COLUMN contact_id SET STATISTICS 500;
+ALTER TABLE aanmelding_antwoorden ALTER COLUMN aanmelding_id SET STATISTICS 500;
+
+-- ============================================
+-- SECTION 6: DENORMALIZATION (CACHED COUNTERS)
+-- ============================================
+ALTER TABLE contact_formulieren ADD COLUMN IF NOT EXISTS antwoorden_count INTEGER DEFAULT 0;
+COMMENT ON COLUMN contact_formulieren.antwoorden_count IS 'Cached count of responses - updated via trigger';
+
+-- Create trigger to maintain count
+CREATE OR REPLACE FUNCTION update_contact_antwoorden_count()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        UPDATE contact_formulieren 
+        SET antwoorden_count = antwoorden_count + 1 
+        WHERE id = NEW.contact_id;
+    ELSIF TG_OP = 'DELETE' THEN
+        UPDATE contact_formulieren 
+        SET antwoorden_count = GREATEST(0, antwoorden_count - 1) 
+        WHERE id = OLD.contact_id;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_contact_antwoorden_count ON contact_antwoorden;
+CREATE TRIGGER trigger_contact_antwoorden_count
+    AFTER INSERT OR DELETE ON contact_antwoorden
+    FOR EACH ROW
+    EXECUTE FUNCTION update_contact_antwoorden_count();
+
+-- Initialize counts
+UPDATE contact_formulieren cf
+SET antwoorden_count = (
+    SELECT COUNT(*) 
+    FROM contact_antwoorden ca 
+    WHERE ca.contact_id = cf.id
+);
+
+-- Same for aanmeldingen
+ALTER TABLE aanmeldingen ADD COLUMN IF NOT EXISTS antwoorden_count INTEGER DEFAULT 0;
+COMMENT ON COLUMN aanmeldingen.antwoorden_count IS 'Cached count of responses - updated via trigger';
+
+CREATE OR REPLACE FUNCTION update_aanmelding_antwoorden_count()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        UPDATE aanmeldingen 
+        SET antwoorden_count = antwoorden_count + 1 
+        WHERE id = NEW.aanmelding_id;
+    ELSIF TG_OP = 'DELETE' THEN
+        UPDATE aanmeldingen 
+        SET antwoorden_count = GREATEST(0, antwoorden_count - 1) 
+        WHERE id = OLD.aanmelding_id;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_aanmelding_antwoorden_count ON aanmelding_antwoorden;
+CREATE TRIGGER trigger_aanmelding_antwoorden_count
+    AFTER INSERT OR DELETE ON aanmelding_antwoorden
+    FOR EACH ROW
+    EXECUTE FUNCTION update_aanmelding_antwoorden_count();
+
+-- Initialize counts
+UPDATE aanmeldingen a
+SET antwoorden_count = (
+    SELECT COUNT(*) 
+    FROM aanmelding_antwoorden aa 
+    WHERE aa.aanmelding_id = a.id
+);
+
+-- ============================================
+-- SECTION 7: MATERIALIZED VIEWS
+-- ============================================
+CREATE MATERIALIZED VIEW IF NOT EXISTS dashboard_stats AS
+SELECT
+    'contact_formulieren' as entity,
+    status,
+    beantwoord,
+    COUNT(*) as count,
+    MAX(created_at) as last_created
+FROM contact_formulieren
+GROUP BY status, beantwoord
+UNION ALL
+SELECT
+    'aanmeldingen' as entity,
+    status,
+    NULL as beantwoord,
+    COUNT(*) as count,
+    MAX(created_at) as last_created
+FROM aanmeldingen
+GROUP BY status
+UNION ALL
+SELECT
+    'verzonden_emails' as entity,
+    status,
+    NULL as beantwoord,
+    COUNT(*) as count,
+    MAX(verzonden_op) as last_created
+FROM verzonden_emails
+WHERE verzonden_op > NOW() - INTERVAL '30 days'
+GROUP BY status;
+
+-- Create index on materialized view
+CREATE UNIQUE INDEX IF NOT EXISTS idx_dashboard_stats_entity_status 
+ON dashboard_stats(entity, status, beantwoord); -- Verbeterde index
+
+-- Refresh function
+CREATE OR REPLACE FUNCTION refresh_dashboard_stats()
+RETURNS void AS $$
+BEGIN
+    REFRESH MATERIALIZED VIEW CONCURRENTLY dashboard_stats;
+END;
+$$ LANGUAGE plpgsql;
+
+COMMENT ON MATERIALIZED VIEW dashboard_stats IS 'Cached dashboard statistics - refresh hourly or on demand';
+COMMENT ON FUNCTION refresh_dashboard_stats() IS 'Refresh dashboard statistics view (concurrent safe)';
+
+-- ============================================
+-- SECTION 8: DATA QUALITY CONSTRAINTS
+-- ============================================
+ALTER TABLE gebruikers DROP CONSTRAINT IF EXISTS gebruikers_naam_not_empty;
+ALTER TABLE gebruikers ADD CONSTRAINT gebruikers_naam_not_empty 
+    CHECK (LENGTH(TRIM(naam)) > 0);
+
+ALTER TABLE contact_formulieren DROP CONSTRAINT IF EXISTS contact_formulieren_naam_not_empty;
+ALTER TABLE contact_formulieren ADD CONSTRAINT contact_formulieren_naam_not_empty 
+    CHECK (LENGTH(TRIM(naam)) > 0);
+
+ALTER TABLE aanmeldingen DROP CONSTRAINT IF EXISTS aanmeldingen_naam_not_empty;
+ALTER TABLE aanmeldingen ADD CONSTRAINT aanmeldingen_naam_not_empty 
+    CHECK (LENGTH(TRIM(naam)) > 0);
+
+ALTER TABLE contact_formulieren DROP CONSTRAINT IF EXISTS contact_formulieren_bericht_not_empty;
+ALTER TABLE contact_formulieren ADD CONSTRAINT contact_formulieren_bericht_not_empty 
+    CHECK (LENGTH(TRIM(bericht)) > 0);
+
+-- ============================================
+-- SECTION 9: PERFORMANCE INDEXES ON COMPUTED COLUMNS
+-- ============================================
+CREATE INDEX IF NOT EXISTS idx_contact_formulieren_antwoorden_count 
+ON contact_formulieren(antwoorden_count) 
+WHERE antwoorden_count > 0;
+
+CREATE INDEX IF NOT EXISTS idx_aanmeldingen_antwoorden_count 
+ON aanmeldingen(antwoorden_count) 
+WHERE antwoorden_count > 0;
+
+-- ============================================
+-- SECTION 10: MISSING INDEXES ON STATUS TRANSITIONS
+-- ============================================
+CREATE INDEX IF NOT EXISTS idx_contact_formulieren_behandeld 
+ON contact_formulieren(behandeld_op DESC NULLS LAST, status);
+
+CREATE INDEX IF NOT EXISTS idx_aanmeldingen_behandeld 
+ON aanmeldingen(behandeld_op DESC NULLS LAST, status);
+
+-- ============================================
+-- POST-MIGRATION INSTRUCTIONS
+-- ============================================
+-- 1. ANALYZE;
+-- 2. SELECT refresh_dashboard_stats();
+-- 3. Set up hourly refresh job.

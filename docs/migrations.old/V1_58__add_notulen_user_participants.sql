@@ -126,8 +126,12 @@ COMMENT ON FUNCTION get_user_uuids_from_names IS 'Converteert array van user nam
 -- 5. VIEWS FOR BACKWARDS COMPATIBILITY AND EASY ACCESS
 -- =====================================================
 
+-- Drop existing views to avoid column mismatch errors
+DROP VIEW IF EXISTS notulen_with_participants CASCADE;
+DROP VIEW IF EXISTS notulen_versies_with_participants CASCADE;
+
 -- View that combines user UUIDs and guest names into single arrays (for API compatibility)
-CREATE OR REPLACE VIEW notulen_with_participants AS
+CREATE VIEW notulen_with_participants AS
 SELECT
     n.*,
     -- Combined aanwezigen (users + guests)
@@ -157,7 +161,7 @@ FROM notulen n;
 COMMENT ON VIEW notulen_with_participants IS 'Notulen view met gecombineerde participant lijsten (voor API backwards compatibility)';
 
 -- Similar view for versions
-CREATE OR REPLACE VIEW notulen_versies_with_participants AS
+CREATE VIEW notulen_versies_with_participants AS
 SELECT
     nv.*,
     -- Combined aanwezigen (users + guests)
