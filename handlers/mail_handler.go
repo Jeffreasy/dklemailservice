@@ -172,13 +172,16 @@ func (h *MailHandler) RegisterRoutes(app *fiber.App) {
 	})
 
 	// Mail beheer routes
+	// BELANGRIJK: Specifieke routes moeten vóór parametrische routes (/:id) komen
 	mailGroup.Get("/", h.ListEmails)
-	mailGroup.Get("/:id", h.GetEmail)
-	mailGroup.Put("/:id/processed", h.MarkAsProcessed)
-	mailGroup.Delete("/:id", h.DeleteEmail)
 	mailGroup.Post("/fetch", h.FetchEmails)
 	mailGroup.Get("/unprocessed", h.ListUnprocessedEmails)
 	mailGroup.Get("/account/:type", h.ListEmailsByAccountType)
+
+	// Parametrische routes komen als laatste
+	mailGroup.Get("/:id", h.GetEmail)
+	mailGroup.Put("/:id/processed", h.MarkAsProcessed)
+	mailGroup.Delete("/:id", h.DeleteEmail)
 }
 
 // ListEmails haalt een lijst van emails op

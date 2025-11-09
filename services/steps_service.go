@@ -12,19 +12,19 @@ import (
 
 // StepsService bevat business logic voor stappen tracking
 type StepsService struct {
-	db             *gorm.DB
-	aanmeldingRepo repository.AanmeldingRepository
-	routeFundRepo  repository.RouteFundRepository
-	stepsHub       *StepsHub // WebSocket hub voor real-time updates
+	db              *gorm.DB
+	participantRepo repository.ParticipantRepository
+	distanceRepo    repository.DistanceRepository
+	stepsHub        *StepsHub // WebSocket hub voor real-time updates
 }
 
 // NewStepsService maakt een nieuwe steps service
-func NewStepsService(db *gorm.DB, aanmeldingRepo repository.AanmeldingRepository, routeFundRepo repository.RouteFundRepository) *StepsService {
+func NewStepsService(db *gorm.DB, participantRepo repository.ParticipantRepository, distanceRepo repository.DistanceRepository) *StepsService {
 	return &StepsService{
-		db:             db,
-		aanmeldingRepo: aanmeldingRepo,
-		routeFundRepo:  routeFundRepo,
-		stepsHub:       nil, // Wordt later gezet via SetStepsHub
+		db:              db,
+		participantRepo: participantRepo,
+		distanceRepo:    distanceRepo,
+		stepsHub:        nil, // Wordt later gezet via SetStepsHub
 	}
 }
 
@@ -33,10 +33,17 @@ func (s *StepsService) SetStepsHub(hub *StepsHub) {
 	s.stepsHub = hub
 }
 
+// GetDB returns the database connection
+func (s *StepsService) GetDB() *gorm.DB {
+	return s.db
+}
+
 // UpdateSteps werkt stappen bij voor een deelnemer (delta toevoegen)
-func (s *StepsService) UpdateSteps(participantID string, deltaSteps int) (*models.Aanmelding, error) {
+func (s *StepsService) UpdateSteps(participantID string, deltaSteps int) (*models.Participant, error) {
+	ctx := context.Background()
+
 	// Haal deelnemer op
-	participant, err := s.aanmeldingRepo.GetByID(context.TODO(), participantID)
+	participant, err := s.participantRepo.GetByID(ctx, participantID)
 	if err != nil {
 		return nil, fmt.Errorf("deelnemer niet gevonden: %w", err)
 	}
@@ -44,15 +51,21 @@ func (s *StepsService) UpdateSteps(participantID string, deltaSteps int) (*model
 		return nil, fmt.Errorf("deelnemer niet gevonden")
 	}
 
+	// Haal event registration op voor stappen bijwerken
+	var eventReg models.EventRegistration
+	if err := s.db.Where("participant_id = ?", participantID).First(&eventReg).Error; err != nil {
+		return nil, fmt.Errorf("event registration niet gevonden: %w", err)
+	}
+
 	// Update stappen (voorkom negatieve stappen)
-	newSteps := participant.Steps + deltaSteps
+	newSteps := eventReg.Steps + deltaSteps
 	if newSteps < 0 {
 		newSteps = 0
 	}
-	participant.Steps = newSteps
+	eventReg.Steps = newSteps
 
-	// Sla wijzigingen op
-	if err := s.aanmeldingRepo.Update(context.TODO(), participant); err != nil {
+	// Sla event registration op
+	if err := s.db.Save(&eventReg).Error; err != nil {
 		return nil, fmt.Errorf("kon stappen niet bijwerken: %w", err)
 	}
 
@@ -63,9 +76,9 @@ func (s *StepsService) UpdateSteps(participantID string, deltaSteps int) (*model
 }
 
 // UpdateStepsByUserID werkt stappen bij voor een deelnemer via gebruiker ID
-func (s *StepsService) UpdateStepsByUserID(userID string, deltaSteps int) (*models.Aanmelding, error) {
+func (s *StepsService) UpdateStepsByUserID(userID string, deltaSteps int) (*models.Participant, error) {
 	// Haal deelnemer op via gebruiker_id
-	var participant models.Aanmelding
+	var participant models.Participant
 	err := s.db.Where("gebruiker_id = ?", userID).First(&participant).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -74,15 +87,27 @@ func (s *StepsService) UpdateStepsByUserID(userID string, deltaSteps int) (*mode
 		return nil, fmt.Errorf("fout bij ophalen deelnemer: %w", err)
 	}
 
+	// Haal event registration op voor stappen bijwerken
+	var eventReg models.EventRegistration
+	if err := s.db.Where("participant_id = ?", userID).First(&eventReg).Error; err != nil {
+		return nil, fmt.Errorf("event registration niet gevonden: %w", err)
+	}
+
 	// Update stappen (voorkom negatieve stappen)
-	newSteps := participant.Steps + deltaSteps
+	newSteps := eventReg.Steps + deltaSteps
 	if newSteps < 0 {
 		newSteps = 0
 	}
-	participant.Steps = newSteps
+	eventReg.Steps = newSteps
+
+	// Sla event registration op
+	if err := s.db.Save(&eventReg).Error; err != nil {
+		return nil, fmt.Errorf("kon stappen niet bijwerken: %w", err)
+	}
 
 	// Sla wijzigingen op
-	if err := s.aanmeldingRepo.Update(context.TODO(), &participant); err != nil {
+	ctx := context.Background()
+	if err := s.participantRepo.Update(ctx, &participant); err != nil {
 		return nil, fmt.Errorf("kon stappen niet bijwerken: %w", err)
 	}
 
@@ -93,9 +118,11 @@ func (s *StepsService) UpdateStepsByUserID(userID string, deltaSteps int) (*mode
 }
 
 // GetParticipantDashboard haalt dashboard data op voor een deelnemer
-func (s *StepsService) GetParticipantDashboard(participantID string) (*models.Aanmelding, int, error) {
+func (s *StepsService) GetParticipantDashboard(participantID string) (*models.Participant, int, error) {
+	ctx := context.Background()
+
 	// Haal deelnemer op
-	participant, err := s.aanmeldingRepo.GetByID(context.TODO(), participantID)
+	participant, err := s.participantRepo.GetByID(ctx, participantID)
 	if err != nil {
 		return nil, 0, fmt.Errorf("deelnemer niet gevonden: %w", err)
 	}
@@ -103,16 +130,26 @@ func (s *StepsService) GetParticipantDashboard(participantID string) (*models.Aa
 		return nil, 0, fmt.Errorf("deelnemer niet gevonden")
 	}
 
+	// Haal event registration op voor afstand
+	var eventReg models.EventRegistration
+	if err := s.db.Where("participant_id = ?", participantID).First(&eventReg).Error; err != nil {
+		return nil, 0, fmt.Errorf("event registration niet gevonden: %w", err)
+	}
+
 	// Bereken allocated funds gebaseerd op afstand
-	allocatedFunds := s.CalculateAllocatedFunds(participant.Afstand)
+	route := ""
+	if eventReg.DistanceRoute != nil {
+		route = *eventReg.DistanceRoute
+	}
+	allocatedFunds := s.CalculateAllocatedFunds(route)
 
 	return participant, allocatedFunds, nil
 }
 
 // GetParticipantDashboardByUserID haalt dashboard data op voor een deelnemer via gebruiker ID
-func (s *StepsService) GetParticipantDashboardByUserID(userID string) (*models.Aanmelding, int, error) {
+func (s *StepsService) GetParticipantDashboardByUserID(userID string) (*models.Participant, int, error) {
 	// Haal deelnemer op via gebruiker_id
-	var participant models.Aanmelding
+	var participant models.Participant
 	err := s.db.Where("gebruiker_id = ?", userID).First(&participant).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -121,16 +158,28 @@ func (s *StepsService) GetParticipantDashboardByUserID(userID string) (*models.A
 		return nil, 0, fmt.Errorf("fout bij ophalen deelnemer: %w", err)
 	}
 
+	// Haal event registration op voor afstand
+	var eventReg models.EventRegistration
+	if err := s.db.Where("participant_id = ?", userID).First(&eventReg).Error; err != nil {
+		return nil, 0, fmt.Errorf("event registration niet gevonden: %w", err)
+	}
+
 	// Bereken allocated funds gebaseerd op afstand
-	allocatedFunds := s.CalculateAllocatedFunds(participant.Afstand)
+	route := ""
+	if eventReg.DistanceRoute != nil {
+		route = *eventReg.DistanceRoute
+	}
+	allocatedFunds := s.CalculateAllocatedFunds(route)
 
 	return &participant, allocatedFunds, nil
 }
 
 // CalculateAllocatedFunds berekent toegewezen fondsen gebaseerd op afstand
 func (s *StepsService) CalculateAllocatedFunds(route string) int {
+	ctx := context.Background()
+
 	// Haal fondsallocatie op uit database
-	routeFund, err := s.routeFundRepo.GetByRoute(context.TODO(), route)
+	distance, err := s.distanceRepo.GetByRoute(ctx, route)
 	if err != nil {
 		// Fallback naar standaard waarden als route niet gevonden wordt
 		switch route {
@@ -146,7 +195,7 @@ func (s *StepsService) CalculateAllocatedFunds(route string) int {
 			return 50 // Standaard bedrag
 		}
 	}
-	return routeFund.Amount
+	return distance.RegistrationFee
 }
 
 // GetTotalSteps haalt totaal aantal stappen op
@@ -154,7 +203,7 @@ func (s *StepsService) CalculateAllocatedFunds(route string) int {
 // Anders filter op jaar van aanmelding
 func (s *StepsService) GetTotalSteps(year int) (int, error) {
 	var total int
-	query := s.db.Model(&models.Aanmelding{})
+	query := s.db.Model(&models.Participant{})
 
 	// Als year > 0, filter op jaar van aanmelding
 	if year > 0 {
@@ -190,36 +239,38 @@ func (s *StepsService) GetFundsDistribution() (map[string]int, error) {
 
 // GetFundsDistributionProportional haalt proportionele fondsverdeling op gebaseerd op aantal deelnemers
 func (s *StepsService) GetFundsDistributionProportional() (map[string]int, int, error) {
-	// Haal alle route funds op
-	routeFunds, err := s.routeFundRepo.GetAll(context.TODO())
+	ctx := context.Background()
+
+	// Haal alle distances op
+	distances, err := s.distanceRepo.GetAll(ctx)
 	if err != nil {
-		return nil, 0, fmt.Errorf("kon route funds niet ophalen: %w", err)
+		return nil, 0, fmt.Errorf("kon distances niet ophalen: %w", err)
 	}
 
 	// Bereken totaal bedrag
 	totalFunds := 0
-	for _, rf := range routeFunds {
-		totalFunds += rf.Amount
+	for _, d := range distances {
+		totalFunds += d.RegistrationFee
 	}
 
 	distribution := make(map[string]int)
 
 	// Tel aantal deelnemers per route
 	totalParticipants := 0
-	for _, rf := range routeFunds {
+	for _, d := range distances {
 		var count int64
-		s.db.Model(&models.Aanmelding{}).Where("afstand = ?", rf.Route).Count(&count)
+		s.db.Model(&models.Participant{}).Where("afstand = ?", d.Route).Count(&count)
 		totalParticipants += int(count)
-		distribution[rf.Route] = int(count)
+		distribution[d.Route] = int(count)
 	}
 
 	// Verdeel proportioneel gebaseerd op aantal deelnemers
 	if totalParticipants > 0 {
 		for route, count := range distribution {
 			// Zoek het fondsbedrag voor deze route
-			for _, rf := range routeFunds {
-				if rf.Route == route {
-					distribution[route] = (rf.Amount * count) / totalParticipants
+			for _, d := range distances {
+				if d.Route == route {
+					distribution[route] = (d.RegistrationFee * count) / totalParticipants
 					break
 				}
 			}
@@ -231,60 +282,95 @@ func (s *StepsService) GetFundsDistributionProportional() (map[string]int, int, 
 
 // GetRouteFunds haalt alle route fondsallocaties op
 func (s *StepsService) GetRouteFunds() ([]*models.RouteFund, error) {
-	return s.routeFundRepo.GetAll(context.TODO())
+	ctx := context.Background()
+	distances, err := s.distanceRepo.GetAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert Distance models to RouteFund models for backward compatibility
+	routeFunds := make([]*models.RouteFund, len(distances))
+	for i, d := range distances {
+		routeFunds[i] = &models.RouteFund{
+			Route:  d.Route,
+			Amount: d.RegistrationFee,
+		}
+	}
+	return routeFunds, nil
 }
 
 // UpdateRouteFund werkt een route fondsallocatie bij
 func (s *StepsService) UpdateRouteFund(route string, amount int) (*models.RouteFund, error) {
+	ctx := context.Background()
+
 	// Controleer of route bestaat
-	existing, err := s.routeFundRepo.GetByRoute(context.TODO(), route)
+	existing, err := s.distanceRepo.GetByRoute(ctx, route)
 	if err != nil {
 		return nil, fmt.Errorf("route niet gevonden: %w", err)
 	}
 
-	existing.Amount = amount
-	if err := s.routeFundRepo.Update(context.TODO(), existing); err != nil {
-		return nil, fmt.Errorf("kon route fund niet bijwerken: %w", err)
+	existing.RegistrationFee = amount
+	if err := s.distanceRepo.Update(ctx, existing); err != nil {
+		return nil, fmt.Errorf("kon distance niet bijwerken: %w", err)
 	}
 
-	return existing, nil
+	// Return RouteFund for backward compatibility
+	return &models.RouteFund{
+		Route:  existing.Route,
+		Amount: existing.RegistrationFee,
+	}, nil
 }
 
 // CreateRouteFund maakt een nieuwe route fondsallocatie aan
 func (s *StepsService) CreateRouteFund(route string, amount int) (*models.RouteFund, error) {
-	routeFund := &models.RouteFund{
-		Route:  route,
-		Amount: amount,
+	distance := &models.Distance{
+		Route:           route,
+		RegistrationFee: amount,
 	}
 
-	if err := s.routeFundRepo.Create(context.TODO(), routeFund); err != nil {
-		return nil, fmt.Errorf("kon route fund niet aanmaken: %w", err)
+	if err := s.distanceRepo.Create(context.TODO(), distance); err != nil {
+		return nil, fmt.Errorf("kon distance niet aanmaken: %w", err)
 	}
 
-	return routeFund, nil
+	// Return RouteFund for backward compatibility
+	return &models.RouteFund{
+		Route:  distance.Route,
+		Amount: distance.RegistrationFee,
+	}, nil
 }
 
 // DeleteRouteFund verwijdert een route fondsallocatie
 func (s *StepsService) DeleteRouteFund(route string) error {
-	return s.routeFundRepo.Delete(context.TODO(), route)
+	ctx := context.Background()
+	return s.distanceRepo.Delete(ctx, route)
 }
 
 // broadcastStepUpdate broadcast een stappen update via WebSocket
-func (s *StepsService) broadcastStepUpdate(participant *models.Aanmelding, delta int) {
+func (s *StepsService) broadcastStepUpdate(participant *models.Participant, delta int) {
 	if s.stepsHub == nil {
 		return // WebSocket niet geïnitialiseerd
 	}
 
-	allocatedFunds := s.CalculateAllocatedFunds(participant.Afstand)
+	// Haal event registration op voor afstand
+	var eventReg models.EventRegistration
+	if err := s.db.Where("participant_id = ?", participant.ID).First(&eventReg).Error; err != nil {
+		return
+	}
+
+	route := ""
+	if eventReg.DistanceRoute != nil {
+		route = *eventReg.DistanceRoute
+	}
+	allocatedFunds := s.CalculateAllocatedFunds(route)
 
 	// Broadcast step update
 	s.stepsHub.StepUpdate <- &StepUpdateMessage{
 		Type:           MessageTypeStepUpdate,
 		ParticipantID:  participant.ID,
 		Naam:           participant.Naam,
-		Steps:          participant.Steps,
+		Steps:          eventReg.Steps,
 		Delta:          delta,
-		Route:          participant.Afstand,
+		Route:          route,
 		AllocatedFunds: allocatedFunds,
 		Timestamp:      time.Now().Unix(),
 	}

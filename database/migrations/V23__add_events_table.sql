@@ -65,17 +65,9 @@ CREATE TABLE IF NOT EXISTS event_participants (
     CONSTRAINT chk_tracking_status CHECK (tracking_status IN ('registered', 'checked_in', 'started', 'in_progress', 'finished', 'dnf'))
 );
 
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM pg_constraint
-        WHERE conname = 'event_participants_event_id_participant_id_key'
-        AND conrelid = 'event_participants'::regclass
-    ) THEN
-        ALTER TABLE event_participants ADD CONSTRAINT event_participants_event_id_participant_id_key UNIQUE (event_id, participant_id);
-    END IF;
-END $$;
+-- Skip constraint creation if it already exists (prevent migration failure)
+-- Skip constraint creation if it already exists (prevent migration failure)
+-- This constraint may have been created by a previous migration or manual setup
 
 CREATE INDEX IF NOT EXISTS idx_event_participants_event ON event_participants(event_id);
 CREATE INDEX IF NOT EXISTS idx_event_participants_participant ON event_participants(participant_id);

@@ -11,28 +11,28 @@ import (
 
 // MockDB is een in-memory database implementatie voor tests
 type MockDB struct {
-	mu                   sync.RWMutex
-	contacts             map[string]*models.ContactFormulier
-	contactAntwoorden    map[string]*models.ContactAntwoord
-	aanmeldingen         map[string]*models.Aanmelding
-	aanmeldingAntwoorden map[string]*models.AanmeldingAntwoord
-	emailTemplates       map[string]*models.EmailTemplate
-	verzondenEmails      map[string]*models.VerzondEmail
-	gebruikers           map[string]*models.Gebruiker
-	migraties            map[string]*models.Migratie
+	mu                    sync.RWMutex
+	contacts              map[string]*models.ContactFormulier
+	contactAntwoorden     map[string]*models.ContactAntwoord
+	participants          map[string]*models.Participant
+	participantAntwoorden map[string]*models.ParticipantAntwoord
+	emailTemplates        map[string]*models.EmailTemplate
+	verzondenEmails       map[string]*models.VerzondEmail
+	gebruikers            map[string]*models.Gebruiker
+	migraties             map[string]*models.Migratie
 }
 
 // NewMockDB maakt een nieuwe mock database
 func NewMockDB() *MockDB {
 	return &MockDB{
-		contacts:             make(map[string]*models.ContactFormulier),
-		contactAntwoorden:    make(map[string]*models.ContactAntwoord),
-		aanmeldingen:         make(map[string]*models.Aanmelding),
-		aanmeldingAntwoorden: make(map[string]*models.AanmeldingAntwoord),
-		emailTemplates:       make(map[string]*models.EmailTemplate),
-		verzondenEmails:      make(map[string]*models.VerzondEmail),
-		gebruikers:           make(map[string]*models.Gebruiker),
-		migraties:            make(map[string]*models.Migratie),
+		contacts:              make(map[string]*models.ContactFormulier),
+		contactAntwoorden:     make(map[string]*models.ContactAntwoord),
+		participants:          make(map[string]*models.Participant),
+		participantAntwoorden: make(map[string]*models.ParticipantAntwoord),
+		emailTemplates:        make(map[string]*models.EmailTemplate),
+		verzondenEmails:       make(map[string]*models.VerzondEmail),
+		gebruikers:            make(map[string]*models.Gebruiker),
+		migraties:             make(map[string]*models.Migratie),
 	}
 }
 
@@ -146,6 +146,7 @@ func (r *MockContactRepository) FindByStatus(ctx context.Context, status string)
 
 	var result []*models.ContactFormulier
 	for _, contact := range r.db.contacts {
+		// V27: Direct field access (database column is 'status')
 		if contact.Status == status {
 			result = append(result, contact)
 		}
@@ -300,57 +301,57 @@ func (r *MockContactAntwoordRepository) Delete(ctx context.Context, id string) e
 	return nil
 }
 
-// MockAanmeldingRepository is een mock implementatie van AanmeldingRepository
-type MockAanmeldingRepository struct {
+// MockParticipantRepository is een mock implementatie van ParticipantRepository
+type MockParticipantRepository struct {
 	db *MockDB
 }
 
-// NewMockAanmeldingRepository maakt een nieuwe mock aanmelding repository
-func NewMockAanmeldingRepository(db *MockDB) *MockAanmeldingRepository {
-	return &MockAanmeldingRepository{
+// NewMockParticipantRepository maakt een nieuwe mock participant repository
+func NewMockParticipantRepository(db *MockDB) *MockParticipantRepository {
+	return &MockParticipantRepository{
 		db: db,
 	}
 }
 
-// Create slaat een nieuwe aanmelding op
-func (r *MockAanmeldingRepository) Create(ctx context.Context, aanmelding *models.Aanmelding) error {
+// Create slaat een nieuwe participant op
+func (r *MockParticipantRepository) Create(ctx context.Context, participant *models.Participant) error {
 	r.db.mu.Lock()
 	defer r.db.mu.Unlock()
 
-	if aanmelding.ID == "" {
-		return errors.New("aanmelding ID is vereist")
+	if participant.ID == "" {
+		return errors.New("participant ID is vereist")
 	}
 
-	r.db.aanmeldingen[aanmelding.ID] = aanmelding
+	r.db.participants[participant.ID] = participant
 	return nil
 }
 
-// GetByID haalt een aanmelding op basis van ID
-func (r *MockAanmeldingRepository) GetByID(ctx context.Context, id string) (*models.Aanmelding, error) {
+// GetByID haalt een participant op basis van ID
+func (r *MockParticipantRepository) GetByID(ctx context.Context, id string) (*models.Participant, error) {
 	r.db.mu.RLock()
 	defer r.db.mu.RUnlock()
 
-	aanmelding, exists := r.db.aanmeldingen[id]
+	participant, exists := r.db.participants[id]
 	if !exists {
 		return nil, nil
 	}
 
-	return aanmelding, nil
+	return participant, nil
 }
 
-// List haalt een lijst van aanmeldingen op
-func (r *MockAanmeldingRepository) List(ctx context.Context, limit, offset int) ([]*models.Aanmelding, error) {
+// List haalt een lijst van participants op
+func (r *MockParticipantRepository) List(ctx context.Context, limit, offset int) ([]*models.Participant, error) {
 	r.db.mu.RLock()
 	defer r.db.mu.RUnlock()
 
-	var result []*models.Aanmelding
-	for _, aanmelding := range r.db.aanmeldingen {
-		result = append(result, aanmelding)
+	var result []*models.Participant
+	for _, participant := range r.db.participants {
+		result = append(result, participant)
 	}
 
 	// Pas limit en offset toe
 	if offset >= len(result) {
-		return []*models.Aanmelding{}, nil
+		return []*models.Participant{}, nil
 	}
 
 	end := offset + limit
@@ -361,96 +362,76 @@ func (r *MockAanmeldingRepository) List(ctx context.Context, limit, offset int) 
 	return result[offset:end], nil
 }
 
-// Update werkt een aanmelding bij
-func (r *MockAanmeldingRepository) Update(ctx context.Context, aanmelding *models.Aanmelding) error {
+// Update werkt een participant bij
+func (r *MockParticipantRepository) Update(ctx context.Context, participant *models.Participant) error {
 	r.db.mu.Lock()
 	defer r.db.mu.Unlock()
 
-	if _, exists := r.db.aanmeldingen[aanmelding.ID]; !exists {
-		return errors.New("aanmelding niet gevonden")
+	if _, exists := r.db.participants[participant.ID]; !exists {
+		return errors.New("participant niet gevonden")
 	}
 
-	aanmelding.UpdatedAt = time.Now()
-	r.db.aanmeldingen[aanmelding.ID] = aanmelding
+	participant.UpdatedAt = time.Now()
+	r.db.participants[participant.ID] = participant
 	return nil
 }
 
-// Delete verwijdert een aanmelding
-func (r *MockAanmeldingRepository) Delete(ctx context.Context, id string) error {
+// Delete verwijdert een participant
+func (r *MockParticipantRepository) Delete(ctx context.Context, id string) error {
 	r.db.mu.Lock()
 	defer r.db.mu.Unlock()
 
-	if _, exists := r.db.aanmeldingen[id]; !exists {
-		return nil // Geen fout als de aanmelding niet bestaat
+	if _, exists := r.db.participants[id]; !exists {
+		return nil // Geen fout als de participant niet bestaat
 	}
 
-	delete(r.db.aanmeldingen, id)
+	delete(r.db.participants, id)
 	return nil
 }
 
-// FindByEmail zoekt aanmeldingen op basis van email
-func (r *MockAanmeldingRepository) FindByEmail(ctx context.Context, email string) ([]*models.Aanmelding, error) {
+// FindByEmail zoekt participants op basis van email
+func (r *MockParticipantRepository) FindByEmail(ctx context.Context, email string) ([]*models.Participant, error) {
 	r.db.mu.RLock()
 	defer r.db.mu.RUnlock()
 
-	var result []*models.Aanmelding
-	for _, aanmelding := range r.db.aanmeldingen {
-		if aanmelding.Email == email {
-			result = append(result, aanmelding)
+	var result []*models.Participant
+	for _, participant := range r.db.participants {
+		if participant.Email == email {
+			result = append(result, participant)
 		}
 	}
 
 	return result, nil
 }
 
-// FindByStatus zoekt aanmeldingen op basis van status
-func (r *MockAanmeldingRepository) FindByStatus(ctx context.Context, status string) ([]*models.Aanmelding, error) {
+// FindByStatus zoekt participants op basis van status
+// Status is niet meer deel van het Participant model, dus retourneer alle participants
+func (r *MockParticipantRepository) FindByStatus(ctx context.Context, status string) ([]*models.Participant, error) {
 	r.db.mu.RLock()
 	defer r.db.mu.RUnlock()
 
-	// Bekende statussen
-	knownStatuses := map[string]bool{
-		"nieuw":          true,
-		"in_behandeling": true,
-		"beantwoord":     true,
-		"gesloten":       true,
-	}
-
-	// Als de status niet bekend is, retourneer alle aanmeldingen
-	// Dit is nodig voor de GetAanmeldingenByRol methode die FindByStatus gebruikt met rol als parameter
-	if !knownStatuses[status] {
-		var result []*models.Aanmelding
-		for _, aanmelding := range r.db.aanmeldingen {
-			result = append(result, aanmelding)
-		}
-		return result, nil
-	}
-
-	// Anders filter op status
-	var result []*models.Aanmelding
-	for _, aanmelding := range r.db.aanmeldingen {
-		if aanmelding.Status == status {
-			result = append(result, aanmelding)
-		}
+	var result []*models.Participant
+	for _, participant := range r.db.participants {
+		result = append(result, participant)
 	}
 
 	return result, nil
 }
 
-// MockAanmeldingAntwoordRepository is een mock implementatie van AanmeldingAntwoordRepository
-type MockAanmeldingAntwoordRepository struct {
+// MockParticipantAntwoordRepository is een mock implementatie van ParticipantAntwoordRepository
+type MockParticipantAntwoordRepository struct {
 	db *MockDB
 }
 
-// NewMockAanmeldingAntwoordRepository maakt een nieuwe mock aanmelding antwoord repository
-func NewMockAanmeldingAntwoordRepository(db *MockDB) *MockAanmeldingAntwoordRepository {
-	return &MockAanmeldingAntwoordRepository{
+// NewMockParticipantAntwoordRepository maakt een nieuwe mock participant antwoord repository
+func NewMockParticipantAntwoordRepository(db *MockDB) *MockParticipantAntwoordRepository {
+	return &MockParticipantAntwoordRepository{
 		db: db,
 	}
 }
 
-// Create slaat een nieuw aanmeldingantwoord op
-func (r *MockAanmeldingAntwoordRepository) Create(ctx context.Context, antwoord *models.AanmeldingAntwoord) error {
+// Create slaat een nieuw participantantwoord op
+func (r *MockParticipantAntwoordRepository) Create(ctx context.Context, antwoord *models.ParticipantAntwoord) error {
 	r.db.mu.Lock()
 	defer r.db.mu.Unlock()
 
@@ -458,16 +439,16 @@ func (r *MockAanmeldingAntwoordRepository) Create(ctx context.Context, antwoord 
 		return errors.New("antwoord ID is vereist")
 	}
 
-	r.db.aanmeldingAntwoorden[antwoord.ID] = antwoord
+	r.db.participantAntwoorden[antwoord.ID] = antwoord
 	return nil
 }
 
-// GetByID haalt een aanmeldingantwoord op basis van ID
-func (r *MockAanmeldingAntwoordRepository) GetByID(ctx context.Context, id string) (*models.AanmeldingAntwoord, error) {
+// GetByID haalt een participantantwoord op basis van ID
+func (r *MockParticipantAntwoordRepository) GetByID(ctx context.Context, id string) (*models.ParticipantAntwoord, error) {
 	r.db.mu.RLock()
 	defer r.db.mu.RUnlock()
 
-	antwoord, exists := r.db.aanmeldingAntwoorden[id]
+	antwoord, exists := r.db.participantAntwoorden[id]
 	if !exists {
 		return nil, nil
 	}
@@ -475,14 +456,14 @@ func (r *MockAanmeldingAntwoordRepository) GetByID(ctx context.Context, id strin
 	return antwoord, nil
 }
 
-// ListByAanmeldingID haalt een lijst van aanmeldingantwoorden op basis van aanmeldingID
-func (r *MockAanmeldingAntwoordRepository) ListByAanmeldingID(ctx context.Context, aanmeldingID string) ([]*models.AanmeldingAntwoord, error) {
+// ListByParticipantID haalt een lijst van participantantwoorden op basis van participantID
+func (r *MockParticipantAntwoordRepository) ListByParticipantID(ctx context.Context, participantID string) ([]*models.ParticipantAntwoord, error) {
 	r.db.mu.RLock()
 	defer r.db.mu.RUnlock()
 
-	var result []*models.AanmeldingAntwoord
-	for _, antwoord := range r.db.aanmeldingAntwoorden {
-		if antwoord.AanmeldingID == aanmeldingID {
+	var result []*models.ParticipantAntwoord
+	for _, antwoord := range r.db.participantAntwoorden {
+		if antwoord.ParticipantID == participantID {
 			result = append(result, antwoord)
 		}
 	}
@@ -490,29 +471,29 @@ func (r *MockAanmeldingAntwoordRepository) ListByAanmeldingID(ctx context.Contex
 	return result, nil
 }
 
-// Update werkt een aanmeldingantwoord bij
-func (r *MockAanmeldingAntwoordRepository) Update(ctx context.Context, antwoord *models.AanmeldingAntwoord) error {
+// Update werkt een participantantwoord bij
+func (r *MockParticipantAntwoordRepository) Update(ctx context.Context, antwoord *models.ParticipantAntwoord) error {
 	r.db.mu.Lock()
 	defer r.db.mu.Unlock()
 
-	if _, exists := r.db.aanmeldingAntwoorden[antwoord.ID]; !exists {
+	if _, exists := r.db.participantAntwoorden[antwoord.ID]; !exists {
 		return errors.New("antwoord niet gevonden")
 	}
 
-	r.db.aanmeldingAntwoorden[antwoord.ID] = antwoord
+	r.db.participantAntwoorden[antwoord.ID] = antwoord
 	return nil
 }
 
-// Delete verwijdert een aanmeldingantwoord
-func (r *MockAanmeldingAntwoordRepository) Delete(ctx context.Context, id string) error {
+// Delete verwijdert een participantantwoord
+func (r *MockParticipantAntwoordRepository) Delete(ctx context.Context, id string) error {
 	r.db.mu.Lock()
 	defer r.db.mu.Unlock()
 
-	if _, exists := r.db.aanmeldingAntwoorden[id]; !exists {
+	if _, exists := r.db.participantAntwoorden[id]; !exists {
 		return nil // Geen fout als het antwoord niet bestaat
 	}
 
-	delete(r.db.aanmeldingAntwoorden, id)
+	delete(r.db.participantAntwoorden, id)
 	return nil
 }
 
@@ -746,5 +727,212 @@ func (m *MockPermissionService) InvalidateUserCache(userID string) {
 
 // RefreshCache vernieuwt alle caches
 func (m *MockPermissionService) RefreshCache(ctx context.Context) error {
+	return nil
+}
+
+// MockEventRepository is een mock implementatie van EventRepository
+type MockEventRepository struct {
+	db *MockDB
+}
+
+// NewMockEventRepository maakt een nieuwe mock event repository
+func NewMockEventRepository(db *MockDB) *MockEventRepository {
+	return &MockEventRepository{
+		db: db,
+	}
+}
+
+// GetActiveEvent haalt het actieve event op
+func (r *MockEventRepository) GetActiveEvent(ctx context.Context) (*models.Event, error) {
+	// Return a mock active event for testing
+	return &models.Event{
+		ID:          "active-event-id",
+		Name:        "Test Event",
+		Description: "Test Event Description",
+		StartTime:   time.Now().Add(24 * time.Hour),
+		EndTime:     &[]time.Time{time.Now().Add(48 * time.Hour)}[0],
+		Status:      "upcoming", // V27: Direct field (database column is 'status')
+		IsActive:    true,
+	}, nil
+}
+
+// Create slaat een nieuw event op
+func (r *MockEventRepository) Create(ctx context.Context, event *models.Event) error {
+	// Mock implementation - do nothing
+	return nil
+}
+
+// GetByID haalt een event op basis van ID
+func (r *MockEventRepository) GetByID(ctx context.Context, id string) (*models.Event, error) {
+	// Return a mock event for testing
+	return &models.Event{
+		ID:          id,
+		Name:        "Test Event",
+		Description: "Test Event Description",
+		StartTime:   time.Now().Add(24 * time.Hour),
+		EndTime:     &[]time.Time{time.Now().Add(48 * time.Hour)}[0],
+		Status:      "upcoming", // V27: Direct field (database column is 'status')
+		IsActive:    true,
+	}, nil
+}
+
+// List haalt een lijst van events op
+func (r *MockEventRepository) List(ctx context.Context, limit, offset int) ([]*models.Event, error) {
+	// Return empty list for testing
+	return []*models.Event{}, nil
+}
+
+// Update werkt een event bij
+func (r *MockEventRepository) Update(ctx context.Context, event *models.Event) error {
+	// Mock implementation - do nothing
+	return nil
+}
+
+// Delete verwijdert een event
+func (r *MockEventRepository) Delete(ctx context.Context, id string) error {
+	// Mock implementation - do nothing
+	return nil
+}
+
+// GetEventParticipant haalt een event participant op
+func (r *MockEventRepository) GetEventParticipant(ctx context.Context, eventID, participantID string) (*models.EventParticipant, error) {
+	// Return a mock event participant for testing
+	return &models.EventParticipant{
+		ID:            "event-participant-id",
+		EventID:       eventID,
+		ParticipantID: participantID,
+	}, nil
+}
+
+// GetEventParticipants haalt alle event participants op
+func (r *MockEventRepository) GetEventParticipants(ctx context.Context, eventID string) ([]*models.EventParticipant, error) {
+	// Return empty list for testing
+	return []*models.EventParticipant{}, nil
+}
+
+// GetParticipantEvents haalt alle events voor een participant op
+func (r *MockEventRepository) GetParticipantEvents(ctx context.Context, participantID string) ([]*models.EventParticipant, error) {
+	// Return empty list for testing
+	return []*models.EventParticipant{}, nil
+}
+
+// ListActive haalt alle actieve events op
+func (r *MockEventRepository) ListActive(ctx context.Context) ([]*models.Event, error) {
+	// Return empty list for testing
+	return []*models.Event{}, nil
+}
+
+// RegisterParticipant registreert een participant voor een event
+func (r *MockEventRepository) RegisterParticipant(ctx context.Context, eventID, participantID string) (*models.EventParticipant, error) {
+	// Return a mock event participant for testing
+	return &models.EventParticipant{
+		ID:            "new-registration-id",
+		EventID:       eventID,
+		ParticipantID: participantID,
+	}, nil
+}
+
+// UpdateEventParticipant werkt een event participant bij
+func (r *MockEventRepository) UpdateEventParticipant(ctx context.Context, eventParticipant *models.EventParticipant) error {
+	// Mock implementation - do nothing
+	return nil
+}
+
+// MockEventRegistrationRepository is een mock implementatie van EventRegistrationRepository
+type MockEventRegistrationRepository struct {
+	db *MockDB
+}
+
+// NewMockEventRegistrationRepository maakt een nieuwe mock event registration repository
+func NewMockEventRegistrationRepository(db *MockDB) *MockEventRegistrationRepository {
+	return &MockEventRegistrationRepository{
+		db: db,
+	}
+}
+
+// Create slaat een nieuwe event registration op
+func (r *MockEventRegistrationRepository) Create(ctx context.Context, registration *models.EventRegistration) error {
+	// Mock implementation - do nothing
+	return nil
+}
+
+// GetByID haalt een event registration op basis van ID
+func (r *MockEventRegistrationRepository) GetByID(ctx context.Context, id string) (*models.EventRegistration, error) {
+	// Return a mock registration for testing
+	return &models.EventRegistration{
+		ID:            id,
+		EventID:       "event-id",
+		ParticipantID: "participant-id",
+		TestMode:      true,
+	}, nil
+}
+
+// ListByEventID haalt een lijst van registrations op basis van event ID
+func (r *MockEventRegistrationRepository) ListByEventID(ctx context.Context, eventID string) ([]*models.EventRegistration, error) {
+	// Return empty list for testing
+	return []*models.EventRegistration{}, nil
+}
+
+// ListByParticipantID haalt een lijst van registrations op basis van participant ID
+func (r *MockEventRegistrationRepository) ListByParticipantID(ctx context.Context, participantID string) ([]*models.EventRegistration, error) {
+	// Return empty list for testing
+	return []*models.EventRegistration{}, nil
+}
+
+// Update werkt een event registration bij
+func (r *MockEventRegistrationRepository) Update(ctx context.Context, registration *models.EventRegistration) error {
+	// Mock implementation - do nothing
+	return nil
+}
+
+// Delete verwijdert een event registration
+func (r *MockEventRegistrationRepository) Delete(ctx context.Context, id string) error {
+	// Mock implementation - do nothing
+	return nil
+}
+
+// GetByEventAndParticipant haalt een registration op basis van event en participant ID
+func (r *MockEventRegistrationRepository) GetByEventAndParticipant(ctx context.Context, eventID, participantID string) (*models.EventRegistration, error) {
+	// Return a mock registration for testing
+	return &models.EventRegistration{
+		ID:            "registration-id",
+		EventID:       eventID,
+		ParticipantID: participantID,
+		TestMode:      true,
+	}, nil
+}
+
+// GetActiveRegistrationForParticipant haalt de actieve registration op voor een participant
+func (r *MockEventRegistrationRepository) GetActiveRegistrationForParticipant(ctx context.Context, participantID string) (*models.EventRegistration, error) {
+	// Return a mock active registration for testing
+	return &models.EventRegistration{
+		ID:            "active-registration-id",
+		EventID:       "active-event-id",
+		ParticipantID: participantID,
+		TestMode:      true,
+	}, nil
+}
+
+// ListByRole haalt een lijst van registrations op basis van rol
+func (r *MockEventRegistrationRepository) ListByRole(ctx context.Context, roleID string) ([]*models.EventRegistration, error) {
+	// Return empty list for testing
+	return []*models.EventRegistration{}, nil
+}
+
+// List haalt een lijst van event registrations op
+func (r *MockEventRegistrationRepository) List(ctx context.Context, limit, offset int) ([]*models.EventRegistration, error) {
+	// Return empty list for testing
+	return []*models.EventRegistration{}, nil
+}
+
+// ListByStatus haalt alle registraties met een specifieke status op
+func (r *MockEventRegistrationRepository) ListByStatus(ctx context.Context, status string) ([]*models.EventRegistration, error) {
+	// Return empty list for testing
+	return []*models.EventRegistration{}, nil
+}
+
+// UpdateStatus werkt alleen de status van een registratie bij
+func (r *MockEventRegistrationRepository) UpdateStatus(ctx context.Context, id, status string) error {
+	// Mock implementation - do nothing
 	return nil
 }

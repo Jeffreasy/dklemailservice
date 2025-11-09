@@ -177,6 +177,7 @@ func (h *ChatHandler) CreateDirectChannel(c *fiber.Ctx) error {
 	}
 
 	for _, channel := range channels {
+		// V27: Direct field access (database column is 'type')
 		if channel.Type == "direct" {
 			participants, err := h.chatService.ListParticipantsByChannel(c.Context(), channel.ID)
 			if err != nil {
@@ -201,8 +202,8 @@ func (h *ChatHandler) CreateDirectChannel(c *fiber.Ctx) error {
 	// Create new
 	channel := &models.ChatChannel{
 		Name:      fmt.Sprintf("Chat between %s and %s", currentUser.Naam, targetUser.Naam),
-		Type:      "direct",
 		CreatedBy: userID,
+		Type:      "direct", // V27: Set type directly (database column is 'type')
 	}
 	err = h.chatService.CreateChannel(c.Context(), channel)
 	if err != nil {

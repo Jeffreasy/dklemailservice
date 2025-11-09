@@ -90,26 +90,15 @@
             </div>
             
             <div class="content">
-                <p>Beste {{.Aanmelding.Naam}},</p>
-                
-                <p>Bedankt voor je inschrijving voor De Koninklijke Loop. We hebben je aanmelding in goede orde ontvangen.</p>
-                
-                <div class="message-box">
-                    <strong>Je inschrijfgegevens:</strong><br>
-                    Naam: {{.Aanmelding.Naam}}<br>
-                    Email: {{.Aanmelding.Email}}<br>
-                    {{if ne .Aanmelding.Telefoon ""}}<br>
-                    Telefoon: {{.Aanmelding.Telefoon}}<br>
-                    {{end}}
-                    Rol: {{.Aanmelding.Rol}}<br>
-                    Afstand: {{.Aanmelding.Afstand}}<br>
-                    {{if ne .Aanmelding.Ondersteuning ""}}<br>
-                    Ondersteuning: {{.Aanmelding.Ondersteuning}}<br>
-                    {{end}}
-                    {{if ne .Aanmelding.Bijzonderheden ""}}<br>
-                    Bijzonderheden: {{.Aanmelding.Bijzonderheden}}<br>
-                    {{end}}
-                </div>
+                 <p>Beste {{.Participant.Naam}},</p>  
+                 <p>Bedankt voor je inschrijving voor De Koninklijke Loop. We hebben je aanmelding in goede orde ontvangen.</p>
+                 
+                 <div class="message-box">
+                 <strong>Je inschrijfgegevens:</strong><br>
+                 Naam: {{.Participant.Naam}}<br>  Email: {{.Participant.Email}}<br>  {{if ne .Participant.Telefoon ""}}<br>  Telefoon: {{.Participant.Telefoon}}<br>  {{end}}
+                 Rol: {{.Registration.ParticipantRoleName}}<br>  Afstand: {{.Registration.DistanceRoute}}<br>  {{if ne .Registration.Ondersteuning ""}}<br>  Ondersteuning: {{.Registration.Ondersteuning}}<br>  {{end}}
+                 {{if ne .Registration.Bijzonderheden ""}}<br>  Bijzonderheden: {{.Registration.Bijzonderheden}}<br>  {{end}}
+                 </div>
                 
                 <p>Heb je vragen over je inschrijving? Bekijk dan onze website voor meer informatie:</p>
                 

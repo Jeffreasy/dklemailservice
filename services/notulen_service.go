@@ -15,17 +15,19 @@ import (
 
 // NotulenService handles business logic for notulen
 type NotulenService struct {
-	repo        *repository.PostgresNotulenRepository
-	userService *AuthService
-	hub         *NotulenHub
+	repo              *repository.PostgresNotulenRepository
+	userService       *AuthService
+	permissionService PermissionService
+	hub               *NotulenHub
 }
 
 // NewNotulenService creates a new notulen service
-func NewNotulenService(repo *repository.PostgresNotulenRepository, userService *AuthService, hub *NotulenHub) *NotulenService {
+func NewNotulenService(repo *repository.PostgresNotulenRepository, userService *AuthService, permissionService PermissionService, hub *NotulenHub) *NotulenService {
 	return &NotulenService{
-		repo:        repo,
-		userService: userService,
-		hub:         hub,
+		repo:              repo,
+		userService:       userService,
+		permissionService: permissionService,
+		hub:               hub,
 	}
 }
 
@@ -38,56 +40,59 @@ func (s *NotulenService) CreateNotulen(ctx context.Context, userID uuid.UUID, re
 	}
 
 	// Convert string UUIDs to UUIDArray for registered users
-	var aanwezigenGebruikers models.UUIDArray
-	var afwezigenGebruikers models.UUIDArray
+	var aanwezigenGebruikerIDs models.UUIDArray
+	var afwezigenGebruikerIDs models.UUIDArray
 
-	if req.AanwezigenGebruikers != nil {
-		uuids := make([]uuid.UUID, 0, len(req.AanwezigenGebruikers))
-		for _, userUUIDStr := range req.AanwezigenGebruikers {
+	// GEFIXED: Gebruik AanwezigenGebruikerIDs (uit req)
+	if req.AanwezigenGebruikerIDs != nil {
+		uuids := make([]uuid.UUID, 0, len(req.AanwezigenGebruikerIDs))
+		for _, userUUIDStr := range req.AanwezigenGebruikerIDs {
 			if userUUID, err := uuid.Parse(userUUIDStr); err == nil {
 				uuids = append(uuids, userUUID)
 			}
 		}
-		aanwezigenGebruikers = uuids
+		aanwezigenGebruikerIDs = uuids
 	} else {
-		aanwezigenGebruikers = models.UUIDArray{}
+		aanwezigenGebruikerIDs = models.UUIDArray{}
 	}
 
-	if req.AfwezigenGebruikers != nil {
-		uuids := make([]uuid.UUID, 0, len(req.AfwezigenGebruikers))
-		for _, userUUIDStr := range req.AfwezigenGebruikers {
+	// GEFIXED: Gebruik AfwezigenGebruikerIDs (uit req)
+	if req.AfwezigenGebruikerIDs != nil {
+		uuids := make([]uuid.UUID, 0, len(req.AfwezigenGebruikerIDs))
+		for _, userUUIDStr := range req.AfwezigenGebruikerIDs {
 			if userUUID, err := uuid.Parse(userUUIDStr); err == nil {
 				uuids = append(uuids, userUUID)
 			}
 		}
-		afwezigenGebruikers = uuids
+		afwezigenGebruikerIDs = uuids
 	} else {
-		afwezigenGebruikers = models.UUIDArray{}
+		afwezigenGebruikerIDs = models.UUIDArray{}
 	}
 
 	// Create notulen object
 	notulen := &models.Notulen{
-		ID:                   uuid.New(),
-		Titel:                req.Titel,
-		VergaderingDatum:     vergaderingDatum,
-		Locatie:              req.Locatie,
-		Voorzitter:           req.Voorzitter,
-		Notulist:             req.Notulist,
-		Aanwezigen:           req.Aanwezigen, // Legacy field for backwards compatibility
-		Afwezigen:            req.Afwezigen,  // Legacy field for backwards compatibility
-		AanwezigenGebruikers: aanwezigenGebruikers,
-		AfwezigenGebruikers:  afwezigenGebruikers,
-		AanwezigenGasten:     req.AanwezigenGasten,
-		AfwezigenGasten:      req.AfwezigenGasten,
-		AgendaItems:          models.AgendaItems(models.AgendaItemsWrapper{Items: req.AgendaItems}),
-		Besluiten:            models.Besluiten(models.BesluitenWrapper{Besluiten: req.Besluiten}),
-		Actiepunten:          models.Actiepunten(models.ActiepuntenWrapper{Acties: req.Actiepunten}),
-		Notities:             req.Notities,
-		Status:               "draft",
-		Versie:               1,
-		CreatedBy:            userID,
-		CreatedAt:            time.Now(),
-		UpdatedAt:            time.Now(),
+		ID:                     uuid.New(),
+		Titel:                  req.Titel,
+		VergaderingDatum:       vergaderingDatum,
+		Locatie:                req.Locatie,
+		Voorzitter:             req.Voorzitter,
+		Notulist:               req.Notulist,
+		Aanwezigen:             req.Aanwezigen,         // Legacy field
+		Afwezigen:              req.Afwezigen,          // Legacy field
+		AanwezigenGebruikerIDs: aanwezigenGebruikerIDs, // GEFIXED
+		AfwezigenGebruikerIDs:  afwezigenGebruikerIDs,  // GEFIXED
+		AanwezigenGasten:       req.AanwezigenGasten,   // GEFIXED
+		AfwezigenGasten:        req.AfwezigenGasten,    // GEFIXED
+		AgendaItems:            req.AgendaItems,        // Direct assignment
+		Besluiten:              req.Besluiten,          // Direct assignment
+		Actiepunten:            req.Actiepunten,        // Direct assignment
+		Notities:               req.Notities,
+		Status:                 "draft",
+		Versie:                 1,
+		CreatedBy:              userID,
+		CreatedAt:              time.Now(),
+		UpdatedAt:              time.Now(),
+		// UpdatedByID wordt bij aanmaak leeg gelaten
 	}
 
 	// Save to database
@@ -99,13 +104,14 @@ func (s *NotulenService) CreateNotulen(ctx context.Context, userID uuid.UUID, re
 }
 
 // GetNotulen retrieves a notulen by ID
+// GEFIXED: Retourneert nu NotulenResponse
 func (s *NotulenService) GetNotulen(ctx context.Context, id uuid.UUID) (*models.NotulenResponse, error) {
 	notulen, err := s.repo.GetByID(ctx, id)
 	if err != nil || notulen == nil {
 		return nil, err
 	}
 
-	return s.convertToNotulenResponse(notulen), nil
+	return s.ConvertToNotulenResponse(notulen), nil
 }
 
 // UpdateNotulen updates an existing notulen
@@ -121,8 +127,10 @@ func (s *NotulenService) UpdateNotulen(ctx context.Context, userID uuid.UUID, id
 
 	// Check if user can edit (only creator or admin)
 	if notulen.CreatedBy != userID {
-		// TODO: Add admin check via permission service
-		return nil, fmt.Errorf("geen toestemming om notulen te bewerken")
+		// Check admin permission
+		if !s.permissionService.HasPermission(ctx, userID.String(), "admin", "access") {
+			return nil, fmt.Errorf("geen toestemming om notulen te bewerken")
+		}
 	}
 
 	// Check if notulen is finalized
@@ -151,23 +159,24 @@ func (s *NotulenService) UpdateNotulen(ctx context.Context, userID uuid.UUID, id
 	}
 
 	// Handle new UUID participant fields
-	if req.AanwezigenGebruikers != nil {
-		uuids := make([]uuid.UUID, 0, len(req.AanwezigenGebruikers))
-		for _, userUUIDStr := range req.AanwezigenGebruikers {
+	// GEFIXED: Gebruik ...GebruikerIDs
+	if req.AanwezigenGebruikerIDs != nil {
+		uuids := make([]uuid.UUID, 0, len(req.AanwezigenGebruikerIDs))
+		for _, userUUIDStr := range req.AanwezigenGebruikerIDs {
 			if userUUID, err := uuid.Parse(userUUIDStr); err == nil {
 				uuids = append(uuids, userUUID)
 			}
 		}
-		notulen.AanwezigenGebruikers = uuids
+		notulen.AanwezigenGebruikerIDs = uuids
 	}
-	if req.AfwezigenGebruikers != nil {
-		uuids := make([]uuid.UUID, 0, len(req.AfwezigenGebruikers))
-		for _, userUUIDStr := range req.AfwezigenGebruikers {
+	if req.AfwezigenGebruikerIDs != nil {
+		uuids := make([]uuid.UUID, 0, len(req.AfwezigenGebruikerIDs))
+		for _, userUUIDStr := range req.AfwezigenGebruikerIDs {
 			if userUUID, err := uuid.Parse(userUUIDStr); err == nil {
 				uuids = append(uuids, userUUID)
 			}
 		}
-		notulen.AfwezigenGebruikers = uuids
+		notulen.AfwezigenGebruikerIDs = uuids
 	}
 	if req.AanwezigenGasten != nil {
 		notulen.AanwezigenGasten = req.AanwezigenGasten
@@ -176,21 +185,22 @@ func (s *NotulenService) UpdateNotulen(ctx context.Context, userID uuid.UUID, id
 		notulen.AfwezigenGasten = req.AfwezigenGasten
 	}
 
+	// Direct assignment for JSONB fields
 	if req.AgendaItems != nil {
-		notulen.AgendaItems = models.AgendaItems(models.AgendaItemsWrapper{Items: req.AgendaItems})
+		notulen.AgendaItems = req.AgendaItems
 	}
 	if req.Besluiten != nil {
-		notulen.Besluiten = models.Besluiten(models.BesluitenWrapper{Besluiten: req.Besluiten})
+		notulen.Besluiten = req.Besluiten
 	}
 	if req.Actiepunten != nil {
-		notulen.Actiepunten = models.Actiepunten(models.ActiepuntenWrapper{Acties: req.Actiepunten})
+		notulen.Actiepunten = req.Actiepunten
 	}
 	if req.Notities != "" {
 		notulen.Notities = req.Notities
 	}
 
 	notulen.UpdatedAt = time.Now()
-	notulen.UpdatedBy = userID
+	notulen.UpdatedByID = userID // GEFIXED: Gebruik UpdatedByID
 
 	// Save changes
 	if err := s.repo.Update(ctx, notulen); err != nil {
@@ -199,7 +209,7 @@ func (s *NotulenService) UpdateNotulen(ctx context.Context, userID uuid.UUID, id
 
 	// Broadcast update to WebSocket clients
 	if s.hub != nil {
-		response := s.convertToNotulenResponse(notulen)
+		response := s.ConvertToNotulenResponse(notulen)
 		s.hub.BroadcastNotulenUpdate(notulen.ID, userID, response)
 	}
 
@@ -219,8 +229,10 @@ func (s *NotulenService) FinalizeNotulen(ctx context.Context, userID uuid.UUID, 
 
 	// Check permissions
 	if notulen.CreatedBy != userID {
-		// TODO: Add admin check
-		return fmt.Errorf("geen toestemming om notulen te finaliseren")
+		// Check admin permission
+		if !s.permissionService.HasPermission(ctx, userID.String(), "admin", "access") {
+			return fmt.Errorf("geen toestemming om notulen te finaliseren")
+		}
 	}
 
 	// Finalize
@@ -249,8 +261,10 @@ func (s *NotulenService) ArchiveNotulen(ctx context.Context, userID uuid.UUID, i
 
 	// Check permissions
 	if notulen.CreatedBy != userID {
-		// TODO: Add admin check
-		return fmt.Errorf("geen toestemming om notulen te archiveren")
+		// Check admin permission
+		if !s.permissionService.HasPermission(ctx, userID.String(), "admin", "access") {
+			return fmt.Errorf("geen toestemming om notulen te archiveren")
+		}
 	}
 
 	// Archive
@@ -279,8 +293,10 @@ func (s *NotulenService) DeleteNotulen(ctx context.Context, userID uuid.UUID, id
 
 	// Check permissions
 	if notulen.CreatedBy != userID {
-		// TODO: Add admin check
-		return fmt.Errorf("geen toestemming om notulen te verwijderen")
+		// Check admin permission
+		if !s.permissionService.HasPermission(ctx, userID.String(), "admin", "access") {
+			return fmt.Errorf("geen toestemming om notulen te verwijderen")
+		}
 	}
 
 	// Delete
@@ -297,6 +313,7 @@ func (s *NotulenService) DeleteNotulen(ctx context.Context, userID uuid.UUID, id
 }
 
 // ListNotulen lists notulen with filtering and pagination
+// GEFIXED: Retourneert []models.NotulenResponse
 func (s *NotulenService) ListNotulen(ctx context.Context, filters *models.NotulenSearchFilters) ([]models.NotulenResponse, int, error) {
 	notulenList, total, err := s.repo.List(ctx, filters)
 	if err != nil {
@@ -304,15 +321,17 @@ func (s *NotulenService) ListNotulen(ctx context.Context, filters *models.Notule
 	}
 
 	// Convert to response models with resolved user names
+	// GEFIXED: Retourneert []models.NotulenResponse
 	responses := make([]models.NotulenResponse, len(notulenList))
 	for i, notulen := range notulenList {
-		responses[i] = *s.convertToNotulenResponse(&notulen)
+		responses[i] = *s.ConvertToNotulenResponse(&notulen)
 	}
 
 	return responses, total, nil
 }
 
 // SearchNotulen performs full-text search on notulen
+// GEFIXED: Retourneert []models.NotulenResponse
 func (s *NotulenService) SearchNotulen(ctx context.Context, query string, filters *models.NotulenSearchFilters) ([]models.NotulenResponse, int, error) {
 	notulenList, total, err := s.repo.Search(ctx, query, filters)
 	if err != nil {
@@ -320,9 +339,10 @@ func (s *NotulenService) SearchNotulen(ctx context.Context, query string, filter
 	}
 
 	// Convert to response models with resolved user names
+	// GEFIXED: Retourneert []models.NotulenResponse
 	responses := make([]models.NotulenResponse, len(notulenList))
 	for i, notulen := range notulenList {
-		responses[i] = *s.convertToNotulenResponse(&notulen)
+		responses[i] = *s.ConvertToNotulenResponse(&notulen)
 	}
 
 	return responses, total, nil
@@ -335,17 +355,19 @@ func (s *NotulenService) GetNotulenVersions(ctx context.Context, notulenID uuid.
 		return nil, err
 	}
 
-	// Resolve user names for all versions to show proper names instead of UUIDs
+	// Resolve user names for all versions
 	for i := range versions {
 		version := &versions[i]
 
-		if len(version.AanwezigenGebruikers) > 0 {
-			userNames := s.resolveUserNames(version.AanwezigenGebruikers)
+		// GEFIXED: Gebruik ...GebruikerIDs
+		if len(version.AanwezigenGebruikerIDs) > 0 {
+			userNames := s.resolveUserNames(version.AanwezigenGebruikerIDs)
 			version.Aanwezigen = append(userNames, version.AanwezigenGasten...)
 		}
 
-		if len(version.AfwezigenGebruikers) > 0 {
-			userNames := s.resolveUserNames(version.AfwezigenGebruikers)
+		// GEFIXED: Gebruik ...GebruikerIDs
+		if len(version.AfwezigenGebruikerIDs) > 0 {
+			userNames := s.resolveUserNames(version.AfwezigenGebruikerIDs)
 			version.Afwezigen = append(userNames, version.AfwezigenGasten...)
 		}
 	}
@@ -360,15 +382,16 @@ func (s *NotulenService) GetNotulenVersion(ctx context.Context, notulenID uuid.U
 		return version, err
 	}
 
-	// Resolve user names for display instead of UUIDs
-	// This ensures version history shows proper names instead of raw UUIDs
-	if len(version.AanwezigenGebruikers) > 0 {
-		userNames := s.resolveUserNames(version.AanwezigenGebruikers)
+	// Resolve user names for display
+	// GEFIXED: Gebruik ...GebruikerIDs
+	if len(version.AanwezigenGebruikerIDs) > 0 {
+		userNames := s.resolveUserNames(version.AanwezigenGebruikerIDs)
 		version.Aanwezigen = append(userNames, version.AanwezigenGasten...)
 	}
 
-	if len(version.AfwezigenGebruikers) > 0 {
-		userNames := s.resolveUserNames(version.AfwezigenGebruikers)
+	// GEFIXED: Gebruik ...GebruikerIDs
+	if len(version.AfwezigenGebruikerIDs) > 0 {
+		userNames := s.resolveUserNames(version.AfwezigenGebruikerIDs)
 		version.Afwezigen = append(userNames, version.AfwezigenGasten...)
 	}
 
@@ -387,11 +410,12 @@ func (s *NotulenService) RenderMarkdown(notulen *models.Notulen) (string, error)
 	}
 
 	// Resolve user names from UUIDs for display
-	if len(notulen.AanwezigenGebruikers) > 0 {
-		templateData.AanwezigenResolved = s.resolveUserNames(notulen.AanwezigenGebruikers)
+	// GEFIXED: Gebruik ...GebruikerIDs
+	if len(notulen.AanwezigenGebruikerIDs) > 0 {
+		templateData.AanwezigenResolved = s.resolveUserNames(notulen.AanwezigenGebruikerIDs)
 	}
-	if len(notulen.AfwezigenGebruikers) > 0 {
-		templateData.AfwezigenResolved = s.resolveUserNames(notulen.AfwezigenGebruikers)
+	if len(notulen.AfwezigenGebruikerIDs) > 0 {
+		templateData.AfwezigenResolved = s.resolveUserNames(notulen.AfwezigenGebruikerIDs)
 	}
 
 	// Combine with guest names
@@ -416,13 +440,15 @@ func (s *NotulenService) RenderMarkdown(notulen *models.Notulen) (string, error)
 	return buf.String(), nil
 }
 
-// convertToNotulenResponse converts a Notulen model to NotulenResponse with resolved user names
-func (s *NotulenService) convertToNotulenResponse(notulen *models.Notulen) *models.NotulenResponse {
+// ConvertToNotulenResponse converts a Notulen model to NotulenResponse with resolved user names
+// GEFIXED: Gebruikt NotulenResponse
+func (s *NotulenService) ConvertToNotulenResponse(notulen *models.Notulen) *models.NotulenResponse {
 	// Collect all unique user UUIDs that need to be resolved
 	userUUIDs := []uuid.UUID{notulen.CreatedBy}
 
-	if notulen.UpdatedBy != uuid.Nil {
-		userUUIDs = append(userUUIDs, notulen.UpdatedBy)
+	// GEFIXED: Gebruik UpdatedByID
+	if notulen.UpdatedByID != uuid.Nil {
+		userUUIDs = append(userUUIDs, notulen.UpdatedByID)
 	}
 
 	if notulen.FinalizedBy != nil && *notulen.FinalizedBy != uuid.Nil {
@@ -452,70 +478,68 @@ func (s *NotulenService) convertToNotulenResponse(notulen *models.Notulen) *mode
 		}
 	}
 
-	// ✅ NIEUW: Resolve participant UUIDs en combineer met guests voor backwards compatibility
+	// Resolve participant UUIDs en combineer met guests
 	var aanwezigenCombined pq.StringArray
 	var afwezigenCombined pq.StringArray
 
-	// Resolve aanwezigen gebruikers UUIDs naar namen
-	if len(notulen.AanwezigenGebruikers) > 0 {
-		resolvedNames := s.resolveUserNames(notulen.AanwezigenGebruikers)
+	// GEFIXED: Gebruik ...GebruikerIDs
+	if len(notulen.AanwezigenGebruikerIDs) > 0 {
+		resolvedNames := s.resolveUserNames(notulen.AanwezigenGebruikerIDs)
 		aanwezigenCombined = append(aanwezigenCombined, resolvedNames...)
 	}
-	// Voeg gasten toe
 	if len(notulen.AanwezigenGasten) > 0 {
 		aanwezigenCombined = append(aanwezigenCombined, notulen.AanwezigenGasten...)
 	}
-	// Fallback naar oude data indien nieuw systeem leeg is
 	if len(aanwezigenCombined) == 0 && len(notulen.Aanwezigen) > 0 {
 		aanwezigenCombined = notulen.Aanwezigen
 	}
 
-	// Resolve afwezigen gebruikers UUIDs naar namen
-	if len(notulen.AfwezigenGebruikers) > 0 {
-		resolvedNames := s.resolveUserNames(notulen.AfwezigenGebruikers)
+	// GEFIXED: Gebruik ...GebruikerIDs
+	if len(notulen.AfwezigenGebruikerIDs) > 0 {
+		resolvedNames := s.resolveUserNames(notulen.AfwezigenGebruikerIDs)
 		afwezigenCombined = append(afwezigenCombined, resolvedNames...)
 	}
-	// Voeg gasten toe
 	if len(notulen.AfwezigenGasten) > 0 {
 		afwezigenCombined = append(afwezigenCombined, notulen.AfwezigenGasten...)
 	}
-	// Fallback naar oude data indien nieuw systeem leeg is
 	if len(afwezigenCombined) == 0 && len(notulen.Afwezigen) > 0 {
 		afwezigenCombined = notulen.Afwezigen
 	}
 
 	// Create response with resolved names
+	// GEFIXED: Gebruik NotulenResponse
 	response := &models.NotulenResponse{
-		ID:                   notulen.ID,
-		Titel:                notulen.Titel,
-		VergaderingDatum:     notulen.VergaderingDatum,
-		Locatie:              notulen.Locatie,
-		Voorzitter:           notulen.Voorzitter,
-		Notulist:             notulen.Notulist,
-		Aanwezigen:           aanwezigenCombined,           // ✅ GEFIXED: Gecombineerde namen (users + guests)
-		Afwezigen:            afwezigenCombined,            // ✅ GEFIXED: Gecombineerde namen (users + guests)
-		AanwezigenGebruikers: notulen.AanwezigenGebruikers, // UUID arrays blijven beschikbaar
-		AfwezigenGebruikers:  notulen.AfwezigenGebruikers,  // UUID arrays blijven beschikbaar
-		AanwezigenGasten:     notulen.AanwezigenGasten,     // Guest namen blijven beschikbaar
-		AfwezigenGasten:      notulen.AfwezigenGasten,      // Guest namen blijven beschikbaar
-		AgendaItems:          notulen.AgendaItems,
-		Besluiten:            notulen.Besluiten,
-		Actiepunten:          notulen.Actiepunten,
-		Notities:             notulen.Notities,
-		Status:               notulen.Status,
-		Versie:               notulen.Versie,
-		CreatedBy:            notulen.CreatedBy,
-		CreatedByName:        nameMap[notulen.CreatedBy],
-		CreatedAt:            notulen.CreatedAt,
-		UpdatedAt:            notulen.UpdatedAt,
-		UpdatedBy:            notulen.UpdatedBy,
-		FinalizedAt:          notulen.FinalizedAt,
-		FinalizedBy:          notulen.FinalizedBy,
+		ID:                     notulen.ID,
+		Titel:                  notulen.Titel,
+		VergaderingDatum:       notulen.VergaderingDatum,
+		Locatie:                notulen.Locatie,
+		Voorzitter:             notulen.Voorzitter,
+		Notulist:               notulen.Notulist,
+		Aanwezigen:             aanwezigenCombined,
+		Afwezigen:              afwezigenCombined,
+		AanwezigenGebruikerIDs: notulen.AanwezigenGebruikerIDs,
+		AfwezigenGebruikerIDs:  notulen.AfwezigenGebruikerIDs,
+		AanwezigenGasten:       notulen.AanwezigenGasten,
+		AfwezigenGasten:        notulen.AfwezigenGasten,
+		AgendaItems:            notulen.AgendaItems,
+		Besluiten:              notulen.Besluiten,
+		Actiepunten:            notulen.Actiepunten,
+		Notities:               notulen.Notities,
+		Status:                 notulen.Status,
+		Versie:                 notulen.Versie,
+		CreatedBy:              notulen.CreatedBy,
+		CreatedByName:          nameMap[notulen.CreatedBy],
+		CreatedAt:              notulen.CreatedAt,
+		UpdatedAt:              notulen.UpdatedAt,
+		UpdatedByID:            notulen.UpdatedByID, // GEFIXED
+		FinalizedAt:            notulen.FinalizedAt,
+		FinalizedBy:            notulen.FinalizedBy,
 	}
 
 	// Set resolved names for updated_by and finalized_by
-	if notulen.UpdatedBy != uuid.Nil {
-		response.UpdatedByName = nameMap[notulen.UpdatedBy]
+	// GEFIXED: Gebruik UpdatedByID
+	if notulen.UpdatedByID != uuid.Nil {
+		response.UpdatedByName = nameMap[notulen.UpdatedByID]
 	}
 
 	if notulen.FinalizedBy != nil && *notulen.FinalizedBy != uuid.Nil {
@@ -532,7 +556,6 @@ func (s *NotulenService) resolveUserNames(userUUIDs []uuid.UUID) []string {
 	}
 
 	// Query database for user names
-	// This would typically be done through a user repository, but for now we'll use a direct query
 	names := make([]string, 0, len(userUUIDs))
 
 	// Build query to get user names by UUIDs
@@ -590,6 +613,8 @@ func (s *NotulenService) ValidateNotulen(req *models.NotulenCreateRequest) error
 }
 
 // Markdown template for notulen rendering
+// GEFIXED: Gebruikt AanwezigenResolved en AfwezigenResolved
+// GEFIXED: Correcte range loops
 const notulenMarkdownTemplate = `# {{.Titel}}
 
 **Datum:** {{.VergaderingDatum.Format "2 January 2006"}}
@@ -632,6 +657,6 @@ const notulenMarkdownTemplate = `# {{.Titel}}
 {{.Notities}}
 
 ---
-*Gemaakt op {{.CreatedAt.Format "2-1-2006 15:04"}} door {{.CreatedBy}}*
+*Gemaakt op {{.CreatedAt.Format "2-1-2006 15:04"}} door {{.CreatedByName}}*
 *Status: {{.Status}} | Versie: {{.Versie}}*
 {{if .FinalizedAt}}*Gefinaliseerd op {{.FinalizedAt.Format "2-1-2006 15:04"}}*{{end}}`

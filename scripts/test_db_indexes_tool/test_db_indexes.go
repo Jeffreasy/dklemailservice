@@ -61,14 +61,14 @@ func main() {
 
 	expectedIndexes := []string{
 		"idx_gebruikers_role_id",
-		"idx_aanmeldingen_gebruiker_id",
+		"idx_participants_gebruiker_id",
 		"idx_verzonden_emails_contact_id",
 		"idx_verzonden_emails_aanmelding_id",
 		"idx_contact_antwoorden_contact_id",
 		"idx_contact_formulieren_status_created",
-		"idx_aanmeldingen_status_created",
+		"idx_participants_status_created",
 		"idx_contact_formulieren_fts",
-		"idx_aanmeldingen_fts",
+		"idx_participants_fts",
 		"idx_chat_messages_fts",
 	}
 

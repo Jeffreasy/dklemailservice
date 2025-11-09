@@ -32,7 +32,7 @@ func (r *PostgresLeaderboardRepository) GetLeaderboard(ctx context.Context, filt
 
 	// Build query met filters
 	query := `
-		SELECT 
+		SELECT
 			a.id,
 			a.naam,
 			a.afstand as route,
@@ -42,7 +42,7 @@ func (r *PostgresLeaderboardRepository) GetLeaderboard(ctx context.Context, filt
 			RANK() OVER (ORDER BY (a.steps + COALESCE(SUM(b.points), 0)) DESC) as rank,
 			COUNT(pa.id) as badge_count,
 			a.created_at as joined_at
-		FROM aanmeldingen a
+		FROM participants a
 		LEFT JOIN participant_achievements pa ON a.id = pa.participant_id
 		LEFT JOIN badges b ON pa.badge_id = b.id AND b.is_active = true
 		WHERE 1=1
@@ -96,7 +96,7 @@ func (r *PostgresLeaderboardRepository) GetLeaderboard(ctx context.Context, filt
 	var totalCount int64
 	countQuery := `
 		SELECT COUNT(DISTINCT a.id)
-		FROM aanmeldingen a
+		FROM participants a
 		WHERE 1=1
 	`
 	countArgs := []interface{}{}
@@ -141,7 +141,7 @@ func (r *PostgresLeaderboardRepository) GetParticipantRank(ctx context.Context, 
 	// Haal rank en scores op voor participant
 	query := `
 		WITH ranked_participants AS (
-			SELECT 
+			SELECT
 				a.id,
 				a.naam,
 				a.steps,
@@ -149,7 +149,7 @@ func (r *PostgresLeaderboardRepository) GetParticipantRank(ctx context.Context, 
 				a.steps + COALESCE(SUM(b.points), 0) as total_score,
 				COUNT(pa.id) as badge_count,
 				RANK() OVER (ORDER BY (a.steps + COALESCE(SUM(b.points), 0)) DESC) as rank
-			FROM aanmeldingen a
+			FROM participants a
 			LEFT JOIN participant_achievements pa ON a.id = pa.participant_id
 			LEFT JOIN badges b ON pa.badge_id = b.id AND b.is_active = true
 			GROUP BY a.id, a.naam, a.steps
@@ -178,7 +178,7 @@ func (r *PostgresLeaderboardRepository) GetParticipantRank(ctx context.Context, 
 	var aboveMe models.LeaderboardEntry
 	aboveQuery := `
 		WITH ranked_participants AS (
-			SELECT 
+			SELECT
 				a.id,
 				a.naam,
 				a.afstand as route,
@@ -187,7 +187,7 @@ func (r *PostgresLeaderboardRepository) GetParticipantRank(ctx context.Context, 
 				a.steps + COALESCE(SUM(b.points), 0) as total_score,
 				COUNT(pa.id) as badge_count,
 				RANK() OVER (ORDER BY (a.steps + COALESCE(SUM(b.points), 0)) DESC) as rank
-			FROM aanmeldingen a
+			FROM participants a
 			LEFT JOIN participant_achievements pa ON a.id = pa.participant_id
 			LEFT JOIN badges b ON pa.badge_id = b.id AND b.is_active = true
 			GROUP BY a.id, a.naam, a.afstand, a.steps
@@ -207,7 +207,7 @@ func (r *PostgresLeaderboardRepository) GetParticipantRank(ctx context.Context, 
 	var belowMe models.LeaderboardEntry
 	belowQuery := `
 		WITH ranked_participants AS (
-			SELECT 
+			SELECT
 				a.id,
 				a.naam,
 				a.afstand as route,
@@ -216,7 +216,7 @@ func (r *PostgresLeaderboardRepository) GetParticipantRank(ctx context.Context, 
 				a.steps + COALESCE(SUM(b.points), 0) as total_score,
 				COUNT(pa.id) as badge_count,
 				RANK() OVER (ORDER BY (a.steps + COALESCE(SUM(b.points), 0)) DESC) as rank
-			FROM aanmeldingen a
+			FROM participants a
 			LEFT JOIN participant_achievements pa ON a.id = pa.participant_id
 			LEFT JOIN badges b ON pa.badge_id = b.id AND b.is_active = true
 			GROUP BY a.id, a.naam, a.afstand, a.steps

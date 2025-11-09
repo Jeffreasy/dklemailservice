@@ -153,12 +153,12 @@ func (s *EmailService) SendContactEmail(data *models.ContactEmailData) error {
 	return s.sendEmailWithTemplate("contact_email", data.Contact.Email, "Bedankt voor je bericht", data)
 }
 
-func (s *EmailService) SendAanmeldingEmail(data *models.AanmeldingEmailData) error {
+func (s *EmailService) SendRegistrationEmail(data *models.RegistrationEmailData) error {
 	// Check if this is a test email to an excluded address
-	if data.Aanmelding.TestMode && !data.ToAdmin {
-		if s.isExcludedEmail(data.Aanmelding.Email) {
+	if data.Registration.TestMode && !data.ToAdmin {
+		if s.isExcludedEmail(data.Participant.Email) {
 			logger.Info("Test email overgeslagen voor uitgesloten adres",
-				"email", data.Aanmelding.Email,
+				"email", data.Participant.Email,
 				"type", "aanmelding")
 			return nil
 		}
@@ -176,7 +176,7 @@ func (s *EmailService) SendAanmeldingEmail(data *models.AanmeldingEmailData) err
 	} else {
 		templateName = "aanmelding_email"
 		subject = "Bedankt voor je aanmelding"
-		recipient = data.Aanmelding.Email
+		recipient = data.Participant.Email
 	}
 
 	template := s.GetTemplate(templateName)
@@ -204,7 +204,7 @@ func (s *EmailService) SendAanmeldingEmail(data *models.AanmeldingEmailData) err
 		To:       recipient,
 		Subject:  subject,
 		Body:     body.String(),
-		TestMode: data.Aanmelding.TestMode,
+		TestMode: data.Registration.TestMode,
 	}
 
 	// Verzend met de juiste client op basis van type

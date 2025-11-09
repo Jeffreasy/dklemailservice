@@ -49,7 +49,7 @@ func (m *mockEmailService) SendContactEmail(data *models.ContactEmailData) error
 	return nil
 }
 
-func (m *mockEmailService) SendAanmeldingEmail(data *models.AanmeldingEmailData) error {
+func (m *mockEmailService) SendRegistrationEmail(data *models.RegistrationEmailData) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -58,7 +58,7 @@ func (m *mockEmailService) SendAanmeldingEmail(data *models.AanmeldingEmailData)
 		return fmt.Errorf("mock email error")
 	}
 
-	recipient := data.Aanmelding.Email
+	recipient := data.Participant.Email
 	if data.ToAdmin {
 		recipient = data.AdminEmail
 	}
@@ -66,7 +66,7 @@ func (m *mockEmailService) SendAanmeldingEmail(data *models.AanmeldingEmailData)
 	m.sentEmails = append(m.sentEmails, services.EmailMessage{
 		To:      recipient,
 		Subject: "Aanmelding DKL",
-		Body:    fmt.Sprintf("Aanmelding van %s voor %s", data.Aanmelding.Naam, data.Aanmelding.Rol),
+		Body:    fmt.Sprintf("Aanmelding van %s", data.Participant.Naam),
 	})
 	return nil
 }
@@ -432,10 +432,11 @@ func (m *MockNotificationService) SendNotification(ctx context.Context, notifica
 }
 
 // CreateNotification mocks creating a notification
+// V27: Updated to use strings instead of types
 func (m *MockNotificationService) CreateNotification(
 	ctx context.Context,
-	notificationType models.NotificationType,
-	priority models.NotificationPriority,
+	notificationType string,
+	priority string,
 	title, message string,
 ) (*models.Notification, error) {
 	args := m.Called(ctx, notificationType, priority, title, message)
@@ -499,7 +500,7 @@ func (m *MockEmailSender) SendContactEmail(data *models.ContactEmailData) error 
 	return args.Error(0)
 }
 
-func (m *MockEmailSender) SendAanmeldingEmail(data *models.AanmeldingEmailData) error {
+func (m *MockEmailSender) SendRegistrationEmail(data *models.RegistrationEmailData) error {
 	args := m.Called(data)
 	return args.Error(0)
 }
@@ -640,4 +641,109 @@ func (m *MockAuthService) RevokeAllUserRefreshTokens(ctx context.Context, userID
 func (m *MockAuthService) SearchUsers(ctx context.Context, query string, limit int) ([]*models.Gebruiker, error) {
 	args := m.Called(ctx, query, limit)
 	return args.Get(0).([]*models.Gebruiker), args.Error(1)
+}
+
+// MockPermissionService is a mock implementation of services.PermissionService
+type MockPermissionService struct {
+	mock.Mock
+}
+
+// NewMockPermissionService creates a new mock permission service
+func NewMockPermissionService() *MockPermissionService {
+	return &MockPermissionService{}
+}
+
+// HasPermission mocks checking if a user has a specific permission
+func (m *MockPermissionService) HasPermission(ctx context.Context, userID, resource, action string) bool {
+	args := m.Called(ctx, userID, resource, action)
+	return args.Bool(0)
+}
+
+// GetUserPermissions mocks retrieving all permissions for a user
+func (m *MockPermissionService) GetUserPermissions(ctx context.Context, userID string) ([]*models.UserPermission, error) {
+	args := m.Called(ctx, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.UserPermission), args.Error(1)
+}
+
+// GetUserRoles mocks retrieving all active roles for a user
+func (m *MockPermissionService) GetUserRoles(ctx context.Context, userID string) ([]*models.UserRole, error) {
+	args := m.Called(ctx, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.UserRole), args.Error(1)
+}
+
+// AssignRole mocks assigning a role to a user
+func (m *MockPermissionService) AssignRole(ctx context.Context, userID, roleID string, assignedBy *string) error {
+	args := m.Called(ctx, userID, roleID, assignedBy)
+	return args.Error(0)
+}
+
+// RevokeRole mocks revoking a role from a user
+func (m *MockPermissionService) RevokeRole(ctx context.Context, userID, roleID string) error {
+	args := m.Called(ctx, userID, roleID)
+	return args.Error(0)
+}
+
+// CreateRole mocks creating a new role
+func (m *MockPermissionService) CreateRole(ctx context.Context, role *models.RBACRole, createdBy *string) error {
+	args := m.Called(ctx, role, createdBy)
+	return args.Error(0)
+}
+
+// UpdateRole mocks updating a role
+func (m *MockPermissionService) UpdateRole(ctx context.Context, role *models.RBACRole) error {
+	args := m.Called(ctx, role)
+	return args.Error(0)
+}
+
+// DeleteRole mocks deleting a role
+func (m *MockPermissionService) DeleteRole(ctx context.Context, roleID string) error {
+	args := m.Called(ctx, roleID)
+	return args.Error(0)
+}
+
+// AssignPermissionToRole mocks assigning a permission to a role
+func (m *MockPermissionService) AssignPermissionToRole(ctx context.Context, roleID, permissionID string, assignedBy *string) error {
+	args := m.Called(ctx, roleID, permissionID, assignedBy)
+	return args.Error(0)
+}
+
+// RevokePermissionFromRole mocks revoking a permission from a role
+func (m *MockPermissionService) RevokePermissionFromRole(ctx context.Context, roleID, permissionID string) error {
+	args := m.Called(ctx, roleID, permissionID)
+	return args.Error(0)
+}
+
+// GetRoles mocks retrieving all roles
+func (m *MockPermissionService) GetRoles(ctx context.Context, limit, offset int) ([]*models.RBACRole, error) {
+	args := m.Called(ctx, limit, offset)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.RBACRole), args.Error(1)
+}
+
+// GetPermissions mocks retrieving all permissions
+func (m *MockPermissionService) GetPermissions(ctx context.Context, limit, offset int) ([]*models.Permission, error) {
+	args := m.Called(ctx, limit, offset)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.Permission), args.Error(1)
+}
+
+// InvalidateUserCache mocks invalidating the cache for a user
+func (m *MockPermissionService) InvalidateUserCache(userID string) {
+	m.Called(userID)
+}
+
+// RefreshCache mocks refreshing all caches
+func (m *MockPermissionService) RefreshCache(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
 }

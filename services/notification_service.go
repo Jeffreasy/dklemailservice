@@ -15,7 +15,7 @@ import (
 
 // NotificationThrottleKey is een struct voor het bijhouden van throttling
 type NotificationThrottleKey struct {
-	Type    models.NotificationType
+	Type    string // V27: Changed from models.NotificationType to string
 	Title   string
 	Message string
 }
@@ -87,7 +87,7 @@ type NotificationServiceImpl struct {
 	client           NotificationClient
 	throttleMap      map[NotificationThrottleKey]*NotificationThrottleValue
 	throttleDuration time.Duration
-	minPriority      models.NotificationPriority
+	minPriority      string // V27: Changed from models.NotificationPriority to string
 	ticker           *time.Ticker
 	running          bool
 	mutex            sync.Mutex
@@ -99,7 +99,7 @@ func NewNotificationService(
 	notificationRepo repository.NotificationRepository,
 	client NotificationClient,
 	throttleDuration time.Duration,
-	minPriority models.NotificationPriority,
+	minPriority string, // V27: Changed from models.NotificationPriority to string
 ) *NotificationServiceImpl {
 	return &NotificationServiceImpl{
 		notificationRepo: notificationRepo,
@@ -113,15 +113,16 @@ func NewNotificationService(
 }
 
 // CreateNotification maakt een nieuwe notificatie aan
+// V27: Now accepts strings instead of types
 func (s *NotificationServiceImpl) CreateNotification(
 	ctx context.Context,
-	notificationType models.NotificationType,
-	priority models.NotificationPriority,
+	notificationType string,
+	priority string,
 	title, message string,
 ) (*models.Notification, error) {
 	notification := &models.Notification{
-		Type:     notificationType,
-		Priority: priority,
+		Type:     notificationType, // V27: Direct field (database column is 'type')
+		Priority: priority,         // V27: Direct field (database column is 'priority')
 		Title:    title,
 		Message:  message,
 		Sent:     false,
@@ -382,8 +383,9 @@ func (s *NotificationServiceImpl) shouldSendNotification(notification *models.No
 }
 
 // isPriorityHighEnough controleert of een prioriteit hoog genoeg is
-func isPriorityHighEnough(priority, minPriority models.NotificationPriority) bool {
-	priorityMap := map[models.NotificationPriority]int{
+// V27: Now uses strings instead of types
+func isPriorityHighEnough(priority, minPriority string) bool {
+	priorityMap := map[string]int{
 		models.NotificationPriorityLow:      1,
 		models.NotificationPriorityMedium:   2,
 		models.NotificationPriorityHigh:     3,
@@ -394,7 +396,8 @@ func isPriorityHighEnough(priority, minPriority models.NotificationPriority) boo
 }
 
 // formatTitleWithEmoji voegt emoji toe aan een titel op basis van prioriteit
-func formatTitleWithEmoji(priority models.NotificationPriority, title string) string {
+// V27: Now uses strings instead of types
+func formatTitleWithEmoji(priority string, title string) string {
 	var emoji string
 	switch priority {
 	case models.NotificationPriorityLow:

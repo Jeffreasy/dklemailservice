@@ -243,7 +243,6 @@ func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 		Description: req.Description,
 		StartTime:   startTime,
 		EndTime:     endTime,
-		Status:      req.Status,
 		Geofences:   req.Geofences,
 		EventConfig: req.EventConfig,
 		IsActive:    req.IsActive,
@@ -253,8 +252,10 @@ func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 		event.CreatedBy = &userID
 	}
 
-	// Set default status if not provided
-	if event.Status == "" {
+	// V27: Set status directly (database column is 'status')
+	if req.Status != "" {
+		event.Status = req.Status
+	} else {
 		event.Status = models.EventStatusUpcoming
 	}
 
@@ -328,6 +329,7 @@ func (h *EventHandler) UpdateEvent(c *fiber.Ctx) error {
 	if req.Description != "" {
 		event.Description = req.Description
 	}
+	// V27: Set status directly (database column is 'status')
 	if req.Status != "" {
 		event.Status = req.Status
 	}

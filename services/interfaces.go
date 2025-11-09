@@ -92,7 +92,7 @@ type EmailSender interface {
 	// Methoden specifiek gebruikt door EmailHandler (Contact/Aanmelding).
 	// Behoud originele signature als ze altijd de geconfigureerde afzender moeten gebruiken.
 	SendContactEmail(data *models.ContactEmailData) error
-	SendAanmeldingEmail(data *models.AanmeldingEmailData) error
+	SendRegistrationEmail(data *models.RegistrationEmailData) error
 
 	// Methode specifiek voor WFC
 	SendWFCEmail(to, subject, body string) error
@@ -140,8 +140,9 @@ type NotificationService interface {
 	SendNotification(ctx context.Context, notification *models.Notification) error
 
 	// CreateNotification maakt een nieuwe notificatie aan
-	CreateNotification(ctx context.Context, notificationType models.NotificationType,
-		priority models.NotificationPriority, title, message string) (*models.Notification, error)
+	// V27 Update: Now uses strings for type and priority (will be converted to FK internally)
+	CreateNotification(ctx context.Context, notificationType string,
+		priority string, title, message string) (*models.Notification, error)
 
 	// GetNotification haalt een notificatie op basis van ID
 	GetNotification(ctx context.Context, id string) (*models.Notification, error)

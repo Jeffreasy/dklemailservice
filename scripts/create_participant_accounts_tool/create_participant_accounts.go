@@ -76,7 +76,7 @@ func main() {
 	db.Raw(`
 		SELECT DISTINCT ON (LOWER(email))
 			email, naam, rol
-		FROM aanmeldingen
+		FROM participants
 		WHERE gebruiker_id IS NULL
 		AND email IS NOT NULL
 		AND email != ''

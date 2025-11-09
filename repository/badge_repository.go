@@ -105,27 +105,48 @@ func (r *PostgresBadgeRepository) Delete(ctx context.Context, id string) error {
 func (r *PostgresBadgeRepository) GetBadgesWithStats(ctx context.Context, participantID *string) ([]models.BadgeWithStats, error) {
 	var badges []models.BadgeWithStats
 
+	// Als participantID nil is, gebruik dan een speciale query zonder participant check
+	if participantID == nil {
+		query := `
+			SELECT
+				b.id, b.name, b.description, b.icon_url, b.criteria, b.points,
+				b.is_active, b.display_order, b.created_at, b.updated_at,
+				COUNT(DISTINCT pa.id) as earned_count,
+				MAX(pa.earned_at) as last_earned_at,
+				false as earned_by_current_user
+			FROM badges b
+			LEFT JOIN participant_achievements pa ON b.id = pa.badge_id
+			WHERE b.is_active = true
+			GROUP BY b.id, b.name, b.description, b.icon_url, b.criteria, b.points,
+			         b.is_active, b.display_order, b.created_at, b.updated_at
+			ORDER BY b.display_order, b.name
+		`
+		err := r.DB().WithContext(ctx).Raw(query).Scan(&badges).Error
+		return badges, err
+	}
+
+	// Met participantID, check of de huidige participant deze badge heeft
 	query := `
-		SELECT 
-			b.id, b.name, b.description, b.icon_url, b.criteria, b.points, 
+		SELECT
+			b.id, b.name, b.description, b.icon_url, b.criteria, b.points,
 			b.is_active, b.display_order, b.created_at, b.updated_at,
 			COUNT(DISTINCT pa.id) as earned_count,
 			MAX(pa.earned_at) as last_earned_at,
-			CASE 
-				WHEN ? IS NOT NULL AND EXISTS(
-					SELECT 1 FROM participant_achievements 
+			CASE
+				WHEN EXISTS(
+					SELECT 1 FROM participant_achievements
 					WHERE badge_id = b.id AND participant_id = ?
-				) THEN true 
-				ELSE false 
+				) THEN true
+				ELSE false
 			END as earned_by_current_user
 		FROM badges b
 		LEFT JOIN participant_achievements pa ON b.id = pa.badge_id
 		WHERE b.is_active = true
-		GROUP BY b.id, b.name, b.description, b.icon_url, b.criteria, b.points, 
+		GROUP BY b.id, b.name, b.description, b.icon_url, b.criteria, b.points,
 		         b.is_active, b.display_order, b.created_at, b.updated_at
 		ORDER BY b.display_order, b.name
 	`
 
-	err := r.DB().WithContext(ctx).Raw(query, participantID, participantID).Scan(&badges).Error
+	err := r.DB().WithContext(ctx).Raw(query, *participantID).Scan(&badges).Error
 	return badges, err
 }

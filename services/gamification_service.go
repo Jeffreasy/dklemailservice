@@ -14,7 +14,8 @@ type GamificationService struct {
 	badgeRepo       repository.BadgeRepository
 	achievementRepo repository.AchievementRepository
 	leaderboardRepo repository.LeaderboardRepository
-	aanmeldingRepo  repository.AanmeldingRepository
+	aanmeldingRepo  repository.ParticipantRepository
+	eventRegRepo    repository.EventRegistrationRepository
 }
 
 // NewGamificationService maakt een nieuwe gamification service
@@ -22,13 +23,15 @@ func NewGamificationService(
 	badgeRepo repository.BadgeRepository,
 	achievementRepo repository.AchievementRepository,
 	leaderboardRepo repository.LeaderboardRepository,
-	aanmeldingRepo repository.AanmeldingRepository,
+	aanmeldingRepo repository.ParticipantRepository,
+	eventRegRepo repository.EventRegistrationRepository,
 ) *GamificationService {
 	return &GamificationService{
 		badgeRepo:       badgeRepo,
 		achievementRepo: achievementRepo,
 		leaderboardRepo: leaderboardRepo,
 		aanmeldingRepo:  aanmeldingRepo,
+		eventRegRepo:    eventRegRepo,
 	}
 }
 
@@ -222,59 +225,67 @@ func (s *GamificationService) GetParticipantSummary(ctx context.Context, partici
 
 // CheckAndAwardBadges controleert of een deelnemer nieuwe badges heeft verdiend
 func (s *GamificationService) CheckAndAwardBadges(ctx context.Context, participantID string) ([]models.Badge, error) {
-	// Haal participant data op
-	participant, err := s.aanmeldingRepo.GetByID(ctx, participantID)
+	// Haal event registration data op voor badge criteria
+	eventReg, err := s.GetEventRegistrationByParticipantID(ctx, participantID)
 	if err != nil {
-		return nil, err
+		logger.Error("Kon event registratie niet ophalen voor badge controle", "participant_id", participantID, "error", err)
+		return []models.Badge{}, nil
 	}
-
-	// Haal alle actieve badges op
-	badges, err := s.badgeRepo.GetAll(ctx, true)
-	if err != nil {
-		return nil, err
+	if eventReg == nil {
+		logger.Debug("Geen actieve event registratie gevonden voor badge controle", "participant_id", participantID)
+		return []models.Badge{}, nil
 	}
 
 	var awardedBadges []models.Badge
 
+	// Haal alle actieve badges op
+	badges, err := s.badgeRepo.GetAll(ctx, true) // activeOnly = true
+	if err != nil {
+		logger.Error("Kon badges niet ophalen voor controle", "error", err)
+		return []models.Badge{}, nil
+	}
+
+	// Controleer elke badge
 	for _, badge := range badges {
-		// Check if already has this badge
-		hasAchievement, err := s.achievementRepo.HasAchievement(ctx, participantID, badge.ID)
-		if err != nil {
-			logger.Error("Fout bij checken achievement", "error", err, "participant_id", participantID, "badge_id", badge.ID)
-			continue
-		}
-
-		if hasAchievement {
-			continue
-		}
-
-		// Check criteria
-		if s.meetsCriteria(participant, &badge) {
-			// Award badge
-			_, err := s.AwardBadge(ctx, participantID, badge.ID)
+		if s.meetsCriteria(eventReg, &badge) {
+			// Controleer of deelnemer deze badge al heeft
+			hasBadge, err := s.achievementRepo.HasAchievement(ctx, participantID, badge.ID)
 			if err != nil {
-				logger.Error("Fout bij auto-award badge", "error", err, "participant_id", participantID, "badge_id", badge.ID)
+				logger.Error("Kon achievement status niet controleren", "participant_id", participantID, "badge_id", badge.ID, "error", err)
 				continue
 			}
 
-			awardedBadges = append(awardedBadges, badge)
+			if !hasBadge {
+				// Ken badge toe
+				_, err := s.AwardBadge(ctx, participantID, badge.ID)
+				if err != nil {
+					logger.Error("Kon badge niet toekennen", "participant_id", participantID, "badge_id", badge.ID, "error", err)
+					continue
+				}
+				awardedBadges = append(awardedBadges, badge)
+			}
 		}
 	}
 
 	return awardedBadges, nil
 }
 
+// GetEventRegistrationByParticipantID haalt de actieve event registratie op voor een participant
+func (s *GamificationService) GetEventRegistrationByParticipantID(ctx context.Context, participantID string) (*models.EventRegistration, error) {
+	return s.eventRegRepo.GetActiveRegistrationForParticipant(ctx, participantID)
+}
+
 // meetsCriteria controleert of een deelnemer aan badge criteria voldoet
-func (s *GamificationService) meetsCriteria(participant *models.Aanmelding, badge *models.Badge) bool {
+func (s *GamificationService) meetsCriteria(eventReg *models.EventRegistration, badge *models.Badge) bool {
 	criteria := badge.Criteria
 
 	// Check min_steps
-	if criteria.MinSteps != nil && participant.Steps < *criteria.MinSteps {
+	if criteria.MinSteps != nil && eventReg.Steps < *criteria.MinSteps {
 		return false
 	}
 
 	// Check route
-	if criteria.Route != nil && participant.Afstand != *criteria.Route {
+	if criteria.Route != nil && eventReg.DistanceRoute != nil && *eventReg.DistanceRoute != *criteria.Route {
 		return false
 	}
 

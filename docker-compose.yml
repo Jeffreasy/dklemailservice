@@ -37,7 +37,7 @@ services:
       target: runtime
     container_name: dkl-email-service
     ports:
-      - "8082:8080"
+      - "${PORT:-8080}:${PORT:-8080}"
     environment:
       # Database
       DB_HOST: postgres
@@ -83,9 +83,47 @@ services:
       APP_ENV: dev
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       
+      # Email Fetch Configuration
+      INFO_EMAIL: ${INFO_EMAIL}
+      INFO_EMAIL_PASSWORD: ${INFO_EMAIL_PASSWORD}
+      INSCHRIJVING_EMAIL: ${INSCHRIJVING_EMAIL}
+      INSCHRIJVING_EMAIL_PASSWORD: ${INSCHRIJVING_EMAIL_PASSWORD}
+      IMAP_SERVER: ${IMAP_SERVER:-imap.gmail.com}
+      IMAP_PORT: ${IMAP_PORT:-993}
+
       # Optional - Disable auto email fetch for dev
-      DISABLE_AUTO_EMAIL_FETCH: ${DISABLE_AUTO_EMAIL_FETCH:-true}
-      
+      DISABLE_AUTO_EMAIL_FETCH: ${DISABLE_AUTO_EMAIL_FETCH:-false}
+
+      # Notifications
+      ENABLE_NOTIFICATIONS: ${ENABLE_NOTIFICATIONS:-true}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+
+      # Newsletter
+      ENABLE_NEWSLETTER: ${ENABLE_NEWSLETTER:-false}
+      NEWSLETTER_SOURCES: ${NEWSLETTER_SOURCES}
+
+      # Rate limiting
+      EMAIL_RATE_LIMIT: ${EMAIL_RATE_LIMIT:-10}
+      CONTACT_RATE_LIMIT: ${CONTACT_RATE_LIMIT:-5}
+      REGISTRATION_RATE_LIMIT: ${REGISTRATION_RATE_LIMIT:-3}
+      RATE_LIMIT_WINDOW: ${RATE_LIMIT_WINDOW:-3600}
+
+      # Metrics
+      ENABLE_METRICS: ${ENABLE_METRICS:-true}
+      METRICS_PORT: ${METRICS_PORT:-9090}
+
+      # Admin API Key
+      ADMIN_API_KEY: ${ADMIN_API_KEY}
+
+      # Cloudinary (optional)
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+      CLOUDINARY_UPLOAD_FOLDER: ${CLOUDINARY_UPLOAD_FOLDER:-dkl_images}
+      CLOUDINARY_UPLOAD_PRESET: ${CLOUDINARY_UPLOAD_PRESET}
+      CLOUDINARY_SECURE: ${CLOUDINARY_SECURE:-true}
+
     depends_on:
       postgres:
         condition: service_healthy

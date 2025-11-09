@@ -158,9 +158,19 @@ func (h *StepsHandler) GetParticipantDashboard(c *fiber.Ctx) error {
 			})
 		}
 
+		// Haal event registration data op voor stappen en afstand
+		var eventReg models.EventRegistration
+		if err := h.stepsService.GetDB().Where("participant_id = ?", id).First(&eventReg).Error; err != nil {
+			logger.Error("Fout bij ophalen event registration", "error", err, "participant_id", id)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Kon event registration data niet ophalen",
+				"code":  "INTERNAL_ERROR",
+			})
+		}
+
 		return c.JSON(fiber.Map{
-			"steps":          participant.Steps,
-			"route":          participant.Afstand,
+			"steps":          eventReg.Steps,
+			"route":          eventReg.DistanceRoute,
 			"allocatedFunds": allocatedFunds,
 			"naam":           participant.Naam,
 			"email":          participant.Email,
@@ -193,9 +203,19 @@ func (h *StepsHandler) GetParticipantDashboard(c *fiber.Ctx) error {
 		})
 	}
 
+	// Haal event registration data op voor stappen en afstand
+	var eventReg models.EventRegistration
+	if err := h.stepsService.GetDB().Where("participant_id = ?", id).First(&eventReg).Error; err != nil {
+		logger.Error("Fout bij ophalen event registration", "error", err, "participant_id", id)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon event registration data niet ophalen",
+			"code":  "INTERNAL_ERROR",
+		})
+	}
+
 	return c.JSON(fiber.Map{
-		"steps":          participant.Steps,
-		"route":          participant.Afstand,
+		"steps":          eventReg.Steps,
+		"route":          eventReg.DistanceRoute,
 		"allocatedFunds": allocatedFunds,
 		"naam":           participant.Naam,
 		"email":          participant.Email,

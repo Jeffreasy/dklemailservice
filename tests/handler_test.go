@@ -72,14 +72,16 @@ func TestEmailHandlerFlow(t *testing.T) {
 			// Gebruik de bestaande mock uit mocks.go
 			mockService := newMockEmailService()
 			mockNotificationService := NewMockNotificationService()
-			mockAanmeldingRepo := new(mocks.MockAanmeldingRepository)
+			mockParticipantRepo := new(mocks.MockParticipantRepository)
+			mockEventRegRepo := new(mocks.MockEventRegistrationRepository)
+			mockEventRepo := new(mocks.MockEventRepository)
 
 			// Stel shouldFail in als we een error willen simuleren
 			if tt.name == "Email verzending mislukt" {
 				mockService.shouldFail = true
 			}
 
-			handler := handlers.NewEmailHandler(mockService, mockNotificationService, mockAanmeldingRepo)
+			handler := handlers.NewEmailHandler(mockService, mockNotificationService, mockParticipantRepo, mockEventRegRepo, mockEventRepo)
 
 			app.Post("/contact-email", handler.HandleContactEmail)
 

@@ -81,7 +81,7 @@ func (r *PostgresNotificationRepository) ListUnsent(ctx context.Context) ([]*mod
 }
 
 // ListByType haalt alle notificaties op van een bepaald type
-func (r *PostgresNotificationRepository) ListByType(ctx context.Context, notificationType models.NotificationType) ([]*models.Notification, error) {
+func (r *PostgresNotificationRepository) ListByType(ctx context.Context, notificationType string) ([]*models.Notification, error) {
 	ctx, cancel := r.withTimeout(ctx)
 	defer cancel()
 
@@ -99,7 +99,7 @@ func (r *PostgresNotificationRepository) ListByType(ctx context.Context, notific
 }
 
 // ListByPriority haalt alle notificaties op met een bepaalde prioriteit
-func (r *PostgresNotificationRepository) ListByPriority(ctx context.Context, priority models.NotificationPriority) ([]*models.Notification, error) {
+func (r *PostgresNotificationRepository) ListByPriority(ctx context.Context, priority string) ([]*models.Notification, error) {
 	ctx, cancel := r.withTimeout(ctx)
 	defer cancel()
 

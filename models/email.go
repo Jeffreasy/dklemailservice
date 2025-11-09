@@ -1,22 +1,17 @@
 package models
 
-import (
-	"errors"
-)
-
-// ContactEmailData bevat de data nodig voor het versturen van contact formulier emails
+// ContactEmailData is de struct voor de contact-template
 type ContactEmailData struct {
-	ToAdmin    bool              `json:"to_admin"`
-	Contact    *ContactFormulier `json:"contact"`
-	AdminEmail string            `json:"admin_email,omitempty"`
+	Contact    *ContactFormulier
+	AdminEmail string
+	ToAdmin    bool
 }
 
-// AanmeldingEmailData bevat de data nodig voor het versturen van aanmelding emails
-type AanmeldingEmailData struct {
-	ToAdmin    bool                 `json:"to_admin"`
-	Aanmelding *AanmeldingFormulier `json:"aanmelding"`
-	AdminEmail string               `json:"admin_email,omitempty"`
+// RegistrationEmailData bevat alle data voor de registratie-templates (V28 refactor).
+// Dit vervangt de oude AanmeldingEmailData.
+type RegistrationEmailData struct {
+	ToAdmin      bool
+	AdminEmail   string
+	Participant  *Participant
+	Registration *EventRegistration
 }
-
-// Nieuwe error toevoegen (ergens in het models package)
-var ErrRateLimitExceeded = errors.New("te veel emails in korte tijd, probeer het later opnieuw")

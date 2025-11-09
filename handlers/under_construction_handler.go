@@ -35,6 +35,7 @@ func (h *UnderConstructionHandler) RegisterRoutes(app *fiber.App) {
 	// Public routes (no authentication required)
 	public := app.Group("/api/under-construction")
 	public.Get("/active", h.GetActiveUnderConstruction)
+	public.Get("/", h.GetActiveUnderConstruction) // Alias voor backwards compatibility
 
 	// Admin routes (require authentication and permissions)
 	admin := app.Group("/api/under-construction", AuthMiddleware(h.authService))

@@ -5,6 +5,7 @@ import (
 	"dklautomationgo/logger"
 	"dklautomationgo/models"
 	"dklautomationgo/repository"
+	"io"
 	"mime/quotedprintable"
 	"strings"
 )
@@ -67,9 +68,12 @@ func (r *EmailReprocessor) reprocessEmail(ctx context.Context, email *models.Inc
 
 	// Try to convert Windows-1252 to UTF-8
 	if email.ContentType != "" && strings.Contains(strings.ToLower(email.ContentType), "windows-1252") {
-		converted, err := r.decoder.convertCharset(decodedBody, "windows-1252")
+		converted, err := r.decoder.convertCharset(strings.NewReader(decodedBody), "windows-1252")
 		if err == nil {
-			decodedBody = converted
+			convertedBytes, readErr := io.ReadAll(converted)
+			if readErr == nil {
+				decodedBody = string(convertedBytes)
+			}
 		}
 	}
 

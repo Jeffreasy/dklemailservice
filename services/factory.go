@@ -99,7 +99,7 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 	notificationService := createNotificationService(repoFactory.Notification)
 
 	// Initialiseer telegram bot service
-	telegramBotService := createTelegramBotService(repoFactory.Contact, repoFactory.Aanmelding)
+	telegramBotService := createTelegramBotService(repoFactory.Contact, repoFactory.Participant)
 
 	chatService := NewChatService(repoFactory.ChatChannel, repoFactory.ChatChannelParticipant, repoFactory.ChatMessage, repoFactory.ChatMessageReaction, repoFactory.ChatUserPresence)
 
@@ -136,7 +136,8 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 		repoFactory.Badge,
 		repoFactory.Achievement,
 		repoFactory.Leaderboard,
-		repoFactory.Aanmelding,
+		repoFactory.Participant,
+		repoFactory.EventRegistration,
 	)
 
 	// Initialize NotulenHub for WebSocket support
@@ -144,7 +145,7 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 	go notulenHub.Run(context.Background())
 
 	// Initialize NotulenService
-	notulenService := NewNotulenService(repoFactory.Notulen.(*repository.PostgresNotulenRepository), &authService, notulenHub)
+	notulenService := NewNotulenService(repoFactory.Notulen.(*repository.PostgresNotulenRepository), &authService, permissionService, notulenHub)
 
 	return &ServiceFactory{
 		EmailService:        emailService,
@@ -278,18 +279,18 @@ func createNotificationService(notificationRepo repository.NotificationRepositor
 	}
 
 	// Parseer minimale prioriteit
-	minPriorityStr := getEnvWithDefault("NOTIFICATION_MIN_PRIORITY", "medium")
-	var minPriority models.NotificationPriority
-	switch minPriorityStr {
-	case "low":
-		minPriority = models.NotificationPriorityLow
-	case "medium":
-		minPriority = models.NotificationPriorityMedium
-	case "high":
-		minPriority = models.NotificationPriorityHigh
-	case "critical":
-		minPriority = models.NotificationPriorityCritical
+	// V27: minPriority is now a string instead of type
+	minPriority := getEnvWithDefault("NOTIFICATION_MIN_PRIORITY", models.NotificationPriorityMedium)
+
+	// Validate the priority string
+	switch minPriority {
+	case models.NotificationPriorityLow,
+		models.NotificationPriorityMedium,
+		models.NotificationPriorityHigh,
+		models.NotificationPriorityCritical:
+		// Valid priority
 	default:
+		// Invalid priority, use default
 		minPriority = models.NotificationPriorityMedium
 	}
 
@@ -312,7 +313,7 @@ func createNotificationService(notificationRepo repository.NotificationRepositor
 }
 
 // createTelegramBotService maakt een nieuwe Telegram bot service
-func createTelegramBotService(contactRepo repository.ContactRepository, aanmeldingRepo repository.AanmeldingRepository) *TelegramBotService {
+func createTelegramBotService(contactRepo repository.ContactRepository, participantRepo repository.ParticipantRepository) *TelegramBotService {
 	// Check of bot enabled is in omgevingsvariabelen
 	enabled := getEnvWithDefault("ENABLE_TELEGRAM_BOT", "false") == "true"
 	if !enabled {
@@ -321,7 +322,7 @@ func createTelegramBotService(contactRepo repository.ContactRepository, aanmeldi
 	}
 
 	// Maak een nieuwe Telegram bot service
-	telegramBotService := NewTelegramBotService(contactRepo, aanmeldingRepo)
+	telegramBotService := NewTelegramBotService(contactRepo, participantRepo)
 
 	// Als de service succesvol is aangemaakt, start polling
 	if telegramBotService != nil {

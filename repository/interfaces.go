@@ -26,8 +26,8 @@ type ContactRepository interface {
 	// FindByEmail zoekt contactformulieren op basis van email
 	FindByEmail(ctx context.Context, email string) ([]*models.ContactFormulier, error)
 
-	// FindByStatus zoekt contactformulieren op basis van status
-	FindByStatus(ctx context.Context, status string) ([]*models.ContactFormulier, error)
+	// FindByStatus zoekt contactformulieren op basis van status_key (V27)
+	FindByStatus(ctx context.Context, statusKey string) ([]*models.ContactFormulier, error)
 }
 
 // ContactAntwoordRepository definieert de interface voor contact antwoord operaties
@@ -48,47 +48,107 @@ type ContactAntwoordRepository interface {
 	Delete(ctx context.Context, id string) error
 }
 
-// AanmeldingRepository definieert de interface voor aanmelding operaties
-type AanmeldingRepository interface {
-	// Create slaat een nieuwe aanmelding op
-	Create(ctx context.Context, aanmelding *models.Aanmelding) error
+// ParticipantRepository definieert de interface voor participant (persoon) operaties
+// HERNOEMD (was AanmeldingRepository)
+type ParticipantRepository interface {
+	// Create slaat een nieuwe participant op
+	Create(ctx context.Context, participant *models.Participant) error
 
-	// GetByID haalt een aanmelding op basis van ID
-	GetByID(ctx context.Context, id string) (*models.Aanmelding, error)
+	// GetByID haalt een participant op basis van ID
+	GetByID(ctx context.Context, id string) (*models.Participant, error)
 
-	// List haalt een lijst van aanmeldingen op
-	List(ctx context.Context, limit, offset int) ([]*models.Aanmelding, error)
+	// List haalt een lijst van participants op
+	List(ctx context.Context, limit, offset int) ([]*models.Participant, error)
 
-	// Update werkt een bestaande aanmelding bij
-	Update(ctx context.Context, aanmelding *models.Aanmelding) error
+	// Update werkt een bestaande participant bij
+	Update(ctx context.Context, participant *models.Participant) error
 
-	// Delete verwijdert een aanmelding
+	// Delete verwijdert een participant
 	Delete(ctx context.Context, id string) error
 
-	// FindByEmail zoekt aanmeldingen op basis van email
-	FindByEmail(ctx context.Context, email string) ([]*models.Aanmelding, error)
+	// FindByEmail zoekt participants op basis van email
+	FindByEmail(ctx context.Context, email string) ([]*models.Participant, error)
 
-	// FindByStatus zoekt aanmeldingen op basis van status
-	FindByStatus(ctx context.Context, status string) ([]*models.Aanmelding, error)
+	// FindByStatus is VERWIJDERD (logica verplaatst naar EventRegistrationRepository)
 }
 
-// AanmeldingAntwoordRepository definieert de interface voor aanmelding antwoord operaties
-type AanmeldingAntwoordRepository interface {
-	// Create slaat een nieuw aanmelding antwoord op
-	Create(ctx context.Context, antwoord *models.AanmeldingAntwoord) error
+// ParticipantAntwoordRepository definieert de interface voor participant antwoord operaties
+// HERNOEMD (was AanmeldingAntwoordRepository)
+type ParticipantAntwoordRepository interface {
+	// Create slaat een nieuw participant antwoord op
+	Create(ctx context.Context, antwoord *models.ParticipantAntwoord) error
 
-	// GetByID haalt een aanmelding antwoord op basis van ID
-	GetByID(ctx context.Context, id string) (*models.AanmeldingAntwoord, error)
+	// GetByID haalt een participant antwoord op basis van ID
+	GetByID(ctx context.Context, id string) (*models.ParticipantAntwoord, error)
 
-	// ListByAanmeldingID haalt alle antwoorden voor een aanmelding op
-	ListByAanmeldingID(ctx context.Context, aanmeldingID string) ([]*models.AanmeldingAntwoord, error)
+	// ListByParticipantID haalt alle antwoorden voor een participant op
+	ListByParticipantID(ctx context.Context, participantID string) ([]*models.ParticipantAntwoord, error)
 
-	// Update werkt een bestaand aanmelding antwoord bij
-	Update(ctx context.Context, antwoord *models.AanmeldingAntwoord) error
+	// Update werkt een bestaand participant antwoord bij
+	Update(ctx context.Context, antwoord *models.ParticipantAntwoord) error
 
-	// Delete verwijdert een aanmelding antwoord
+	// Delete verwijdert een participant antwoord
 	Delete(ctx context.Context, id string) error
 }
+
+// --- NIEUWE REPOSITORIES VOOR V28 REFACTOR ---
+
+// EventRegistrationRepository definieert de interface voor event registratie (deelname) operaties
+type EventRegistrationRepository interface {
+	Create(ctx context.Context, registration *models.EventRegistration) error
+	GetByID(ctx context.Context, id string) (*models.EventRegistration, error)
+	ListByParticipantID(ctx context.Context, participantID string) ([]*models.EventRegistration, error)
+	GetActiveRegistrationForParticipant(ctx context.Context, participantID string) (*models.EventRegistration, error)
+	ListByRole(ctx context.Context, roleName string) ([]*models.EventRegistration, error)
+	Update(ctx context.Context, registration *models.EventRegistration) error
+	List(ctx context.Context, limit, offset int) ([]*models.EventRegistration, error)
+	ListByEventID(ctx context.Context, eventID string) ([]*models.EventRegistration, error)
+	ListByStatus(ctx context.Context, status string) ([]*models.EventRegistration, error)
+	GetByEventAndParticipant(ctx context.Context, eventID, participantID string) (*models.EventRegistration, error)
+	UpdateStatus(ctx context.Context, id, status string) error
+	Delete(ctx context.Context, id string) error
+}
+
+// EventRepository definieert de interface voor event operaties
+type EventRepository interface {
+	Create(ctx context.Context, event *models.Event) error
+	GetByID(ctx context.Context, id string) (*models.Event, error)
+	GetActiveEvent(ctx context.Context) (*models.Event, error)
+	List(ctx context.Context, limit, offset int) ([]*models.Event, error)
+	ListActive(ctx context.Context) ([]*models.Event, error)
+	Update(ctx context.Context, event *models.Event) error
+	Delete(ctx context.Context, id string) error
+
+	// Event Registration methods (formerly Event Participant)
+	RegisterParticipant(ctx context.Context, eventID, participantID string) (*models.EventRegistration, error)
+	GetEventParticipant(ctx context.Context, eventID, participantID string) (*models.EventRegistration, error)
+	UpdateEventParticipant(ctx context.Context, ep *models.EventRegistration) error
+	GetEventParticipants(ctx context.Context, eventID string) ([]*models.EventRegistration, error)
+	GetParticipantEvents(ctx context.Context, participantID string) ([]*models.EventRegistration, error)
+}
+
+// DistanceRepository definieert de interface voor afstanden (voorheen RouteFund)
+type DistanceRepository interface {
+	Create(ctx context.Context, distance *models.Distance) error
+	GetByRoute(ctx context.Context, route string) (*models.Distance, error)
+	GetAll(ctx context.Context) ([]*models.Distance, error)
+	List(ctx context.Context) ([]*models.Distance, error)
+	Update(ctx context.Context, distance *models.Distance) error
+	Delete(ctx context.Context, route string) error
+}
+
+// ParticipantRoleRepository definieert de interface voor participant rollen
+type ParticipantRoleRepository interface {
+	Create(ctx context.Context, role *models.ParticipantRole) error
+	GetByID(ctx context.Context, id string) (*models.ParticipantRole, error)
+	GetByName(ctx context.Context, name string) (*models.ParticipantRole, error)
+	List(ctx context.Context) ([]*models.ParticipantRole, error)
+	ListActive(ctx context.Context) ([]*models.ParticipantRole, error)
+	Update(ctx context.Context, role *models.ParticipantRole) error
+	Delete(ctx context.Context, id string) error
+}
+
+// --- EINDE NIEUWE REPOSITORIES ---
 
 // EmailTemplateRepository definieert de interface voor email template operaties
 type EmailTemplateRepository interface {
@@ -131,8 +191,9 @@ type VerzondEmailRepository interface {
 	// FindByContactID haalt verzonden emails op basis van contact ID
 	FindByContactID(ctx context.Context, contactID string) ([]*models.VerzondEmail, error)
 
-	// FindByAanmeldingID haalt verzonden emails op basis van aanmelding ID
-	FindByAanmeldingID(ctx context.Context, aanmeldingID string) ([]*models.VerzondEmail, error)
+	// FindByParticipantID haalt verzonden emails op basis van participant ID
+	// HERNOEMD (was FindByAanmeldingID)
+	FindByParticipantID(ctx context.Context, participantID string) ([]*models.VerzondEmail, error)
 
 	// FindByOntvanger haalt verzonden emails op basis van ontvanger
 	FindByOntvanger(ctx context.Context, ontvanger string) ([]*models.VerzondEmail, error)
@@ -254,11 +315,11 @@ type NotificationRepository interface {
 	// ListUnsent haalt alle niet verzonden notificaties op
 	ListUnsent(ctx context.Context) ([]*models.Notification, error)
 
-	// ListByType haalt alle notificaties op van een bepaald type
-	ListByType(ctx context.Context, notificationType models.NotificationType) ([]*models.Notification, error)
+	// ListByType haalt alle notificaties op van een bepaald type (V27 key)
+	ListByType(ctx context.Context, notificationTypeKey string) ([]*models.Notification, error)
 
-	// ListByPriority haalt alle notificaties op met een bepaalde prioriteit
-	ListByPriority(ctx context.Context, priority models.NotificationPriority) ([]*models.Notification, error)
+	// ListByPriority haalt alle notificaties op met een bepaalde prioriteit (V27 key)
+	ListByPriority(ctx context.Context, priorityKey string) ([]*models.Notification, error)
 }
 
 // ChatChannelRepository defines the interface for chat channel operations
@@ -562,6 +623,24 @@ type UnderConstructionRepository interface {
 	Update(ctx context.Context, uc *models.UnderConstruction) error
 
 	// Delete removes an under construction record
+	Delete(ctx context.Context, id int) error
+}
+
+// AutoResponseRepository defines the interface for auto response operations
+type AutoResponseRepository interface {
+	// GetAll retrieves all auto responses
+	GetAll(ctx context.Context) ([]*models.AutoResponse, error)
+
+	// GetByID retrieves an auto response by ID
+	GetByID(ctx context.Context, id int) (*models.AutoResponse, error)
+
+	// Create saves a new auto response
+	Create(ctx context.Context, response *models.AutoResponse) error
+
+	// Update updates an existing auto response
+	Update(ctx context.Context, response *models.AutoResponse) error
+
+	// Delete removes an auto response
 	Delete(ctx context.Context, id int) error
 }
 

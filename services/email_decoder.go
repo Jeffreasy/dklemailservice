@@ -8,224 +8,331 @@ import (
 	"mime/multipart"
 	"mime/quotedprintable"
 	"net/mail"
+	"path/filepath"
 	"strings"
 
-	"dklautomationgo/logger"
+	"dklautomationgo/logger" // Je eigen logger
 
-	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/net/html/charset"
 	"golang.org/x/text/transform"
 )
 
-// EmailDecoder handles advanced email decoding including multipart, charset conversion, and encoding
-type EmailDecoder struct{}
-
-// NewEmailDecoder creates a new email decoder
-func NewEmailDecoder() *EmailDecoder {
-	return &EmailDecoder{}
+// Attachment bevat de data voor een bijlage of inline afbeelding
+type Attachment struct {
+	Filename    string
+	ContentType string
+	ContentID   string // Voor inline afbeeldingen (cid:)
+	Data        []byte
 }
 
-// DecodeEmailBody decodes an email body with proper MIME parsing, charset conversion, and transfer decoding
-func (d *EmailDecoder) DecodeEmailBody(m *mail.Message) (string, error) {
-	contentType := m.Header.Get("Content-Type")
+// DecodedEmail bevat alle uitgepakte onderdelen van een e-mail
+type DecodedEmail struct {
+	Subject     string
+	From        *mail.Address
+	To          []*mail.Address
+	Cc          []*mail.Address
+	HTMLBody    string
+	TextBody    string
+	Attachments []Attachment
+	Inline      []Attachment
+}
 
-	// Parse content type to get media type and parameters
+// EmailDecoder verwerkt het decoderen van complexe e-mails
+type EmailDecoder struct {
+	WordDecoder *mime.WordDecoder
+}
+
+// NewEmailDecoder maakt een nieuwe decoder
+func NewEmailDecoder() *EmailDecoder {
+	return &EmailDecoder{
+		WordDecoder: new(mime.WordDecoder),
+	}
+}
+
+// decodeHeader decodeert een enkele header string met RFC 2047
+func (d *EmailDecoder) decodeHeader(s string) string {
+	decoded, err := d.WordDecoder.DecodeHeader(s)
+	if err != nil {
+		logger.Warn("Could not decode header, using original", "header", s, "error", err)
+		return s // Retourneer origineel bij fout
+	}
+	return decoded
+}
+
+// DecodeEmail is de hoofd-instapfunctie.
+// Het parseert de mail.Message en retourneert de DecodedEmail struct.
+func (d *EmailDecoder) DecodeEmail(m *mail.Message) (*DecodedEmail, error) {
+	result := &DecodedEmail{}
+
+	// --- Header Decoding ---
+	// Decodeer Subject (simpele header)
+	result.Subject = d.decodeHeader(m.Header.Get("Subject"))
+
+	// Decodeer Adres-headers (complex, lijsten)
+	// AddressList handelt RFC 2047 decodering voor namen automatisch af.
+	if from, err := m.Header.AddressList("From"); err == nil {
+		if len(from) > 0 {
+			result.From = from[0]
+		}
+	} else {
+		logger.Warn("Could not parse 'From' header", "value", m.Header.Get("From"), "error", err)
+	}
+
+	if to, err := m.Header.AddressList("To"); err == nil {
+		result.To = to
+	} else {
+		logger.Warn("Could not parse 'To' header", "value", m.Header.Get("To"), "error", err)
+	}
+
+	if cc, err := m.Header.AddressList("Cc"); err == nil {
+		result.Cc = cc
+	} else {
+		logger.Warn("Could not parse 'Cc' header", "value", m.Header.Get("Cc"), "error", err)
+	}
+	// --- End Header Decoding ---
+
+	// Start het recursief parsen van de body
+	err := d.parsePart(m.Body, m.Header, result)
+	if err != nil {
+		return nil, err
+	}
+
+	// --- Post-Processing ---
+
+	// Voeg inline afbeeldingen in de HTML in als data-URIs
+	d.embedInlineImages(result)
+
+	// Fallback: Als we Text hebben maar geen HTML, converteer Text naar simpele HTML
+	if result.TextBody != "" && result.HTMLBody == "" {
+		result.HTMLBody = d.textToHTML(result.TextBody)
+	}
+
+	return result, nil
+}
+
+// parsePart is de kern: een recursieve functie die elk MIME-deel verwerkt
+func (d *EmailDecoder) parsePart(body io.Reader, header mail.Header, result *DecodedEmail) error {
+	contentType := header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "text/plain" // Veel e-mails zonder header zijn plain text
+	}
+
 	mediaType, params, err := mime.ParseMediaType(contentType)
 	if err != nil {
-		logger.Warn("Could not parse content type, treating as plain text", "content_type", contentType, "error", err)
-		return d.readSimpleBody(m)
+		logger.Warn("Could not parse content type, skipping part", "content_type", contentType, "error", err)
+		return nil // Ga door met andere parts
 	}
 
-	// Handle multipart messages
+	// Is dit een multipart bericht?
 	if strings.HasPrefix(mediaType, "multipart/") {
-		return d.decodeMultipartBody(m, params)
+		boundary := params["boundary"]
+		if boundary == "" {
+			logger.Warn("Multipart message without boundary, reading as plain", "media_type", mediaType)
+			// Probeer de body te lezen als een simpele tekst, ook al is het 'multipart'
+			return d.processNonMultipart(body, header, result)
+		}
+
+		mr := multipart.NewReader(body, boundary)
+		for {
+			part, err := mr.NextPart()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				logger.Warn("Error reading multipart section, skipping part", "error", err)
+				continue
+			}
+
+			// RECURSIEVE AANROEP: verwerk het onderdeel
+			mailHeader := mail.Header(part.Header)
+			if err := d.parsePart(part, mailHeader, result); err != nil {
+				logger.Warn("Error parsing nested part, skipping", "error", err)
+			}
+		}
+		return nil
 	}
 
-	// Handle single part messages
-	return d.decodeSinglePart(m.Body, m.Header.Get("Content-Transfer-Encoding"), params)
+	// Geen multipart, dus verwerk het als een 'simpel' onderdeel (tekst, bijlage, etc.)
+	return d.processNonMultipart(body, header, result)
 }
 
-// decodeMultipartBody handles multipart MIME messages
-func (d *EmailDecoder) decodeMultipartBody(m *mail.Message, params map[string]string) (string, error) {
-	boundary := params["boundary"]
-	if boundary == "" {
-		logger.Warn("Multipart message without boundary")
-		return d.readSimpleBody(m)
-	}
-
-	mr := multipart.NewReader(m.Body, boundary)
-	var htmlPart string
-	var textPart string
-
-	// Read all parts
-	for {
-		part, err := mr.NextPart()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			logger.Warn("Error reading multipart section", "error", err)
-			continue
-		}
-
-		// Get part content type
-		partContentType := part.Header.Get("Content-Type")
-		partMediaType, partParams, err := mime.ParseMediaType(partContentType)
-		if err != nil {
-			logger.Warn("Could not parse part content type", "error", err)
-			continue
-		}
-
-		// Get transfer encoding for this part
-		partEncoding := part.Header.Get("Content-Transfer-Encoding")
-
-		// Read and decode part body
-		partBody, err := d.decodePartBody(part, partEncoding, partParams)
-		if err != nil {
-			logger.Warn("Error decoding part body", "error", err, "content_type", partMediaType)
-			continue
-		}
-
-		// Store HTML and text parts
-		if strings.HasPrefix(partMediaType, "text/html") {
-			htmlPart = partBody
-		} else if strings.HasPrefix(partMediaType, "text/plain") {
-			textPart = partBody
-		}
-	}
-
-	// Prefer HTML over plain text
-	if htmlPart != "" {
-		return htmlPart, nil
-	}
-	if textPart != "" {
-		// Convert plain text to HTML
-		return d.textToHTML(textPart), nil
-	}
-
-	return "", nil
-}
-
-// decodeSinglePart decodes a single part message
-func (d *EmailDecoder) decodeSinglePart(body io.Reader, encoding string, params map[string]string) (string, error) {
-	// Apply transfer encoding
-	decodedBody, err := d.decodeTransferEncoding(body, encoding)
+// processNonMultipart verwerkt een 'blad' onderdeel (geen multipart)
+func (d *EmailDecoder) processNonMultipart(body io.Reader, header mail.Header, result *DecodedEmail) error {
+	// Check voor bijlagen of inline afbeeldingen
+	contentDisposition := header.Get("Content-Disposition")
+	disposition, dParams, err := mime.ParseMediaType(contentDisposition)
 	if err != nil {
-		return "", err
+		disposition = "inline" // Standaard
 	}
 
-	// Apply charset conversion
-	charset := params["charset"]
-	if charset != "" && !strings.EqualFold(charset, "utf-8") && !strings.EqualFold(charset, "us-ascii") {
-		converted, err := d.convertCharset(decodedBody, charset)
-		if err != nil {
-			logger.Warn("Charset conversion failed, using original", "charset", charset, "error", err)
-			return decodedBody, nil
-		}
-		return converted, nil
-	}
-
-	return decodedBody, nil
-}
-
-// decodePartBody decodes a multipart section
-func (d *EmailDecoder) decodePartBody(part *multipart.Part, encoding string, params map[string]string) (string, error) {
-	// First decode the transfer encoding
-	decoded, err := d.decodeTransferEncoding(part, encoding)
+	// Decodeer de body (transfer encoding + charset)
+	partData, err := d.decodePartBody(body, header)
 	if err != nil {
-		return "", err
+		logger.Warn("Failed to decode part body", "error", err)
+		return nil // Sla dit onderdeel over
 	}
 
-	// Then convert charset if needed
-	charset := params["charset"]
-	if charset != "" && !strings.EqualFold(charset, "utf-8") && !strings.EqualFold(charset, "us-ascii") {
-		converted, err := d.convertCharset(decoded, charset)
-		if err != nil {
-			logger.Warn("Charset conversion failed for part", "charset", charset, "error", err)
-			return decoded, nil
+	contentType := header.Get("Content-Type")
+	mediaType, _, _ := mime.ParseMediaType(contentType) // We weten dat dit werkt van parsePart
+
+	contentID := header.Get("Content-ID")
+	contentID = strings.Trim(contentID, "<>") // Verwijder '<' en '>'
+
+	// Is het een bijlage?
+	if disposition == "attachment" {
+		filename := dParams["filename"]
+		if filename == "" {
+			filename = "attachment" // Fallback
 		}
-		return converted, nil
+		filename = d.decodeHeader(filename) // Decodeer bestandsnaam (RFC 2047)
+
+		result.Attachments = append(result.Attachments, Attachment{
+			Filename:    filepath.Base(filename), // Clean up paden
+			ContentType: mediaType,
+			Data:        partData,
+		})
+		return nil
 	}
 
-	return decoded, nil
+	// Is het een inline afbeelding?
+	if contentID != "" && strings.HasPrefix(mediaType, "image/") {
+		filename := dParams["filename"] // Kan ook een bestandsnaam hebben
+		filename = d.decodeHeader(filename)
+
+		result.Inline = append(result.Inline, Attachment{
+			Filename:    filepath.Base(filename),
+			ContentType: mediaType,
+			ContentID:   contentID,
+			Data:        partData,
+		})
+		return nil
+	}
+
+	// Is het de HTML body?
+	if strings.HasPrefix(mediaType, "text/html") {
+		// We slaan de 'beste' (meestal laatste in alternative) op
+		result.HTMLBody = string(partData)
+		return nil
+	}
+
+	// Is het de platte tekst body?
+	if strings.HasPrefix(mediaType, "text/plain") {
+		result.TextBody = string(partData)
+		return nil
+	}
+
+	// Anders... negeer het (bijv. vCard, kalender-items die niet als bijlage zijn gemarkeerd)
+	logger.Debug("Skipping unhandled inline part", "media_type", mediaType)
+	return nil
 }
 
-// decodeTransferEncoding decodes the transfer encoding (quoted-printable, base64, etc.)
-func (d *EmailDecoder) decodeTransferEncoding(reader io.Reader, encoding string) (string, error) {
-	var decodedReader io.Reader
+// decodePartBody past transfer encoding en charset conversie toe
+func (d *EmailDecoder) decodePartBody(reader io.Reader, header mail.Header) ([]byte, error) {
+	// Stap 1: Decodeer transfer encoding (base64, quoted-printable)
+	transferEncoding := header.Get("Content-Transfer-Encoding")
+	decodedReader, err := d.decodeTransferEncoding(reader, transferEncoding)
+	if err != nil {
+		return nil, err
+	}
 
+	// Stap 2: Decodeer charset (naar UTF-8)
+	contentType := header.Get("Content-Type")
+	_, params, _ := mime.ParseMediaType(contentType)
+	charset := "us-ascii" // Default
+	if params["charset"] != "" {
+		charset = params["charset"]
+	}
+
+	utf8Reader, err := d.convertCharset(decodedReader, charset)
+	if err != nil {
+		logger.Warn("Charset conversion failed, reading as raw", "charset", charset, "error", err)
+		// Fallback: lees de 'raw' (alleen transfer-decoded) body
+		bodyBytes, readErr := io.ReadAll(decodedReader) // Moet originele decodedReader lezen
+		if readErr != nil {
+			return nil, readErr // Fout bij het lezen van fallback
+		}
+		return bodyBytes, nil // Retourneer raw data, niet de error van convertCharset
+	}
+
+	return io.ReadAll(utf8Reader)
+}
+
+// decodeTransferEncoding retourneert een io.Reader die de data on-the-fly decodeert
+func (d *EmailDecoder) decodeTransferEncoding(reader io.Reader, encoding string) (io.Reader, error) {
 	switch strings.ToLower(strings.TrimSpace(encoding)) {
 	case "quoted-printable":
-		decodedReader = quotedprintable.NewReader(reader)
 		logger.Debug("Applying quoted-printable decoding")
+		return quotedprintable.NewReader(reader), nil
 	case "base64":
-		decodedReader = base64.NewDecoder(base64.StdEncoding, reader)
 		logger.Debug("Applying base64 decoding")
+		return base64.NewDecoder(base64.StdEncoding, reader), nil
 	case "7bit", "8bit", "binary", "":
-		decodedReader = reader
+		return reader, nil // Geen decodering nodig
 	default:
 		logger.Warn("Unknown transfer encoding, treating as plain", "encoding", encoding)
-		decodedReader = reader
+		return reader, nil
 	}
-
-	bodyBytes, err := io.ReadAll(decodedReader)
-	if err != nil {
-		return "", err
-	}
-
-	return string(bodyBytes), nil
 }
 
-// convertCharset converts text from one charset to UTF-8
-func (d *EmailDecoder) convertCharset(text string, charset string) (string, error) {
-	charset = strings.ToLower(strings.TrimSpace(charset))
-
-	var decoder *charmap.Charmap
-	switch charset {
-	case "windows-1252", "cp1252":
-		decoder = charmap.Windows1252
-	case "iso-8859-1", "latin1":
-		decoder = charmap.ISO8859_1
-	case "iso-8859-15", "latin9":
-		decoder = charmap.ISO8859_15
-	case "windows-1250":
-		decoder = charmap.Windows1250
-	case "windows-1251":
-		decoder = charmap.Windows1251
-	default:
-		logger.Debug("Unsupported charset, skipping conversion", "charset", charset)
-		return text, nil
+// convertCharset (ROBUUST) converteert een reader van een specifieke charset naar UTF-8
+func (d *EmailDecoder) convertCharset(reader io.Reader, charsetName string) (io.Reader, error) {
+	charsetName = strings.ToLower(strings.TrimSpace(charsetName))
+	if charsetName == "" || strings.EqualFold(charsetName, "utf-8") || strings.EqualFold(charsetName, "us-ascii") {
+		return reader, nil // Geen conversie nodig
 	}
 
-	// Convert to UTF-8
-	reader := transform.NewReader(strings.NewReader(text), decoder.NewDecoder())
-	result, err := io.ReadAll(reader)
-	if err != nil {
-		return "", err
+	// Gebruik de robuuste charset library
+	e, name := charset.Lookup(charsetName)
+	if e == nil {
+		// Probeer IANA-naam (soms weet de ene het wel en de andere niet)
+		// Skip IANA lookup for now to avoid import issues
+		logger.Warn("Unsupported charset, skipping conversion", "charset", charsetName)
+		return reader, nil // Retourneer de originele reader
+	} else {
+		logger.Debug("Charset matched via x/net/html/charset", "original", charsetName, "matched", name)
 	}
 
-	return string(result), nil
+	// Converteer naar UTF-8
+	return transform.NewReader(reader, e.NewDecoder()), nil
 }
 
-// readSimpleBody reads body without MIME parsing (fallback)
-func (d *EmailDecoder) readSimpleBody(m *mail.Message) (string, error) {
-	bodyBytes, err := io.ReadAll(m.Body)
-	if err != nil {
-		return "", err
+// embedInlineImages (NIEUWE FUNCTIE) herschrijft cid: links in HTML naar data: URIs
+func (d *EmailDecoder) embedInlineImages(email *DecodedEmail) {
+	if email.HTMLBody == "" || len(email.Inline) == 0 {
+		return // Geen HTML of geen inline afbeeldingen om te verwerken
 	}
-	return string(bodyBytes), nil
+
+	html := email.HTMLBody
+	for _, inline := range email.Inline {
+		if inline.ContentID == "" {
+			continue
+		}
+
+		// Maak data URI
+		b64data := base64.StdEncoding.EncodeToString(inline.Data)
+		dataURI := "data:" + inline.ContentType + ";base64," + b64data
+
+		// Maak cid string
+		cid := "cid:" + inline.ContentID
+
+		// Vervang in HTML. We vervangen zowel met dubbele als enkele quotes
+		// voor robuustheid tegen slordige HTML.
+		html = strings.ReplaceAll(html, `src="`+cid+`"`, `src="`+dataURI+`"`)
+		html = strings.ReplaceAll(html, `src='`+cid+`'`, `src='`+dataURI+`'`)
+	}
+	email.HTMLBody = html
 }
 
-// textToHTML converts plain text to simple HTML
+// textToHTML (GECORRIGEERD) converteert platte tekst naar simpele HTML
 func (d *EmailDecoder) textToHTML(text string) string {
 	var buf bytes.Buffer
-
 	buf.WriteString("<div style='white-space: pre-wrap; font-family: monospace;'>")
 
 	// Escape HTML characters
-	text = strings.ReplaceAll(text, "&", "&amp;")
-	text = strings.ReplaceAll(text, "<", "&lt;")
-	text = strings.ReplaceAll(text, ">", "&gt;")
-	text = strings.ReplaceAll(text, "\"", "&quot;")
+	text = strings.ReplaceAll(text, "&", "&amp;")   // GECORRIGEERD
+	text = strings.ReplaceAll(text, "<", "&lt;")    // GECORRIGEERD
+	text = strings.ReplaceAll(text, ">", "&gt;")    // GECORRIGEERD
+	text = strings.ReplaceAll(text, "\"", "&quot;") // GECORRIGEERD
 
 	// Convert line breaks to <br>
 	text = strings.ReplaceAll(text, "\r\n", "<br>")
@@ -233,28 +340,48 @@ func (d *EmailDecoder) textToHTML(text string) string {
 
 	buf.WriteString(text)
 	buf.WriteString("</div>")
-
 	return buf.String()
 }
 
-// DecodeSubject decodes email subject with RFC 2047 encoding
+// DecodeSubject decodeert een subject header met RFC 2047 encoding
 func (d *EmailDecoder) DecodeSubject(subject string) string {
-	dec := new(mime.WordDecoder)
-	decoded, err := dec.DecodeHeader(subject)
-	if err != nil {
-		logger.Warn("Could not decode subject", "subject", subject, "error", err)
-		return subject
-	}
-	return decoded
+	return d.decodeHeader(subject)
 }
 
-// DecodeFrom decodes and parses the From header
+// DecodeFrom decodeert een from header naar een leesbare string
 func (d *EmailDecoder) DecodeFrom(from string) string {
-	dec := new(mime.WordDecoder)
-	decoded, err := dec.DecodeHeader(from)
-	if err != nil {
-		logger.Warn("Could not decode from header", "from", from, "error", err)
-		return from
+	// Parse de from header als address list
+	if addresses, err := mail.ParseAddressList(from); err == nil && len(addresses) > 0 {
+		// Gebruik de eerste address en formatteer als "Name <email>" of alleen email
+		addr := addresses[0]
+		if addr.Name != "" {
+			return addr.Name + " <" + addr.Address + ">"
+		}
+		return addr.Address
 	}
-	return decoded
+
+	// Fallback: probeer als enkele address
+	if addr, err := mail.ParseAddress(from); err == nil {
+		if addr.Name != "" {
+			return addr.Name + " <" + addr.Address + ">"
+		}
+		return addr.Address
+	}
+
+	// Laatste fallback: retourneer origineel
+	logger.Warn("Could not parse 'From' header, using original", "from", from)
+	return from
+}
+
+// DecodeEmailBody is de backward-compatible methode die alleen de body string retourneert
+func (d *EmailDecoder) DecodeEmailBody(m *mail.Message) (string, error) {
+	// Gebruik de volledige, robuuste decoder
+	decoded, err := d.DecodeEmail(m)
+	if err != nil {
+		return "", err
+	}
+
+	// `DecodeEmail` heeft de HTMLBody al voorbereid,
+	// inclusief de text-to-HTML fallback.
+	return decoded.HTMLBody, nil
 }

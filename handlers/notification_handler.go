@@ -82,9 +82,9 @@ func (h *NotificationHandler) ListNotifications(c *fiber.Ctx) error {
 
 	// Filter op basis van query parameters
 	if notificationType != "" {
-		notifications, err = h.notificationRepo.ListByType(ctx, models.NotificationType(notificationType))
+		notifications, err = h.notificationRepo.ListByType(ctx, notificationType)
 	} else if priority != "" {
-		notifications, err = h.notificationRepo.ListByPriority(ctx, models.NotificationPriority(priority))
+		notifications, err = h.notificationRepo.ListByPriority(ctx, priority)
 	} else {
 		// Standaard alle niet verzonden notificaties
 		notifications, err = h.notificationRepo.ListUnsent(ctx)
@@ -131,10 +131,11 @@ func (h *NotificationHandler) CreateNotification(c *fiber.Ctx) error {
 	}
 
 	// Maak een nieuwe notificatie aan
+	// V27: Now uses strings directly
 	notification, err := h.notificationService.CreateNotification(
 		c.Context(),
-		models.NotificationType(request.Type),
-		models.NotificationPriority(request.Priority),
+		request.Type,
+		request.Priority,
 		request.Title,
 		request.Message,
 	)
@@ -226,7 +227,8 @@ func (h *NotificationHandler) ReprocessAllNotifications(c *fiber.Ctx) error {
 	ctx := c.Context()
 
 	// Haal notificaties op per type om de database niet te overbelasten
-	types := []models.NotificationType{
+	// V27: Now uses string constants directly
+	types := []string{
 		models.NotificationTypeContact,
 		models.NotificationTypeAanmelding,
 		models.NotificationTypeAuth,
@@ -251,6 +253,7 @@ func (h *NotificationHandler) ReprocessAllNotifications(c *fiber.Ctx) error {
 		// Markeer elke notificatie als niet verzonden en update in de database
 		for _, notification := range notifications {
 			// Alleen verwerk notificaties die prioriteit medium of hoger hebben
+			// V27: Direct field access (database column is 'priority')
 			if notification.Priority == models.NotificationPriorityLow {
 				continue
 			}

@@ -58,12 +58,18 @@ func TestEmailTemplateRendering(t *testing.T) {
 		{
 			name:     "Aanmelding template - optionele velden",
 			template: "aanmelding_email",
-			data: &models.AanmeldingEmailData{
-				Aanmelding: &models.AanmeldingFormulier{
+			data: &models.RegistrationEmailData{
+				Participant: &models.Participant{
+					ID:    "test-participant-id",
 					Naam:  "Test Deelnemer",
 					Email: "test@example.com",
-					Rol:   "Deelnemer",
 				},
+				Registration: &models.EventRegistration{
+					ID:            "test-reg-id",
+					ParticipantID: "test-participant-id",
+					TestMode:      true,
+				},
+				ToAdmin: false,
 			},
 		},
 		{

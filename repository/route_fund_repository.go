@@ -7,53 +7,49 @@ import (
 	"gorm.io/gorm"
 )
 
-// RouteFundRepository interface voor route fund operaties
-type RouteFundRepository interface {
-	Create(ctx context.Context, routeFund *models.RouteFund) error
-	GetByRoute(ctx context.Context, route string) (*models.RouteFund, error)
-	GetAll(ctx context.Context) ([]*models.RouteFund, error)
-	Update(ctx context.Context, routeFund *models.RouteFund) error
-	Delete(ctx context.Context, route string) error
-}
-
-// routeFundRepository implementeert RouteFundRepository
-type routeFundRepository struct {
+// distanceRepository implementeert DistanceRepository
+type distanceRepository struct {
 	db *gorm.DB
 }
 
-// NewRouteFundRepository maakt een nieuwe route fund repository
-func NewRouteFundRepository(db *gorm.DB) RouteFundRepository {
-	return &routeFundRepository{db: db}
+// NewDistanceRepository maakt een nieuwe distance repository
+func NewDistanceRepository(db *gorm.DB) DistanceRepository {
+	return &distanceRepository{db: db}
 }
 
-// Create slaat een nieuwe route fund op
-func (r *routeFundRepository) Create(ctx context.Context, routeFund *models.RouteFund) error {
-	return r.db.WithContext(ctx).Create(routeFund).Error
+// Create slaat een nieuwe distance op
+func (r *distanceRepository) Create(ctx context.Context, distance *models.Distance) error {
+	return r.db.WithContext(ctx).Create(distance).Error
 }
 
-// GetByRoute haalt een route fund op basis van route naam
-func (r *routeFundRepository) GetByRoute(ctx context.Context, route string) (*models.RouteFund, error) {
-	var routeFund models.RouteFund
-	err := r.db.WithContext(ctx).Where("route = ?", route).First(&routeFund).Error
+// GetByRoute haalt een distance op basis van route naam
+func (r *distanceRepository) GetByRoute(ctx context.Context, route string) (*models.Distance, error) {
+	var distance models.Distance
+	err := r.db.WithContext(ctx).Where("route = ?", route).First(&distance).Error
 	if err != nil {
 		return nil, err
 	}
-	return &routeFund, nil
+	return &distance, nil
 }
 
-// GetAll haalt alle route funds op
-func (r *routeFundRepository) GetAll(ctx context.Context) ([]*models.RouteFund, error) {
-	var routeFunds []*models.RouteFund
-	err := r.db.WithContext(ctx).Order("route ASC").Find(&routeFunds).Error
-	return routeFunds, err
+// GetAll haalt alle distances op
+func (r *distanceRepository) GetAll(ctx context.Context) ([]*models.Distance, error) {
+	var distances []*models.Distance
+	err := r.db.WithContext(ctx).Order("route ASC").Find(&distances).Error
+	return distances, err
 }
 
-// Update werkt een route fund bij
-func (r *routeFundRepository) Update(ctx context.Context, routeFund *models.RouteFund) error {
-	return r.db.WithContext(ctx).Save(routeFund).Error
+// List haalt alle distances op (alias voor GetAll voor backward compatibility)
+func (r *distanceRepository) List(ctx context.Context) ([]*models.Distance, error) {
+	return r.GetAll(ctx)
 }
 
-// Delete verwijdert een route fund
-func (r *routeFundRepository) Delete(ctx context.Context, route string) error {
-	return r.db.WithContext(ctx).Where("route = ?", route).Delete(&models.RouteFund{}).Error
+// Update werkt een distance bij
+func (r *distanceRepository) Update(ctx context.Context, distance *models.Distance) error {
+	return r.db.WithContext(ctx).Save(distance).Error
+}
+
+// Delete verwijdert een distance
+func (r *distanceRepository) Delete(ctx context.Context, route string) error {
+	return r.db.WithContext(ctx).Where("route = ?", route).Delete(&models.Distance{}).Error
 }

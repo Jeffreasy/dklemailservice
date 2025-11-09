@@ -2,6 +2,8 @@ package models
 
 import "time"
 
+// ContactFormulier representeert een contactformulier inzending
+// V27 Update: Status now uses foreign key to contact_status_types lookup table
 type ContactFormulier struct {
 	ID               string     `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
 	CreatedAt        time.Time  `json:"created_at" gorm:"autoCreateTime"`
@@ -12,10 +14,14 @@ type ContactFormulier struct {
 	EmailVerzonden   bool       `json:"email_verzonden" gorm:"default:false"`
 	EmailVerzondenOp *time.Time `json:"email_verzonden_op"`
 	PrivacyAkkoord   bool       `json:"privacy_akkoord" gorm:"not null"`
-	Status           string     `json:"status" gorm:"default:'nieuw';index"`
-	BehandeldDoor    *string    `json:"behandeld_door"`
-	BehandeldOp      *time.Time `json:"behandeld_op"`
-	Notities         *string    `json:"notities" gorm:"type:text"`
+
+	// V27: Foreign key to lookup table (database column is 'status')
+	Status     string            `json:"status" gorm:"type:text;index;default:'nieuw'"`
+	StatusType ContactStatusType `json:"status_type,omitempty" gorm:"foreignKey:Status;references:Status"`
+
+	BehandeldDoor *string    `json:"behandeld_door"`
+	BehandeldOp   *time.Time `json:"behandeld_op"`
+	Notities      *string    `json:"notities" gorm:"type:text"`
 
 	// Nieuwe velden voor antwoorden
 	Beantwoord    bool       `json:"beantwoord" gorm:"default:false"`

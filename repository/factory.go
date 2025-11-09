@@ -8,8 +8,8 @@ import (
 type Repository struct {
 	Contact                ContactRepository
 	ContactAntwoord        ContactAntwoordRepository
-	Aanmelding             AanmeldingRepository
-	AanmeldingAntwoord     AanmeldingAntwoordRepository
+	Participant            ParticipantRepository
+	ParticipantAntwoord    ParticipantAntwoordRepository
 	Gebruiker              GebruikerRepository
 	VerzondEmail           VerzondEmailRepository
 	EmailTemplate          EmailTemplateRepository
@@ -35,8 +35,10 @@ type Repository struct {
 	SocialLink             SocialLinkRepository
 	UnderConstruction      UnderConstructionRepository
 	TitleSection           TitleSectionRepository
-	RouteFund              RouteFundRepository
+	Distance               DistanceRepository
 	Event                  EventRepository
+	EventRegistration      EventRegistrationRepository
+	AutoResponse           AutoResponseRepository
 
 	// Gamification repositories
 	Badge       BadgeRepository
@@ -61,8 +63,8 @@ func NewRepository(db *gorm.DB) *Repository {
 	repo := &Repository{
 		Contact:                NewPostgresContactRepository(baseRepo),
 		ContactAntwoord:        NewPostgresContactAntwoordRepository(baseRepo),
-		Aanmelding:             NewPostgresAanmeldingRepository(baseRepo),
-		AanmeldingAntwoord:     NewPostgresAanmeldingAntwoordRepository(baseRepo),
+		Participant:            NewPostgresParticipantRepository(baseRepo),
+		ParticipantAntwoord:    NewPostgresParticipantAntwoordRepository(baseRepo),
 		Gebruiker:              NewPostgresGebruikerRepository(baseRepo),
 		VerzondEmail:           NewPostgresVerzondEmailRepository(baseRepo),
 		EmailTemplate:          NewPostgresEmailTemplateRepository(baseRepo),
@@ -88,8 +90,10 @@ func NewRepository(db *gorm.DB) *Repository {
 		SocialLink:             NewPostgresSocialLinkRepository(db),
 		UnderConstruction:      NewPostgresUnderConstructionRepository(db),
 		TitleSection:           NewPostgresTitleSectionRepository(db),
-		RouteFund:              NewRouteFundRepository(db),
+		Distance:               NewDistanceRepository(db),
 		Event:                  NewPostgresEventRepository(baseRepo),
+		EventRegistration:      NewPostgresEventRegistrationRepository(baseRepo),
+		AutoResponse:           NewPostgresAutoResponseRepository(db),
 
 		// Gamification repositories (Note: Badge moet eerst omdat Achievement het nodig heeft)
 		Badge: NewBadgeRepository(db),

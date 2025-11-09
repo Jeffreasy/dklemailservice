@@ -7,39 +7,49 @@ import (
 	"dklautomationgo/repository"
 	"dklautomationgo/services"
 	"encoding/json"
+	"errors"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 )
 
 // EmailServiceInterface definieert de interface voor email operaties
 type EmailServiceInterface interface {
 	SendContactEmail(data *models.ContactEmailData) error
-	SendAanmeldingEmail(data *models.AanmeldingEmailData) error
+	// GEWIJZIGD: Gebruikt nu de nieuwe struct
+	SendRegistrationEmail(data *models.RegistrationEmailData) error
 }
 
 // EmailHandler verzorgt de afhandeling van email verzoeken
 type EmailHandler struct {
 	emailService        EmailServiceInterface
 	notificationService services.NotificationService
-	aanmeldingRepo      repository.AanmeldingRepository
+	participantRepo     repository.ParticipantRepository
+	eventRegRepo        repository.EventRegistrationRepository
+	eventRepo           repository.EventRepository
 }
 
 // NewEmailHandler maakt een nieuwe EmailHandler
 func NewEmailHandler(
 	emailService EmailServiceInterface,
 	notificationService services.NotificationService,
-	aanmeldingRepo repository.AanmeldingRepository,
+	participantRepo repository.ParticipantRepository,
+	eventRegRepo repository.EventRegistrationRepository,
+	eventRepo repository.EventRepository,
 ) *EmailHandler {
 	return &EmailHandler{
 		emailService:        emailService,
 		notificationService: notificationService,
-		aanmeldingRepo:      aanmeldingRepo,
+		participantRepo:     participantRepo,
+		eventRegRepo:        eventRegRepo,
+		eventRepo:           eventRepo,
 	}
 }
 
+// HandleContactEmail is ongewijzigd gebleven.
 func (h *EmailHandler) HandleContactEmail(c *fiber.Ctx) error {
 	var request models.ContactFormulier
 	start := time.Now()
@@ -60,17 +70,17 @@ func (h *EmailHandler) HandleContactEmail(c *fiber.Ctx) error {
 		testMode = true
 		logger.Info("Test modus gedetecteerd via header", "remote_ip", c.IP())
 	}
-
 	if c.Locals("test_mode") != nil {
 		testMode = true
 		logger.Info("Test modus gedetecteerd via locals", "remote_ip", c.IP())
 	}
-
 	var requestMap map[string]interface{}
 	if err := json.Unmarshal(c.Body(), &requestMap); err == nil {
-		if val, ok := requestMap["test_mode"]; ok && val.(bool) {
-			testMode = true
-			logger.Info("Test modus gedetecteerd via body parameter", "remote_ip", c.IP())
+		if val, ok := requestMap["test_mode"]; ok {
+			if bVal, ok := val.(bool); ok && bVal {
+				testMode = true
+				logger.Info("Test modus gedetecteerd via body parameter", "remote_ip", c.IP())
+			}
 		}
 	}
 
@@ -176,7 +186,6 @@ func (h *EmailHandler) HandleContactEmail(c *fiber.Ctx) error {
 	}
 
 	// Stuur een notificatie over het nieuwe contactformulier
-	// We doen dit alleen in productie modus
 	h.sendContactNotification(&request, testMode)
 
 	// Return success
@@ -202,232 +211,198 @@ func (h *EmailHandler) HandleContactEmail(c *fiber.Ctx) error {
 	}
 }
 
-func (h *EmailHandler) HandleAanmeldingEmail(c *fiber.Ctx) error {
-	var aanmelding models.AanmeldingFormulier
+// HandleRegistrationEmail (voorheen HandleAanmeldingEmail)
+// @Summary Nieuwe participant en event registratie aanmaken
+// @Tags Public
+// @Router /api/register [post]
+func (h *EmailHandler) HandleRegistrationEmail(c *fiber.Ctx) error {
+	var form models.AanmeldingFormulier // We hergebruiken de DTO, dat is prima
 	start := time.Now()
+	ctx := c.Context()
 
-	if err := c.BodyParser(&aanmelding); err != nil {
-		logger.Error("Fout bij parsen van aanmelding formulier",
-			"error", err,
-			"remote_ip", c.IP())
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"error":   "Ongeldig verzoek: " + err.Error(),
-		})
+	if err := c.BodyParser(&form); err != nil {
+		logger.Error("Fout bij parsen van registratie formulier", "error", err, "remote_ip", c.IP())
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "error": "Ongeldig verzoek: " + err.Error()})
 	}
 
-	// Detecteer test modus
+	// --- Detecteer test modus (zelfde als hierboven) ---
 	var testMode bool
-	if testModeValue := c.Get("X-Test-Mode"); testModeValue == "true" {
+	if c.Get("X-Test-Mode") == "true" {
 		testMode = true
-		logger.Info("Test modus gedetecteerd via header", "remote_ip", c.IP())
 	}
-
 	if c.Locals("test_mode") != nil {
 		testMode = true
-		logger.Info("Test modus gedetecteerd via locals", "remote_ip", c.IP())
 	}
-
 	var requestMap map[string]interface{}
 	if err := json.Unmarshal(c.Body(), &requestMap); err == nil {
-		if val, ok := requestMap["test_mode"]; ok && val.(bool) {
-			testMode = true
-			logger.Info("Test modus gedetecteerd via body parameter", "remote_ip", c.IP())
+		if val, ok := requestMap["test_mode"]; ok {
+			if bVal, ok := val.(bool); ok && bVal {
+				testMode = true
+			}
 		}
 	}
+	// --- Einde test modus detectie ---
 
-	// Log the incoming request
-	logger.Info("Aanmelding formulier ontvangen",
-		"naam", aanmelding.Naam,
-		"email", aanmelding.Email,
-		"remote_ip", c.IP(),
-		"test_mode", testMode)
+	logger.Info("Registratie formulier ontvangen", "naam", form.Naam, "email", form.Email, "remote_ip", c.IP(), "test_mode", testMode)
 
-	// Validate required fields
-	if aanmelding.Naam == "" {
-		logger.Warn("Ontbrekende naam in aanmelding",
-			"email", aanmelding.Email,
-			"remote_ip", c.IP())
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"error":   "Naam is verplicht",
-		})
+	// --- Validatie (grotendeels ongewijzigd) ---
+	if form.Naam == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "error": "Naam is verplicht"})
+	}
+	if form.Email == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "error": "Email is verplicht"})
+	}
+	if !strings.Contains(form.Email, "@") || !strings.Contains(form.Email, ".") {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "error": "Ongeldig email adres"})
+	}
+	if !form.Terms {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "error": "Je moet akkoord gaan met de voorwaarden"})
 	}
 
-	if aanmelding.Email == "" {
-		logger.Warn("Ontbrekende email in aanmelding",
-			"naam", aanmelding.Naam,
-			"remote_ip", c.IP())
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"error":   "Email is verplicht",
-		})
+	// --- NIEUWE LOGICA (V28 REFACTOR) ---
+
+	// 1. Zoek of maak de "Persoon" (Participant)
+	var participant *models.Participant
+	var err error
+
+	// Probeer participant op email te vinden
+	participants, err := h.participantRepo.FindByEmail(ctx, form.Email)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		logger.Error("Fout bij zoeken naar bestaande participant", "error", err, "email", form.Email)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": "Databasefout bij zoeken participant"})
 	}
 
-	// Validate email format
-	if !strings.Contains(aanmelding.Email, "@") || !strings.Contains(aanmelding.Email, ".") {
-		logger.Warn("Ongeldig email formaat",
-			"email", aanmelding.Email,
-			"remote_ip", c.IP())
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"error":   "Ongeldig email adres",
-		})
-	}
-
-	// Validate terms acceptance
-	if !aanmelding.Terms {
-		logger.Warn("Terms niet geaccepteerd",
-			"naam", aanmelding.Naam,
-			"email", aanmelding.Email,
-			"remote_ip", c.IP())
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"error":   "Je moet akkoord gaan met de voorwaarden",
-		})
-	}
-
-	// Maak een Aanmelding object aan voor de database
-	// We gebruiken pointers voor optionele velden zoals Bijzonderheden
-	nieuweAanmelding := &models.Aanmelding{
-		Naam:           aanmelding.Naam,
-		Email:          aanmelding.Email,
-		Telefoon:       aanmelding.Telefoon,
-		Rol:            aanmelding.Rol,
-		Afstand:        aanmelding.Afstand,
-		Ondersteuning:  aanmelding.Ondersteuning,
-		Bijzonderheden: aanmelding.Bijzonderheden,
-		Terms:          aanmelding.Terms,
-		Status:         "nieuw",  // Standaard status
-		TestMode:       testMode, // Neem test mode over
-	}
-
-	// Sla de aanmelding op in de database (niet in test modus)
-	if !testMode {
-		logger.Info("Aanmelding opslaan in database",
-			"naam", nieuweAanmelding.Naam,
-			"email", nieuweAanmelding.Email)
-		ctx := c.Context()
-		if err := h.aanmeldingRepo.Create(ctx, nieuweAanmelding); err != nil {
-			logger.Error("Fout bij opslaan aanmelding in database",
-				"error", err,
-				"naam", nieuweAanmelding.Naam,
-				"email", nieuweAanmelding.Email,
-				"elapsed", time.Since(start))
-			// Geef een fout terug als opslaan mislukt
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"success": false,
-				"error":   "Kon aanmelding niet opslaan: " + err.Error(),
-			})
-		}
-		logger.Info("Aanmelding succesvol opgeslagen in database",
-			"id", nieuweAanmelding.ID,
-			"naam", nieuweAanmelding.Naam)
+	if len(participants) > 0 {
+		// Participant bestaat al, we gebruiken deze
+		participant = participants[0]
+		logger.Info("Bestaande participant gevonden", "id", participant.ID, "email", participant.Email)
 	} else {
-		logger.Info("Test modus: Aanmelding niet opgeslagen in database",
-			"naam", nieuweAanmelding.Naam)
+		// Participant bestaat niet, maak een nieuwe aan
+		logger.Info("Nieuwe participant aanmaken", "email", form.Email)
+		participant = &models.Participant{
+			Naam:     form.Naam,
+			Email:    form.Email,
+			Telefoon: form.Telefoon,
+			Terms:    form.Terms,
+		}
+
+		if !testMode {
+			if err := h.participantRepo.Create(ctx, participant); err != nil {
+				logger.Error("Fout bij opslaan nieuwe participant", "error", err, "email", form.Email)
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": "Kon participant niet opslaan"})
+			}
+			logger.Info("Nieuwe participant succesvol opgeslagen", "id", participant.ID)
+		} else {
+			logger.Info("Test modus: Participant niet opgeslagen", "email", form.Email)
+		}
 	}
 
-	// Send email to admin
+	// 2. Haal het actieve evenement op
+	activeEvent, err := h.eventRepo.GetActiveEvent(ctx)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			logger.Error("Geen actief evenement gevonden. Registratie is gesloten.", "error", err)
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"success": false, "error": "De inschrijving is momenteel niet geopend."})
+		}
+		logger.Error("Fout bij ophalen actief evenement", "error", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": "Fout bij ophalen event data"})
+	}
+
+	// 3. Maak de "Deelname" (EventRegistration) aan
+	distanceRoute := form.Afstand
+	roleName := form.Rol
+
+	nieuweRegistratie := &models.EventRegistration{
+		EventID:             activeEvent.ID,
+		ParticipantID:       participant.ID,
+		TestMode:            testMode,
+		Ondersteuning:       form.Ondersteuning,
+		Bijzonderheden:      form.Bijzonderheden,
+		Status:              "nieuw", // V27: Direct field (database column is 'status')
+		DistanceRoute:       &distanceRoute,
+		ParticipantRoleName: &roleName,
+		// Standaardwaarden (Steps, TotalDistance etc.) worden door DB default gezet
+	}
+
+	// Sla de registratie op
+	if !testMode {
+		// DIT IS DE FIX VOOR FOUT 2 (h.eventRegRepo.Create undefined)
+		// We roepen nu de 'Create' methode aan die we zojuist hebben gedefinieerd.
+		if err := h.eventRegRepo.Create(ctx, nieuweRegistratie); err != nil {
+			logger.Error("Fout bij opslaan event registratie", "error", err, "participant_id", participant.ID, "event_id", activeEvent.ID)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": "Kon registratie niet opslaan"})
+		}
+		logger.Info("Event registratie succesvol opgeslagen", "id", nieuweRegistratie.ID, "participant_id", participant.ID)
+	} else {
+		logger.Info("Test modus: Event registratie niet opgeslagen", "participant_email", form.Email)
+	}
+
+	// --- Einde V28 Refactor Logica ---
+
+	// 4. Verzend e-mails
 	adminEmail := os.Getenv("REGISTRATION_EMAIL")
 	if adminEmail == "" {
-		adminEmail = "inschrijving@dekoninklijkeloop.nl" // Default registration email
-		logger.Warn("REGISTRATION_EMAIL niet geconfigureerd, gebruik standaardwaarde",
-			"default", adminEmail)
+		adminEmail = "inschrijving@dekoninklijkeloop.nl"
+		logger.Warn("REGISTRATION_EMAIL niet geconfigureerd, gebruik standaardwaarde", "default", adminEmail)
+	}
+
+	// DIT IS DE FIX VOOR FOUT 3 (undefined: models.RegistrationEmailData)
+	// We gebruiken nu de correct gedefinieerde struct
+	emailData := &models.RegistrationEmailData{
+		Participant:  participant,
+		Registration: nieuweRegistratie,
+		AdminEmail:   adminEmail,
 	}
 
 	// Stuur email naar admin
-	adminEmailData := &models.AanmeldingEmailData{
-		ToAdmin:    true,
-		Aanmelding: &aanmelding,
-		AdminEmail: adminEmail,
-	}
-
-	// In testmodus sturen we geen echte emails
+	emailData.ToAdmin = true
 	if testMode {
 		logger.Info("Test modus: Geen admin email verzonden", "admin_email", adminEmail)
 	} else {
-		logger.Info("Admin email wordt verzonden",
-			"admin_email", adminEmail,
-			"aanmelding_naam", aanmelding.Naam)
-		if err := h.emailService.SendAanmeldingEmail(adminEmailData); err != nil {
-			logger.Error("Fout bij verzenden admin email",
-				"error", err,
-				"admin_email", adminEmail,
-				"elapsed", time.Since(start))
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"success": false,
-				"error":   "Fout bij het verzenden van de email: " + err.Error(),
-			})
+		logger.Info("Admin email wordt verzonden", "admin_email", adminEmail, "naam", form.Naam)
+		if err := h.emailService.SendRegistrationEmail(emailData); err != nil {
+			logger.Error("Fout bij verzenden admin email", "error", err, "elapsed", time.Since(start))
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": "Fout bij het verzenden van de email"})
 		}
-		logger.Info("Admin email verzonden",
-			"admin_email", adminEmail,
-			"elapsed", time.Since(start))
+		logger.Info("Admin email verzonden", "admin_email", adminEmail, "elapsed", time.Since(start))
 	}
 
 	// Stuur bevestigingsemail naar gebruiker
-	userEmailData := &models.AanmeldingEmailData{
-		ToAdmin:    false,
-		Aanmelding: &aanmelding,
-	}
-
-	// In testmodus sturen we geen echte emails
+	emailData.ToAdmin = false
 	if testMode {
-		logger.Info("Test modus: Geen gebruiker email verzonden", "user_email", aanmelding.Email)
+		logger.Info("Test modus: Geen gebruiker email verzonden", "user_email", form.Email)
 	} else {
-		logger.Info("Bevestigingsemail wordt verzonden",
-			"user_email", aanmelding.Email,
-			"naam", aanmelding.Naam)
-		if err := h.emailService.SendAanmeldingEmail(userEmailData); err != nil {
-			logger.Error("Fout bij verzenden bevestigingsemail",
-				"error", err,
-				"user_email", aanmelding.Email,
-				"elapsed", time.Since(start))
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"success": false,
-				"error":   "Fout bij het verzenden van de bevestigingsemail: " + err.Error(),
-			})
+		logger.Info("Bevestigingsemail wordt verzonden", "user_email", form.Email, "naam", form.Naam)
+		if err := h.emailService.SendRegistrationEmail(emailData); err != nil {
+			logger.Error("Fout bij verzenden bevestigingsemail", "error", err, "elapsed", time.Since(start))
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": "Fout bij het verzenden van de bevestigingsemail"})
 		}
-		logger.Info("Bevestigingsemail verzonden",
-			"user_email", aanmelding.Email,
-			"elapsed", time.Since(start))
+		logger.Info("Bevestigingsemail verzonden", "user_email", form.Email, "elapsed", time.Since(start))
 
-		// Werk de aanmelding bij in de database om aan te geven dat emails zijn verzonden
+		// 5. Update de *registratie* (niet de participant) met verzendstatus
 		now := time.Now()
-		nieuweAanmelding.EmailVerzonden = true
-		nieuweAanmelding.EmailVerzondenOp = &now
-		ctx := c.Context() // Gebruik dezelfde context als voor create
-		if err := h.aanmeldingRepo.Update(ctx, nieuweAanmelding); err != nil {
-			// Log de fout, maar ga door omdat de hoofdactie (aanmelding + emails) al gelukt is.
-			// We willen geen 500 error teruggeven aan de gebruiker op dit punt.
-			logger.Error("Fout bij bijwerken aanmelding na email verzending",
-				"error", err,
-				"aanmelding_id", nieuweAanmelding.ID)
+		nieuweRegistratie.EmailVerzonden = true
+		nieuweRegistratie.EmailVerzondenOp = &now
+		if err := h.eventRegRepo.Update(ctx, nieuweRegistratie); err != nil {
+			logger.Error("Fout bij bijwerken registratie na email verzending", "error", err, "reg_id", nieuweRegistratie.ID)
 		} else {
-			logger.Info("Aanmelding bijgewerkt met email verzendstatus",
-				"aanmelding_id", nieuweAanmelding.ID)
+			logger.Info("Registratie bijgewerkt met email verzendstatus", "reg_id", nieuweRegistratie.ID)
 		}
 	}
 
-	// Stuur een notificatie voor een nieuwe aanmelding
-	h.sendAanmeldingNotification(&aanmelding, testMode)
+	// 6. Stuur een notificatie
+	h.sendRegistrationNotification(&form, testMode) // De DTO is hier prima
 
-	// Return success
+	// 7. Return success
 	if testMode {
-		logger.Info("Aanmelding formulier succesvol verwerkt in test modus",
-			"naam", aanmelding.Naam,
-			"email", aanmelding.Email,
-			"total_elapsed", time.Since(start))
+		logger.Info("Registratie formulier succesvol verwerkt in test modus", "naam", form.Naam, "total_elapsed", time.Since(start))
 		return c.JSON(fiber.Map{
 			"success":   true,
 			"message":   "[TEST MODE] Je aanmelding is verwerkt (geen echte email verzonden).",
 			"test_mode": true,
 		})
 	} else {
-		logger.Info("Aanmelding formulier succesvol verwerkt",
-			"naam", aanmelding.Naam,
-			"email", aanmelding.Email,
-			"total_elapsed", time.Since(start))
+		logger.Info("Registratie formulier succesvol verwerkt", "naam", form.Naam, "total_elapsed", time.Since(start))
 		return c.JSON(fiber.Map{
 			"success": true,
 			"message": "Je aanmelding is verzonden! Je ontvangt ook een bevestiging per email.",
@@ -443,77 +418,54 @@ func (h *EmailHandler) LogUserActivity(email, activity, ip string) {
 		"ip", ip)
 }
 
-// Stuur een notificatie voor een nieuw contactformulier
+// sendContactNotification - GEWIJZIGD om string key te gebruiken
 func (h *EmailHandler) sendContactNotification(contact *models.ContactFormulier, isTestMode bool) {
-	// Skip als de notification service niet beschikbaar is of als we in test mode zijn
 	if h.notificationService == nil || isTestMode {
 		return
 	}
-
 	priority := models.NotificationPriorityMedium
 	title := "Nieuw Contactverzoek"
-	message := ""
+	message := "<b>" + contact.Naam + "</b> heeft contact opgenomen via het contactformulier.\n\n" +
+		"<b>Email:</b> " + contact.Email + "\n\n" +
+		"<b>Bericht:</b>\n" + contact.Bericht
 
-	if contact.Naam != "" && contact.Email != "" {
-		message = "<b>" + contact.Naam + "</b> heeft contact opgenomen via het contactformulier.\n\n" +
-			"<b>Email:</b> " + contact.Email + "\n\n" +
-			"<b>Bericht:</b>\n" + contact.Bericht
-	} else {
-		// Fallback als naam of email ontbreekt
-		message = "Er is een nieuw contactverzoek ontvangen.\n\n" +
-			"<b>Bericht:</b>\n" + contact.Bericht
-	}
-
-	// Maak een notificatie aan
+	// GEWIJZIGD: Gebruik V27 string key
 	_, err := h.notificationService.CreateNotification(
 		context.Background(),
-		models.NotificationTypeContact,
+		"contact", // voorheen models.NotificationTypeContact
 		priority,
 		title,
 		message,
 	)
-
 	if err != nil {
-		logger.Error("Fout bij aanmaken contact notificatie",
-			"error", err,
-			"contact_naam", contact.Naam,
-			"contact_email", contact.Email)
+		logger.Error("Fout bij aanmaken contact notificatie", "error", err, "contact_naam", contact.Naam)
 	}
 }
 
-// Stuur een notificatie voor een nieuwe aanmelding
-func (h *EmailHandler) sendAanmeldingNotification(aanmelding *models.AanmeldingFormulier, isTestMode bool) {
-	// Skip als de notification service niet beschikbaar is of als we in test mode zijn
+// sendRegistrationNotification - GEWIJZIGD om string key te gebruiken
+func (h *EmailHandler) sendRegistrationNotification(aanmelding *models.AanmeldingFormulier, isTestMode bool) {
 	if h.notificationService == nil || isTestMode {
 		return
 	}
 
 	priority := models.NotificationPriorityMedium
 	title := "Nieuwe Aanmelding"
-	message := ""
+	message := "<b>" + aanmelding.Naam + "</b> heeft zich aangemeld.\n\n" +
+		"<b>Email:</b> " + aanmelding.Email + "\n\n" +
+		"<b>Rol:</b> " + aanmelding.Rol + "\n" +
+		"<b>Afstand:</b> " + aanmelding.Afstand + "\n"
 
-	if aanmelding.Naam != "" && aanmelding.Email != "" {
-		message = "<b>" + aanmelding.Naam + "</b> heeft zich aangemeld.\n\n" +
-			"<b>Email:</b> " + aanmelding.Email + "\n\n" +
-			"<b>Rol:</b> " + aanmelding.Rol + "\n" +
-			"<b>Afstand:</b> " + aanmelding.Afstand + "\n"
-
-		if aanmelding.Telefoon != "" {
-			message += "<b>Telefoon:</b> " + aanmelding.Telefoon + "\n\n"
-		}
-
-		if aanmelding.Bijzonderheden != "" {
-			message += "<b>Bijzonderheden:</b>\n" + aanmelding.Bijzonderheden
-		}
-	} else {
-		// Fallback als naam of email ontbreekt
-		message = "Er is een nieuwe aanmelding ontvangen."
+	if aanmelding.Telefoon != "" {
+		message += "<b>Telefoon:</b> " + aanmelding.Telefoon + "\n\n"
+	}
+	if aanmelding.Bijzonderheden != "" {
+		message += "<b>Bijzonderheden:</b>\n" + aanmelding.Bijzonderheden
 	}
 
-	// Maak een notificatie aan
+	// DIT IS DE FIX VOOR FOUT 4 (undefined: models.NotificationTypeRegistration)
 	_, err := h.notificationService.CreateNotification(
 		context.Background(),
-		models.NotificationTypeAanmelding,
+		"registration", // voorheen models.NotificationTypeRegistration
 		priority,
 		title,
 		message,

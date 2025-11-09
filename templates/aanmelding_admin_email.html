@@ -74,25 +74,15 @@
             </div>
             
             <div class="content">
-                <p>Er is een nieuwe inschrijving binnengekomen voor De Koninklijke Loop.</p>
-                
-                <div class="message-box">
-                    <strong>Inschrijfgegevens:</strong><br>
-                    Naam: {{.Aanmelding.Naam}}<br>
-                    Email: {{.Aanmelding.Email}}<br>
-                    {{if ne .Aanmelding.Telefoon ""}}<br>
-                    Telefoon: {{.Aanmelding.Telefoon}}<br>
-                    {{end}}
-                    Rol: {{.Aanmelding.Rol}}<br>
-                    Afstand: {{.Aanmelding.Afstand}}<br>
-                    {{if ne .Aanmelding.Ondersteuning ""}}<br>
-                    Ondersteuning: {{.Aanmelding.Ondersteuning}}<br>
-                    {{end}}
-                    {{if ne .Aanmelding.Bijzonderheden ""}}<br>
-                    Bijzonderheden: {{.Aanmelding.Bijzonderheden}}<br>
-                    {{end}}
-                </div>
-            </div>
+                 <p>Er is een nieuwe inschrijving binnengekomen voor De Koninklijke Loop.</p>
+                 
+                 <div class="message-box">
+                 <strong>Inschrijfgegevens:</strong><br>
+                 Naam: {{.Participant.Naam}}<br>  Email: {{.Participant.Email}}<br>  {{if ne .Participant.Telefoon ""}}<br>  Telefoon: {{.Participant.Telefoon}}<br>  {{end}}
+                 Rol: {{.Registration.ParticipantRoleName}}<br>  Afstand: {{.Registration.DistanceRoute}}<br>  {{if ne .Registration.Ondersteuning ""}}<br>  Ondersteuning: {{.Registration.Ondersteuning}}<br>  {{end}}
+                 {{if ne .Registration.Bijzonderheden ""}}<br>  Bijzonderheden: {{.Registration.Bijzonderheden}}<br>  {{end}}
+                 </div>
+                 </div>
             
             <div class="footer">
                 <p>Dit is een automatisch gegenereerd bericht van het DKL Email Systeem.</p>

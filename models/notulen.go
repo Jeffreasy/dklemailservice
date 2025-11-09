@@ -11,30 +11,30 @@ import (
 
 // Notulen represents a meeting minutes document
 type Notulen struct {
-	ID                   uuid.UUID      `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-	Titel                string         `json:"titel" gorm:"type:varchar(255);not null"`
-	VergaderingDatum     time.Time      `json:"vergadering_datum" gorm:"type:date;not null"`
-	Locatie              string         `json:"locatie,omitempty" gorm:"type:varchar(255)"`
-	Voorzitter           string         `json:"voorzitter,omitempty" gorm:"type:varchar(255)"`
-	Notulist             string         `json:"notulist,omitempty" gorm:"type:varchar(255)"`
-	Aanwezigen           pq.StringArray `json:"aanwezigen,omitempty" gorm:"type:text[]"`            // Legacy field - combined names for backwards compatibility
-	Afwezigen            pq.StringArray `json:"afwezigen,omitempty" gorm:"type:text[]"`             // Legacy field - combined names for backwards compatibility
-	AanwezigenGebruikers UUIDArray      `json:"aanwezigen_gebruikers,omitempty" gorm:"type:uuid[]"` // UUIDs of registered users present
-	AfwezigenGebruikers  UUIDArray      `json:"afwezigen_gebruikers,omitempty" gorm:"type:uuid[]"`  // UUIDs of registered users absent
-	AanwezigenGasten     pq.StringArray `json:"aanwezigen_gasten,omitempty" gorm:"type:text[]"`     // Names of non-registered guests present
-	AfwezigenGasten      pq.StringArray `json:"afwezigen_gasten,omitempty" gorm:"type:text[]"`      // Names of non-registered guests absent
-	AgendaItems          AgendaItems    `json:"agenda_items,omitempty" gorm:"type:jsonb"`
-	Besluiten            Besluiten      `json:"besluiten,omitempty" gorm:"type:jsonb"`
-	Actiepunten          Actiepunten    `json:"actiepunten,omitempty" gorm:"type:jsonb"`
-	Notities             string         `json:"notities,omitempty" gorm:"type:text"`
-	Status               string         `json:"status" gorm:"type:varchar(50);not null;default:'draft'"`
-	Versie               int            `json:"versie" gorm:"type:integer;not null;default:1"`
-	CreatedBy            uuid.UUID      `json:"created_by" gorm:"type:uuid;not null"`
-	CreatedAt            time.Time      `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt            time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
-	UpdatedBy            uuid.UUID      `json:"updated_by,omitempty" gorm:"type:uuid"`
-	FinalizedAt          *time.Time     `json:"finalized_at,omitempty" gorm:"type:timestamp"`
-	FinalizedBy          *uuid.UUID     `json:"finalized_by,omitempty" gorm:"type:uuid"`
+	ID                     uuid.UUID      `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+	Titel                  string         `json:"titel" gorm:"type:varchar(255);not null"`
+	VergaderingDatum       time.Time      `json:"vergadering_datum" gorm:"type:date;not null"`
+	Locatie                string         `json:"locatie,omitempty" gorm:"type:varchar(255)"`
+	Voorzitter             string         `json:"voorzitter,omitempty" gorm:"type:varchar(255)"`
+	Notulist               string         `json:"notulist,omitempty" gorm:"type:varchar(255)"`
+	Aanwezigen             pq.StringArray `json:"aanwezigen,omitempty" gorm:"type:text[]"`               // Legacy field
+	Afwezigen              pq.StringArray `json:"afwezigen,omitempty" gorm:"type:text[]"`                // Legacy field
+	AanwezigenGebruikerIDs UUIDArray      `json:"aanwezigen_gebruiker_ids,omitempty" gorm:"type:uuid[]"` // New UUID array field
+	AfwezigenGebruikerIDs  UUIDArray      `json:"afwezigen_gebruiker_ids,omitempty" gorm:"type:uuid[]"`  // New UUID array field
+	AanwezigenGasten       pq.StringArray `json:"aanwezigen_gasten,omitempty" gorm:"type:text[]"`        // New guest array field
+	AfwezigenGasten        pq.StringArray `json:"afwezigen_gasten,omitempty" gorm:"type:text[]"`         // New guest array field
+	AgendaItems            AgendaItems    `json:"agenda_items,omitempty" gorm:"type:jsonb"`
+	Besluiten              Besluiten      `json:"besluiten,omitempty" gorm:"type:jsonb"`
+	Actiepunten            Actiepunten    `json:"actiepunten,omitempty" gorm:"type:jsonb"`
+	Notities               string         `json:"notities,omitempty" gorm:"type:text"`
+	Status                 string         `json:"status" gorm:"type:varchar(50);not null;default:'draft';index"`
+	Versie                 int            `json:"versie" gorm:"type:integer;not null;default:1"`
+	CreatedBy              uuid.UUID      `json:"created_by" gorm:"type:uuid;not null;index"`
+	CreatedAt              time.Time      `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt              time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
+	UpdatedByID            uuid.UUID      `json:"updated_by_id,omitempty" gorm:"type:uuid"` // New updated_by field
+	FinalizedAt            *time.Time     `json:"finalized_at,omitempty" gorm:"type:timestamp"`
+	FinalizedBy            *uuid.UUID     `json:"finalized_by,omitempty" gorm:"type:uuid"`
 }
 
 // TableName returns the table name for the Notulen model
@@ -44,46 +44,179 @@ func (Notulen) TableName() string {
 
 // AgendaItem represents an item on the meeting agenda
 type AgendaItem struct {
-	Title   string `json:"title"`
-	Details string `json:"details,omitempty"`
+	Titel        string `json:"titel"`
+	Beschrijving string `json:"beschrijving,omitempty"`
+	Spreker      string `json:"spreker,omitempty"`
+	Tijdslot     string `json:"tijdslot,omitempty"`
+}
+
+// AgendaItems is a custom type for JSONB scanning of agenda items
+type AgendaItems []AgendaItem
+
+// Scan implements sql.Scanner interface for reading JSONB agenda items from database
+func (a *AgendaItems) Scan(value interface{}) error {
+	if value == nil {
+		*a = AgendaItems{}
+		return nil
+	}
+
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		// For unsupported types, default to empty array
+		*a = AgendaItems{}
+		return nil
+	}
+
+	if len(bytes) == 0 {
+		*a = AgendaItems{}
+		return nil
+	}
+
+	// *** HIER ZIT DE FIX ***
+	// Probeer te unmarshal-en. Als het faalt (omdat het een object is),
+	// negeer de fout en zet 'a' op een lege slice.
+	if err := json.Unmarshal(bytes, a); err != nil {
+		*a = AgendaItems{}
+	}
+	return nil // Altijd nil teruggeven om de SQL-scan niet te laten falen
+}
+
+// Value implements driver.Valuer interface for writing JSONB agenda items to database
+func (a AgendaItems) Value() (driver.Value, error) {
+	if len(a) == 0 {
+		return "[]", nil
+	}
+	return json.Marshal(a)
 }
 
 // Besluit represents a decision made during the meeting
 type Besluit struct {
-	Besluit string                 `json:"besluit"`
-	Teams   map[string]interface{} `json:"teams,omitempty"`
+	Beschrijving      string     `json:"beschrijving"`
+	Verantwoordelijke string     `json:"verantwoordelijke,omitempty"`
+	Deadline          *time.Time `json:"deadline,omitempty"`
+}
+
+// Besluiten is a custom type for JSONB scanning of besluiten
+type Besluiten []Besluit
+
+// Scan implements sql.Scanner interface for reading JSONB besluiten from database
+func (b *Besluiten) Scan(value interface{}) error {
+	if value == nil {
+		*b = Besluiten{}
+		return nil
+	}
+
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		// For unsupported types, default to empty array
+		*b = Besluiten{}
+		return nil
+	}
+
+	if len(bytes) == 0 {
+		*b = Besluiten{}
+		return nil
+	}
+
+	// *** HIER ZIT DE FIX ***
+	if err := json.Unmarshal(bytes, b); err != nil {
+		*b = Besluiten{}
+	}
+	return nil // Altijd nil teruggeven
+}
+
+// Value implements driver.Valuer interface for writing JSONB besluiten to database
+func (b Besluiten) Value() (driver.Value, error) {
+	if len(b) == 0 {
+		return "[]", nil
+	}
+	return json.Marshal(b)
 }
 
 // Actiepunt represents an action item from the meeting
 type Actiepunt struct {
-	Actie             string      `json:"actie"`
-	Verantwoordelijke interface{} `json:"verantwoordelijke"` // Can be string or []string
+	Beschrijving      string     `json:"beschrijving"`
+	Verantwoordelijke string     `json:"verantwoordelijke"`
+	Deadline          *time.Time `json:"deadline,omitempty"`
+	Status            string     `json:"status"` // pending, in_progress, completed
+}
+
+// Actiepunten is a custom type for JSONB scanning of actiepunten
+type Actiepunten []Actiepunt
+
+// Scan implements sql.Scanner interface for reading JSONB actiepunten from database
+func (a *Actiepunten) Scan(value interface{}) error {
+	if value == nil {
+		*a = Actiepunten{}
+		return nil
+	}
+
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		// For unsupported types, default to empty array
+		*a = Actiepunten{}
+		return nil
+	}
+
+	if len(bytes) == 0 {
+		*a = Actiepunten{}
+		return nil
+	}
+
+	// *** HIER ZIT DE FIX ***
+	if err := json.Unmarshal(bytes, a); err != nil {
+		*a = Actiepunten{}
+	}
+	return nil // Altijd nil teruggeven
+}
+
+// Value implements driver.Valuer interface for writing JSONB actiepunten to database
+func (a Actiepunten) Value() (driver.Value, error) {
+	if len(a) == 0 {
+		return "[]", nil
+	}
+	return json.Marshal(a)
 }
 
 // NotulenVersie represents a version snapshot of notulen
 type NotulenVersie struct {
-	ID                   uuid.UUID      `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-	NotulenID            uuid.UUID      `json:"notulen_id" gorm:"type:uuid;not null"`
-	Versie               int            `json:"versie" gorm:"type:integer;not null"`
-	Titel                string         `json:"titel" gorm:"type:varchar(255);not null"`
-	VergaderingDatum     time.Time      `json:"vergadering_datum" gorm:"type:date;not null"`
-	Locatie              string         `json:"locatie,omitempty" gorm:"type:varchar(255)"`
-	Voorzitter           string         `json:"voorzitter,omitempty" gorm:"type:varchar(255)"`
-	Notulist             string         `json:"notulist,omitempty" gorm:"type:varchar(255)"`
-	Aanwezigen           pq.StringArray `json:"aanwezigen,omitempty" gorm:"type:text[]"`            // Legacy field - combined names for backwards compatibility
-	Afwezigen            pq.StringArray `json:"afwezigen,omitempty" gorm:"type:text[]"`             // Legacy field - combined names for backwards compatibility
-	AanwezigenGebruikers UUIDArray      `json:"aanwezigen_gebruikers,omitempty" gorm:"type:uuid[]"` // UUIDs of registered users present
-	AfwezigenGebruikers  UUIDArray      `json:"afwezigen_gebruikers,omitempty" gorm:"type:uuid[]"`  // UUIDs of registered users absent
-	AanwezigenGasten     pq.StringArray `json:"aanwezigen_gasten,omitempty" gorm:"type:text[]"`     // Names of non-registered guests present
-	AfwezigenGasten      pq.StringArray `json:"afwezigen_gasten,omitempty" gorm:"type:text[]"`      // Names of non-registered guests absent
-	AgendaItems          AgendaItems    `json:"agenda_items,omitempty" gorm:"type:jsonb"`
-	Besluiten            Besluiten      `json:"besluiten,omitempty" gorm:"type:jsonb"`
-	Actiepunten          Actiepunten    `json:"actiepunten,omitempty" gorm:"type:jsonb"`
-	Notities             string         `json:"notities,omitempty" gorm:"type:text"`
-	Status               string         `json:"status" gorm:"type:varchar(50);not null"`
-	GewijzigdDoor        uuid.UUID      `json:"gewijzigd_door" gorm:"type:uuid;not null"`
-	GewijzigdOp          time.Time      `json:"gewijzigd_op" gorm:"autoCreateTime"`
-	WijzigingReden       string         `json:"wijziging_reden,omitempty" gorm:"type:text"`
+	ID                     uuid.UUID      `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+	NotulenID              uuid.UUID      `json:"notulen_id" gorm:"type:uuid;not null"`
+	Versie                 int            `json:"versie" gorm:"type:integer;not null"`
+	Titel                  string         `json:"titel" gorm:"type:varchar(255);not null"`
+	VergaderingDatum       time.Time      `json:"vergadering_datum" gorm:"type:date;not null;index"`
+	Locatie                string         `json:"locatie,omitempty" gorm:"type:varchar(255)"`
+	Voorzitter             string         `json:"voorzitter,omitempty" gorm:"type:varchar(255)"`
+	Notulist               string         `json:"notulist,omitempty" gorm:"type:varchar(255)"`
+	Aanwezigen             pq.StringArray `json:"aanwezigen,omitempty" gorm:"type:text[]"`                     // Legacy field
+	Afwezigen              pq.StringArray `json:"afwezigen,omitempty" gorm:"type:text[]"`                      // Legacy field
+	AanwezigenGebruikerIDs UUIDArray      `json:"aanwezigen_gebruiker_ids,omitempty" gorm:"type:uuid[];index"` // New UUID array field
+	AfwezigenGebruikerIDs  UUIDArray      `json:"afwezigen_gebruiker_ids,omitempty" gorm:"type:uuid[];index"`  // New UUID array field
+	AanwezigenGasten       pq.StringArray `json:"aanwezigen_gasten,omitempty" gorm:"type:text[]"`              // New guest array field
+	AfwezigenGasten        pq.StringArray `json:"afwezigen_gasten,omitempty" gorm:"type:text[]"`               // New guest array field
+	AgendaItems            AgendaItems    `json:"agenda_items,omitempty" gorm:"type:jsonb"`
+	Besluiten              Besluiten      `json:"besluiten,omitempty" gorm:"type:jsonb"`
+	Actiepunten            Actiepunten    `json:"actiepunten,omitempty" gorm:"type:jsonb"`
+	Notities               string         `json:"notities,omitempty" gorm:"type:text"`
+	Status                 string         `json:"status" gorm:"type:varchar(50);not null"`
+	GewijzigdDoor          uuid.UUID      `json:"gewijzigd_door" gorm:"type:uuid;not null"`
+	GewijzigdOp            time.Time      `json:"gewijzigd_op" gorm:"autoCreateTime"`
+	WijzigingReden         string         `json:"wijziging_reden,omitempty" gorm:"type:text"`
 }
 
 // TableName returns the table name for the NotulenVersie model
@@ -93,70 +226,39 @@ func (NotulenVersie) TableName() string {
 
 // NotulenCreateRequest represents the request to create new notulen
 type NotulenCreateRequest struct {
-	Titel                string       `json:"titel" validate:"required,min=3,max=255"`
-	VergaderingDatum     string       `json:"vergadering_datum" validate:"required"` // ISO date string
-	Locatie              string       `json:"locatie,omitempty"`
-	Voorzitter           string       `json:"voorzitter,omitempty"`
-	Notulist             string       `json:"notulist,omitempty"`
-	Aanwezigen           []string     `json:"aanwezigen,omitempty"`            // Legacy field - combined participant names
-	Afwezigen            []string     `json:"afwezigen,omitempty"`             // Legacy field - combined participant names
-	AanwezigenGebruikers []string     `json:"aanwezigen_gebruikers,omitempty"` // UUIDs of registered users present
-	AfwezigenGebruikers  []string     `json:"afwezigen_gebruikers,omitempty"`  // UUIDs of registered users absent
-	AanwezigenGasten     []string     `json:"aanwezigen_gasten,omitempty"`     // Names of non-registered guests present
-	AfwezigenGasten      []string     `json:"afwezigen_gasten,omitempty"`      // Names of non-registered guests absent
-	AgendaItems          []AgendaItem `json:"agenda_items,omitempty"`
-	Besluiten            []Besluit    `json:"besluiten,omitempty"`
-	Actiepunten          []Actiepunt  `json:"actiepunten,omitempty"`
-	Notities             string       `json:"notities,omitempty"`
+	Titel                  string       `json:"titel" validate:"required,min=3,max=255"`
+	VergaderingDatum       string       `json:"vergadering_datum" validate:"required"` // ISO date string
+	Locatie                string       `json:"locatie,omitempty"`
+	Voorzitter             string       `json:"voorzitter,omitempty"`
+	Notulist               string       `json:"notulist,omitempty"`
+	Aanwezigen             []string     `json:"aanwezigen,omitempty"`
+	Afwezigen              []string     `json:"afwezigen,omitempty"`
+	AanwezigenGebruikerIDs []string     `json:"aanwezigen_gebruiker_ids,omitempty"` // UUID strings for registered users
+	AfwezigenGebruikerIDs  []string     `json:"afwezigen_gebruiker_ids,omitempty"`  // UUID strings for registered users
+	AanwezigenGasten       []string     `json:"aanwezigen_gasten,omitempty"`        // Guest names
+	AfwezigenGasten        []string     `json:"afwezigen_gasten,omitempty"`         // Guest names
+	AgendaItems            []AgendaItem `json:"agenda_items,omitempty"`
+	Besluiten              []Besluit    `json:"besluiten,omitempty"`
+	Actiepunten            []Actiepunt  `json:"actiepunten,omitempty"`
+	Notities               string       `json:"notities,omitempty"`
 }
 
 // NotulenUpdateRequest represents the request to update existing notulen
 type NotulenUpdateRequest struct {
-	Titel                string       `json:"titel,omitempty" validate:"omitempty,min=3,max=255"`
-	Locatie              string       `json:"locatie,omitempty"`
-	Voorzitter           string       `json:"voorzitter,omitempty"`
-	Notulist             string       `json:"notulist,omitempty"`
-	Aanwezigen           []string     `json:"aanwezigen,omitempty"`            // Legacy field - combined participant names
-	Afwezigen            []string     `json:"afwezigen,omitempty"`             // Legacy field - combined participant names
-	AanwezigenGebruikers []string     `json:"aanwezigen_gebruikers,omitempty"` // UUIDs of registered users present
-	AfwezigenGebruikers  []string     `json:"afwezigen_gebruikers,omitempty"`  // UUIDs of registered users absent
-	AanwezigenGasten     []string     `json:"aanwezigen_gasten,omitempty"`     // Names of non-registered guests present
-	AfwezigenGasten      []string     `json:"afwezigen_gasten,omitempty"`      // Names of non-registered guests absent
-	AgendaItems          []AgendaItem `json:"agenda_items,omitempty"`
-	Besluiten            []Besluit    `json:"besluiten,omitempty"`
-	Actiepunten          []Actiepunt  `json:"actiepunten,omitempty"`
-	Notities             string       `json:"notities,omitempty"`
-}
-
-// NotulenResponse represents a notulen with resolved user names for API responses
-type NotulenResponse struct {
-	ID                   uuid.UUID      `json:"id"`
-	Titel                string         `json:"titel"`
-	VergaderingDatum     time.Time      `json:"vergadering_datum"`
-	Locatie              string         `json:"locatie,omitempty"`
-	Voorzitter           string         `json:"voorzitter,omitempty"`
-	Notulist             string         `json:"notulist,omitempty"`
-	Aanwezigen           pq.StringArray `json:"aanwezigen,omitempty"`
-	Afwezigen            pq.StringArray `json:"afwezigen,omitempty"`
-	AanwezigenGebruikers UUIDArray      `json:"aanwezigen_gebruikers,omitempty"`
-	AfwezigenGebruikers  UUIDArray      `json:"afwezigen_gebruikers,omitempty"`
-	AanwezigenGasten     pq.StringArray `json:"aanwezigen_gasten,omitempty"`
-	AfwezigenGasten      pq.StringArray `json:"afwezigen_gasten,omitempty"`
-	AgendaItems          AgendaItems    `json:"agenda_items,omitempty"`
-	Besluiten            Besluiten      `json:"besluiten,omitempty"`
-	Actiepunten          Actiepunten    `json:"actiepunten,omitempty"`
-	Notities             string         `json:"notities,omitempty"`
-	Status               string         `json:"status"`
-	Versie               int            `json:"versie"`
-	CreatedBy            uuid.UUID      `json:"created_by"`
-	CreatedByName        string         `json:"created_by_name,omitempty"`
-	CreatedAt            time.Time      `json:"created_at"`
-	UpdatedAt            time.Time      `json:"updated_at"`
-	UpdatedBy            uuid.UUID      `json:"updated_by,omitempty"`
-	UpdatedByName        string         `json:"updated_by_name,omitempty"`
-	FinalizedAt          *time.Time     `json:"finalized_at,omitempty"`
-	FinalizedBy          *uuid.UUID     `json:"finalized_by,omitempty"`
-	FinalizedByName      string         `json:"finalized_by_name,omitempty"`
+	Titel                  string       `json:"titel,omitempty" validate:"omitempty,min=3,max=255"`
+	Locatie                string       `json:"locatie,omitempty"`
+	Voorzitter             string       `json:"voorzitter,omitempty"`
+	Notulist               string       `json:"notulist,omitempty"`
+	Aanwezigen             []string     `json:"aanwezigen,omitempty"`
+	Afwezigen              []string     `json:"afwezigen,omitempty"`
+	AanwezigenGebruikerIDs []string     `json:"aanwezigen_gebruiker_ids,omitempty"` // UUID strings for registered users
+	AfwezigenGebruikerIDs  []string     `json:"afwezigen_gebruiker_ids,omitempty"`  // UUID strings for registered users
+	AanwezigenGasten       []string     `json:"aanwezigen_gasten,omitempty"`        // Guest names
+	AfwezigenGasten        []string     `json:"afwezigen_gasten,omitempty"`         // Guest names
+	AgendaItems            []AgendaItem `json:"agenda_items,omitempty"`
+	Besluiten              []Besluit    `json:"besluiten,omitempty"`
+	Actiepunten            []Actiepunt  `json:"actiepunten,omitempty"`
+	Notities               string       `json:"notities,omitempty"`
 }
 
 // NotulenListResponse represents the response for listing notulen
@@ -178,112 +280,38 @@ type NotulenSearchFilters struct {
 	Offset    int        `json:"offset,omitempty"`     // Pagination offset
 }
 
+// NotulenResponse represents the response model for notulen with resolved user names
+type NotulenResponse struct {
+	ID                     uuid.UUID    `json:"id"`
+	Titel                  string       `json:"titel"`
+	VergaderingDatum       time.Time    `json:"vergadering_datum"`
+	Locatie                string       `json:"locatie,omitempty"`
+	Voorzitter             string       `json:"voorzitter,omitempty"`
+	Notulist               string       `json:"notulist,omitempty"`
+	Aanwezigen             []string     `json:"aanwezigen"` // Combined and resolved names
+	Afwezigen              []string     `json:"afwezigen"`  // Combined and resolved names
+	AanwezigenGebruikerIDs UUIDArray    `json:"aanwezigen_gebruiker_ids,omitempty"`
+	AfwezigenGebruikerIDs  UUIDArray    `json:"afwezigen_gebruiker_ids,omitempty"`
+	AanwezigenGasten       []string     `json:"aanwezigen_gasten,omitempty"`
+	AfwezigenGasten        []string     `json:"afwezigen_gasten,omitempty"`
+	AgendaItems            []AgendaItem `json:"agenda_items,omitempty"`
+	Besluiten              []Besluit    `json:"besluiten,omitempty"`
+	Actiepunten            []Actiepunt  `json:"actiepunten,omitempty"`
+	Notities               string       `json:"notities,omitempty"`
+	Status                 string       `json:"status"`
+	Versie                 int          `json:"versie"`
+	CreatedBy              uuid.UUID    `json:"created_by"`
+	CreatedByName          string       `json:"created_by_name,omitempty"`
+	CreatedAt              time.Time    `json:"created_at"`
+	UpdatedAt              time.Time    `json:"updated_at"`
+	UpdatedByID            uuid.UUID    `json:"updated_by_id,omitempty"`
+	UpdatedByName          string       `json:"updated_by_name,omitempty"`
+	FinalizedAt            *time.Time   `json:"finalized_at,omitempty"`
+	FinalizedBy            *uuid.UUID   `json:"finalized_by,omitempty"`
+	FinalizedByName        string       `json:"finalized_by_name,omitempty"`
+}
+
 // NotulenFinalizeRequest represents the request to finalize notulen
 type NotulenFinalizeRequest struct {
 	WijzigingReden string `json:"wijziging_reden,omitempty"`
-}
-
-// AgendaItemsWrapper represents the JSONB structure for agenda items
-type AgendaItemsWrapper struct {
-	Items []AgendaItem `json:"items"`
-}
-
-// AgendaItems is a custom type for JSONB storage of agenda items
-type AgendaItems AgendaItemsWrapper
-
-// Scan implements sql.Scanner interface for database reading
-func (a *AgendaItems) Scan(value interface{}) error {
-	if value == nil {
-		*a = AgendaItems(AgendaItemsWrapper{Items: []AgendaItem{}})
-		return nil
-	}
-
-	bytes, ok := value.([]byte)
-	if !ok {
-		return nil
-	}
-
-	var wrapper AgendaItemsWrapper
-	if err := json.Unmarshal(bytes, &wrapper); err != nil {
-		return err
-	}
-
-	*a = AgendaItems(wrapper)
-	return nil
-}
-
-// Value implements driver.Valuer interface for database writing
-func (a AgendaItems) Value() (driver.Value, error) {
-	wrapper := AgendaItemsWrapper(a)
-	return json.Marshal(wrapper)
-}
-
-// BesluitenWrapper represents the JSONB structure for decisions
-type BesluitenWrapper struct {
-	Besluiten []Besluit `json:"besluiten"`
-}
-
-// Besluiten is a custom type for JSONB storage of decisions
-type Besluiten BesluitenWrapper
-
-// Scan implements sql.Scanner interface for database reading
-func (b *Besluiten) Scan(value interface{}) error {
-	if value == nil {
-		*b = Besluiten(BesluitenWrapper{Besluiten: []Besluit{}})
-		return nil
-	}
-
-	bytes, ok := value.([]byte)
-	if !ok {
-		return nil
-	}
-
-	var wrapper BesluitenWrapper
-	if err := json.Unmarshal(bytes, &wrapper); err != nil {
-		return err
-	}
-
-	*b = Besluiten(wrapper)
-	return nil
-}
-
-// Value implements driver.Valuer interface for database writing
-func (b Besluiten) Value() (driver.Value, error) {
-	wrapper := BesluitenWrapper(b)
-	return json.Marshal(wrapper)
-}
-
-// ActiepuntenWrapper represents the JSONB structure for action items
-type ActiepuntenWrapper struct {
-	Acties []Actiepunt `json:"acties"`
-}
-
-// Actiepunten is a custom type for JSONB storage of action items
-type Actiepunten ActiepuntenWrapper
-
-// Scan implements sql.Scanner interface for database reading
-func (a *Actiepunten) Scan(value interface{}) error {
-	if value == nil {
-		*a = Actiepunten(ActiepuntenWrapper{Acties: []Actiepunt{}})
-		return nil
-	}
-
-	bytes, ok := value.([]byte)
-	if !ok {
-		return nil
-	}
-
-	var wrapper ActiepuntenWrapper
-	if err := json.Unmarshal(bytes, &wrapper); err != nil {
-		return err
-	}
-
-	*a = Actiepunten(wrapper)
-	return nil
-}
-
-// Value implements driver.Valuer interface for database writing
-func (a Actiepunten) Value() (driver.Value, error) {
-	wrapper := ActiepuntenWrapper(a)
-	return json.Marshal(wrapper)
 }

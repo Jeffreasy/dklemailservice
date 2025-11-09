@@ -23,8 +23,8 @@ func (m *MockEmailService) SendContactEmail(data *models.ContactEmailData) error
 	return args.Error(0)
 }
 
-// SendAanmeldingEmail implements the EmailService interface
-func (m *MockEmailService) SendAanmeldingEmail(data *models.AanmeldingEmailData) error {
+// SendRegistrationEmail implements the EmailService interface
+func (m *MockEmailService) SendRegistrationEmail(data *models.RegistrationEmailData) error {
 	args := m.Called(data)
 	return args.Error(0)
 }
@@ -46,7 +46,7 @@ func (m *NoOpEmailService) SendContactEmail(data *models.ContactEmailData) error
 	return nil
 }
 
-func (m *NoOpEmailService) SendAanmeldingEmail(data *models.AanmeldingEmailData) error {
+func (m *NoOpEmailService) SendRegistrationEmail(data *models.RegistrationEmailData) error {
 	return nil
 }
 

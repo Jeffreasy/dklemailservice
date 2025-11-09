@@ -120,7 +120,7 @@ func (r *PostgresAchievementRepository) GetParticipantSummary(ctx context.Contex
 	}
 
 	err := r.DB().WithContext(ctx).
-		Table("aanmeldingen").
+		Table("participants").
 		Select("naam").
 		Where("id = ?", participantID).
 		Scan(&participant).Error

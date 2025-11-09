@@ -90,18 +90,18 @@ func (r *PostgresVerzondEmailRepository) FindByContactID(ctx context.Context, co
 	return emails, nil
 }
 
-// FindByAanmeldingID haalt verzonden emails op basis van aanmelding ID
-func (r *PostgresVerzondEmailRepository) FindByAanmeldingID(ctx context.Context, aanmeldingID string) ([]*models.VerzondEmail, error) {
+// FindByParticipantID haalt verzonden emails op basis van participant ID
+func (r *PostgresVerzondEmailRepository) FindByParticipantID(ctx context.Context, participantID string) ([]*models.VerzondEmail, error) {
 	ctx, cancel := r.withTimeout(ctx)
 	defer cancel()
 
 	var emails []*models.VerzondEmail
 	result := r.DB().WithContext(ctx).
-		Where("aanmelding_id = ?", aanmeldingID).
+		Where("aanmelding_id = ?", participantID). // Keep column name for backward compatibility
 		Order("verzonden_op DESC").
 		Find(&emails)
 
-	if err := r.handleError("FindByAanmeldingID", result.Error); err != nil {
+	if err := r.handleError("FindByParticipantID", result.Error); err != nil {
 		return nil, err
 	}
 

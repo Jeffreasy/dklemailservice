@@ -91,35 +91,51 @@ func TestEmailService_SendEmail(t *testing.T) {
 		mockSMTP.mutex.Unlock()
 	})
 
-	t.Run("SendAanmeldingEmail Admin", func(t *testing.T) {
-		data := &models.AanmeldingEmailData{
-			Aanmelding: &models.AanmeldingFormulier{
-				Naam:  "Test Aanmelding",
-				Email: "testaanmelding@example.com",
-			},
-			ToAdmin:    true,
-			AdminEmail: "admin@example.com",
+	t.Run("SendRegistrationEmail Admin", func(t *testing.T) {
+		participant := &models.Participant{
+			ID:    "test-participant-id",
+			Naam:  "Test Participant",
+			Email: "testaanmelding@example.com",
 		}
-		err := emailService.SendAanmeldingEmail(data)
+		registration := &models.EventRegistration{
+			ID:            "test-reg-id",
+			ParticipantID: participant.ID,
+			TestMode:      true,
+		}
+		data := &models.RegistrationEmailData{
+			Participant:  participant,
+			Registration: registration,
+			AdminEmail:   "admin@example.com",
+			ToAdmin:      true,
+		}
+		err := emailService.SendRegistrationEmail(data)
 		assert.NoError(t, err)
 		mockSMTP.mutex.Lock()
-		assert.True(t, mockSMTP.SendCalled, "Send should be called for admin aanmelding")
+		assert.True(t, mockSMTP.SendCalled, "Send should be called for admin registration")
 		assert.Equal(t, "admin@example.com", mockSMTP.LastTo)
 		mockSMTP.mutex.Unlock()
 	})
 
-	t.Run("SendAanmeldingEmail User", func(t *testing.T) {
-		data := &models.AanmeldingEmailData{
-			Aanmelding: &models.AanmeldingFormulier{
-				Naam:  "Test Aanmelding",
-				Email: "user@example.com",
-			},
-			ToAdmin: false,
+	t.Run("SendRegistrationEmail User", func(t *testing.T) {
+		participant := &models.Participant{
+			ID:    "test-participant-id",
+			Naam:  "Test Participant",
+			Email: "user@example.com",
 		}
-		err := emailService.SendAanmeldingEmail(data)
+		registration := &models.EventRegistration{
+			ID:            "test-reg-id",
+			ParticipantID: participant.ID,
+			TestMode:      true,
+		}
+		data := &models.RegistrationEmailData{
+			Participant:  participant,
+			Registration: registration,
+			ToAdmin:      false,
+		}
+		err := emailService.SendRegistrationEmail(data)
 		assert.NoError(t, err)
 		mockSMTP.mutex.Lock()
-		assert.True(t, mockSMTP.SendRegCalled, "SendRegistration should be called for user aanmelding")
+		assert.True(t, mockSMTP.SendRegCalled, "SendRegistration should be called for user registration")
 		assert.Equal(t, "user@example.com", mockSMTP.LastTo)
 		mockSMTP.mutex.Unlock()
 	})

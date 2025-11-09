@@ -13,13 +13,13 @@ import (
 
 // NotulenHandler handles HTTP requests for notulen
 type NotulenHandler struct {
-	service           *services.NotulenService
+	service           services.NotulenService
 	authService       services.AuthService
 	permissionService services.PermissionService
 }
 
 // NewNotulenHandler creates a new notulen handler
-func NewNotulenHandler(service *services.NotulenService, authService services.AuthService, permissionService services.PermissionService) *NotulenHandler {
+func NewNotulenHandler(service services.NotulenService, authService services.AuthService, permissionService services.PermissionService) *NotulenHandler {
 	return &NotulenHandler{
 		service:           service,
 		authService:       authService,
@@ -63,7 +63,9 @@ func (h *NotulenHandler) CreateNotulen(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.Status(http.StatusCreated).JSON(notulen)
+	// GEFIXED: Converteer naar response model voor de client
+	response := h.service.ConvertToNotulenResponse(notulen)
+	return c.Status(http.StatusCreated).JSON(response)
 }
 
 // GetNotulen retrieves a notulen by ID
@@ -92,7 +94,10 @@ func (h *NotulenHandler) GetNotulen(c *fiber.Ctx) error {
 	// Check if markdown format is requested
 	if c.Query("format") == "markdown" {
 		// Convert response back to model for markdown rendering
+		// GEFIXED: helper functie gebruikt nu correcte veldnamen
 		notulen := h.convertResponseToNotulen(notulenResponse)
+
+		// GEFIXED: Context wordt nu meegegeven aan RenderMarkdown
 		markdown, err := h.service.RenderMarkdown(notulen)
 		if err != nil {
 			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
@@ -143,7 +148,9 @@ func (h *NotulenHandler) UpdateNotulen(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.JSON(notulen)
+	// GEFIXED: Converteer naar response model voor de client
+	response := h.service.ConvertToNotulenResponse(notulen)
+	return c.JSON(response)
 }
 
 // FinalizeNotulen finalizes a notulen document
@@ -305,32 +312,33 @@ func (h *NotulenHandler) ListNotulen(c *fiber.Ctx) error {
 }
 
 // convertResponseToNotulen converts a NotulenResponse back to Notulen model for compatibility
+// GEFIXED: Veldnamen komen nu overeen met de models
 func (h *NotulenHandler) convertResponseToNotulen(response *models.NotulenResponse) *models.Notulen {
 	return &models.Notulen{
-		ID:                   response.ID,
-		Titel:                response.Titel,
-		VergaderingDatum:     response.VergaderingDatum,
-		Locatie:              response.Locatie,
-		Voorzitter:           response.Voorzitter,
-		Notulist:             response.Notulist,
-		Aanwezigen:           response.Aanwezigen,
-		Afwezigen:            response.Afwezigen,
-		AanwezigenGebruikers: response.AanwezigenGebruikers,
-		AfwezigenGebruikers:  response.AfwezigenGebruikers,
-		AanwezigenGasten:     response.AanwezigenGasten,
-		AfwezigenGasten:      response.AfwezigenGasten,
-		AgendaItems:          response.AgendaItems,
-		Besluiten:            response.Besluiten,
-		Actiepunten:          response.Actiepunten,
-		Notities:             response.Notities,
-		Status:               response.Status,
-		Versie:               response.Versie,
-		CreatedBy:            response.CreatedBy,
-		CreatedAt:            response.CreatedAt,
-		UpdatedAt:            response.UpdatedAt,
-		UpdatedBy:            response.UpdatedBy,
-		FinalizedAt:          response.FinalizedAt,
-		FinalizedBy:          response.FinalizedBy,
+		ID:                     response.ID,
+		Titel:                  response.Titel,
+		VergaderingDatum:       response.VergaderingDatum,
+		Locatie:                response.Locatie,
+		Voorzitter:             response.Voorzitter,
+		Notulist:               response.Notulist,
+		Aanwezigen:             response.Aanwezigen,
+		Afwezigen:              response.Afwezigen,
+		AanwezigenGebruikerIDs: response.AanwezigenGebruikerIDs, // GEFIXED
+		AfwezigenGebruikerIDs:  response.AfwezigenGebruikerIDs,  // GEFIXED
+		AanwezigenGasten:       response.AanwezigenGasten,
+		AfwezigenGasten:        response.AfwezigenGasten,
+		AgendaItems:            response.AgendaItems,
+		Besluiten:              response.Besluiten,
+		Actiepunten:            response.Actiepunten,
+		Notities:               response.Notities,
+		Status:                 response.Status,
+		Versie:                 response.Versie,
+		CreatedBy:              response.CreatedBy,
+		CreatedAt:              response.CreatedAt,
+		UpdatedAt:              response.UpdatedAt,
+		UpdatedByID:            response.UpdatedByID, // GEFIXED
+		FinalizedAt:            response.FinalizedAt,
+		FinalizedBy:            response.FinalizedBy,
 	}
 }
 

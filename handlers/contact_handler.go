@@ -236,6 +236,7 @@ func (h *ContactHandler) UpdateContactFormulier(c *fiber.Ctx) error {
 	}
 
 	// Update contactformulier
+	// V27: Set status directly (database column is 'status')
 	if updateData.Status != "" {
 		contact.Status = updateData.Status
 	}
@@ -405,6 +406,7 @@ func (h *ContactHandler) AddContactAntwoord(c *fiber.Ctx) error {
 	h.handleContactNotification(ctx, contact)
 
 	// Update contactformulier status naar beantwoord
+	// V27: Set status directly (database column is 'status')
 	contact.Status = "beantwoord"
 	contact.Beantwoord = true
 	contact.AntwoordTekst = antwoordData.Tekst

@@ -51,6 +51,7 @@ func (r *PostgresNotulenRepository) GetByID(ctx context.Context, id uuid.UUID) (
 	defer cancel()
 
 	var notulen models.Notulen
+	// De GORM tags in het model (Fix 1) zorgen dat GORM de kolommen correct mapt.
 	result := r.DB().WithContext(ctx).First(&notulen, "id = ?", id)
 	if err := r.handleError("GetByID", result.Error); err != nil {
 		return nil, err
@@ -68,7 +69,7 @@ func (r *PostgresNotulenRepository) Update(ctx context.Context, notulen *models.
 	ctx, cancel := r.withTimeout(ctx)
 	defer cancel()
 
-	// Explicitly update all fields including updated_by using a map to ensure all fields are included
+	// GEFIXTE KOLOMNAMEN: Gebruik de namen uit de Postgres HINTs
 	updateData := map[string]interface{}{
 		"titel":                 notulen.Titel,
 		"vergadering_datum":     notulen.VergaderingDatum,
@@ -77,10 +78,10 @@ func (r *PostgresNotulenRepository) Update(ctx context.Context, notulen *models.
 		"notulist":              notulen.Notulist,
 		"aanwezigen":            notulen.Aanwezigen,
 		"afwezigen":             notulen.Afwezigen,
-		"aanwezigen_gebruikers": notulen.AanwezigenGebruikers, // UUID array for registered users
-		"afwezigen_gebruikers":  notulen.AfwezigenGebruikers,  // UUID array for registered users
-		"aanwezigen_gasten":     notulen.AanwezigenGasten,     // Text array for guest names
-		"afwezigen_gasten":      notulen.AfwezigenGasten,      // Text array for guest names
+		"aanwezigen_gebruikers": notulen.AanwezigenGebruikerIDs, // GEFIXT
+		"afwezigen_gebruikers":  notulen.AfwezigenGebruikerIDs,  // GEFIXT
+		"aanwezigen_gasten":     notulen.AanwezigenGasten,
+		"afwezigen_gasten":      notulen.AfwezigenGasten,
 		"agenda_items":          notulen.AgendaItems,
 		"besluiten":             notulen.Besluiten,
 		"actiepunten":           notulen.Actiepunten,
@@ -90,11 +91,12 @@ func (r *PostgresNotulenRepository) Update(ctx context.Context, notulen *models.
 		"created_by":            notulen.CreatedBy,
 		"created_at":            notulen.CreatedAt,
 		"updated_at":            notulen.UpdatedAt,
-		"updated_by":            notulen.UpdatedBy,
+		"updated_by":            notulen.UpdatedByID, // GEFIXT
 		"finalized_at":          notulen.FinalizedAt,
 		"finalized_by":          notulen.FinalizedBy,
 	}
 
+	// De GORM tags in het model (Fix 1) zorgen dat GORM dit correct mapt.
 	result := r.DB().WithContext(ctx).Model(notulen).Updates(updateData)
 	return r.handleError("Update", result.Error)
 }
@@ -143,7 +145,7 @@ func (r *PostgresNotulenRepository) List(ctx context.Context, filters *models.No
 	ctx, cancel := r.withTimeout(ctx)
 	defer cancel()
 
-	query := r.DB().WithContext(ctx).Model(&models.Notulen{}) // Explicitly set model to struct pointer - this fixes the "&[]" error
+	query := r.DB().WithContext(ctx).Model(&models.Notulen{})
 
 	// Apply filters
 	if filters.Status != "" {
@@ -161,7 +163,7 @@ func (r *PostgresNotulenRepository) List(ctx context.Context, filters *models.No
 
 	// Get total count (before applying pagination)
 	var total int64
-	logger.Info("Executing count query for List") // Debug: Confirm this runs before error
+	logger.Info("Executing count query for List")
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, r.handleError("List count", err)
 	}
@@ -176,13 +178,18 @@ func (r *PostgresNotulenRepository) List(ctx context.Context, filters *models.No
 		offset = filters.Offset
 	}
 
-	// Execute query with ordering
+	// Execute query with ordering - SELECT only the columns we need to avoid scanning issues
 	var notulen []models.Notulen
+	// GEFIXTE KOLOMNAMEN: Gebruik de namen uit de Postgres HINTs
 	result := query.
+		Select("id, titel, vergadering_datum, locatie, voorzitter, notulist, aanwezigen, afwezigen, agenda_items, besluiten, actiepunten, notities, status, versie, created_by, created_at, updated_at, finalized_at, finalized_by, updated_by, aanwezigen_gebruikers, afwezigen_gebruikers, aanwezigen_gasten, afwezigen_gasten").
 		Order("vergadering_datum DESC").
 		Limit(limit).
 		Offset(offset).
-		Find(&notulen)
+		Find(&notulen) // Gebruik .Find()
+
+	// Debug: Log the actual query being executed
+	logger.Info("Executing List query", "query", query.Statement.SQL.String(), "vars", query.Statement.Vars)
 
 	if err := r.handleError("List", result.Error); err != nil {
 		return nil, 0, err
@@ -196,7 +203,7 @@ func (r *PostgresNotulenRepository) Search(ctx context.Context, searchQuery stri
 	ctx, cancel := r.withTimeout(ctx)
 	defer cancel()
 
-	query := r.DB().WithContext(ctx).Model(&models.Notulen{}) // Explicitly set model to struct pointer - this fixes the "&[]" error
+	query := r.DB().WithContext(ctx).Model(&models.Notulen{})
 
 	// Apply full-text search if query provided
 	if searchQuery != "" {
@@ -219,7 +226,7 @@ func (r *PostgresNotulenRepository) Search(ctx context.Context, searchQuery stri
 
 	// Get total count (before applying pagination)
 	var total int64
-	logger.Info("Executing count query for Search") // Debug: Confirm this runs before error
+	logger.Info("Executing count query for Search")
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, r.handleError("Search count", err)
 	}
@@ -234,13 +241,15 @@ func (r *PostgresNotulenRepository) Search(ctx context.Context, searchQuery stri
 		offset = filters.Offset
 	}
 
-	// Execute query with ordering
+	// Execute query with ordering - SELECT only the columns we need to avoid scanning issues
 	var notulen []models.Notulen
+	// GEFIXTE KOLOMNAMEN: Gebruik de namen uit de Postgres HINTs
 	result := query.
+		Select("id, titel, vergadering_datum, locatie, voorzitter, notulist, aanwezigen, afwezigen, agenda_items, besluiten, actiepunten, notities, status, versie, created_by, created_at, updated_at, finalized_at, finalized_by, updated_by, aanwezigen_gebruikers, afwezigen_gebruikers, aanwezigen_gasten, afwezigen_gasten").
 		Order("vergadering_datum DESC").
 		Limit(limit).
 		Offset(offset).
-		Find(&notulen)
+		Find(&notulen) // Gebruik .Find()
 
 	if err := r.handleError("Search", result.Error); err != nil {
 		return nil, 0, err
