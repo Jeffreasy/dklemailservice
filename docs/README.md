@@ -18,6 +18,7 @@ Complete API reference for all endpoints including:
 - [Steps & Gamification](./api/STEPS_GAMIFICATION.md) - Steps tracking, achievements, badges
 - [CMS APIs](./api/CMS.md) - Videos, partners, sponsors, photos, albums
 - [Notifications](./api/NOTIFICATIONS.md) - User notifications en real-time updates
+- [Auto Responses](./api/AUTO_RESPONSES.md) - Email auto-reply management (V33)
 - [WebSocket APIs](./api/WEBSOCKET.md) - Notulen en Steps real-time communication
 
 ### [Architecture](./architecture/)
@@ -35,6 +36,13 @@ Step-by-step guides for:
 - [Frontend Integration](./guides/FRONTEND_INTEGRATION.md) - React/Vue integratie voorbeelden
 - [Testing Guide](./guides/TESTING.md) - Unit, integration, performance en security testing
 - [Database Migrations](./guides/MIGRATIONS.md) - Schema wijzigingen en migration management
+
+### [Database Migrations](./migrations/)
+Detailed documentation for database schema changes:
+- [Migration Index](./migrations/README.md) - Overview V01-V34 met risk levels
+- [V31 Participant Refactor](./migrations/V31_PARTICIPANT_REFACTOR.md) - Data separation fix
+- [V32 Schema Changes](./migrations/V32_SCHEMA_CHANGES.md) - Breaking changes guide
+- [V34 Breaking Changes](./migrations/V34_BREAKING_CHANGES.md) - ⚠️ Critical warnings
 
 ### [Examples](./examples/)
 Code examples and integration samples:
@@ -82,6 +90,7 @@ PostgreSQL 17 database met:
 **Documentation:**
 - [Database Schema](./architecture/DATABASE.md) - Alle tabellen, relaties, indexes
 - [Migrations Guide](./guides/MIGRATIONS.md) - Schema wijzigingen beheren
+- [Migration Index](./migrations/README.md) - V30-V34 detailed documentation
 
 ## 🔧 Technology Stack
 
@@ -109,15 +118,17 @@ See [TODO.md](./TODO.md) voor:
 
 ## 📊 Documentation Statistics
 
-- **Total Documentation Files:** 23
-- **API Endpoints Documented:** 100+
+- **Total Documentation Files:** 30+
+- **API Endpoints Documented:** 105+
 - **Database Tables Documented:** 30+
-- **Code Examples:** 50+
-- **Lines of Documentation:** 10,000+
+- **Database Migrations Documented:** 34 (V30-V34 detailed)
+- **Code Examples:** 60+
+- **Lines of Documentation:** 12,000+
 
 See [DOCUMENTATION_SUMMARY.md](./DOCUMENTATION_SUMMARY.md) voor complete overzicht.
 
 ---
 
-**Last Updated:** 2025-01-08
+**Last Updated:** 2025-11-10
 **Documentation Status:** ✅ COMPLETE & UP-TO-DATE
+**Recent Updates:** V30-V34 Migration Documentation Added

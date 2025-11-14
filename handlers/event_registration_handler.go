@@ -15,6 +15,7 @@ type EventRegistrationHandler struct {
 	eventRegRepo      repository.EventRegistrationRepository // De nieuwe repository
 	authService       services.AuthService
 	permissionService services.PermissionService
+	stepsService      *services.StepsService // Voor stappen updates
 	// Voeg hier andere services toe die je nodig hebt (bv. EmailService)
 }
 
@@ -23,11 +24,13 @@ func NewEventRegistrationHandler(
 	eventRegRepo repository.EventRegistrationRepository,
 	authService services.AuthService,
 	permissionService services.PermissionService,
+	stepsService *services.StepsService,
 ) *EventRegistrationHandler {
 	return &EventRegistrationHandler{
 		eventRegRepo:      eventRegRepo,
 		authService:       authService,
 		permissionService: permissionService,
+		stepsService:      stepsService,
 	}
 }
 
@@ -52,6 +55,12 @@ func (h *EventRegistrationHandler) RegisterRoutes(app *fiber.App) {
 	regApi.Get("/rol/:rol",
 		PermissionMiddleware(h.permissionService, "participant", "read"), // Gebruikt oude permissie
 		h.ListRegistrationsByRole)
+
+	// OPTIE A: Nieuwe endpoint voor stappen update die totaal aantal stappen retourneert
+	// Dit geeft syncWithRetry 1-op-1 support voor optimale data-integriteit
+	regApi.Post("/:id/steps",
+		PermissionMiddleware(h.permissionService, "steps", "create"), // Gebruikt steps permissie
+		h.UpdateRegistrationSteps)
 
 	// Alias routes voor backwards compatibility
 	registrationsApi := app.Group("/api/registrations", AuthMiddleware(h.authService))
@@ -190,4 +199,71 @@ func (h *EventRegistrationHandler) ListRegistrationsByRole(c *fiber.Ctx) error {
 
 	// Stuur resultaat terug
 	return c.JSON(registrations)
+}
+
+// UpdateRegistrationSteps werkt stappen bij voor een registratie en retourneert het nieuwe totaal
+// OPTIE A: Deze endpoint geeft syncWithRetry 1-op-1 support voor optimale data-integriteit
+// @Summary Stappen bijwerken voor registratie
+// @Description Voegt stappen toe aan een registratie (delta) en retourneert het nieuwe totaal aantal stappen
+// @Tags Registration
+// @Accept json
+// @Produce json
+// @Param id path string true "Event Registration ID"
+// @Param request body object{steps=int} true "Stappen delta"
+// @Success 200 {object} object{steps=int}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Failure 403 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/registration/{id}/steps [post]
+// @Security BearerAuth
+func (h *EventRegistrationHandler) UpdateRegistrationSteps(c *fiber.Ctx) error {
+	// Haal ID op uit URL
+	id := c.Params("id")
+	if id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID is verplicht"})
+	}
+
+	// Parse request body
+	var req struct {
+		Steps int `json:"steps"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Ongeldige request data",
+		})
+	}
+
+	// Update stappen via steps service
+	_, err := h.stepsService.UpdateSteps(id, req.Steps)
+	if err != nil {
+		logger.Error("Fout bij bijwerken stappen", "error", err, "id", id)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon stappen niet bijwerken",
+			"code":  "INTERNAL_ERROR",
+		})
+	}
+
+	// Haal bijgewerkte registratie op om het nieuwe totaal aantal stappen te krijgen
+	ctx := c.Context()
+	registration, err := h.eventRegRepo.GetByID(ctx, id)
+	if err != nil {
+		logger.Error("Fout bij ophalen bijgewerkte registratie", "error", err, "id", id)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon bijgewerkte registratie niet ophalen",
+			"code":  "INTERNAL_ERROR",
+		})
+	}
+	if registration == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Registratie niet gevonden",
+		})
+	}
+
+	// Retourneer het nieuwe totaal aantal stappen
+	// Dit geeft syncWithRetry perfect 1-op-1 support
+	return c.JSON(fiber.Map{
+		"steps": registration.Steps,
+	})
 }

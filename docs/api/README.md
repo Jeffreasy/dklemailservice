@@ -73,7 +73,13 @@ See [Authentication API](./AUTHENTICATION.md) for detailed documentation.
 - Notification preferences
 - Broadcast messaging
 
-### 📡 [WebSocket APIs](./WEBSOCKET.md)
+### 📧 [Auto Responses](./AUTO_RESPONSES.md)
+- Email auto-reply management
+- Vacation responders
+- Automated acknowledgments
+- Time-based activation
+
+###  [WebSocket APIs](./WEBSOCKET.md)
 - Notulen (Meeting Notes) real-time updates
 - Steps application real-time updates
 - Connection management

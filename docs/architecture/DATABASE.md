@@ -396,32 +396,57 @@ CREATE INDEX idx_contact_antwoorden_contact ON contact_antwoorden(contact_id);
 
 ---
 
-### Participants & Registrations
+### Participants & Registrations (V30+ Architecture)
 
-#### `participants`
-Event participants (persons).
+#### `participants` - DE PERSOON
+Slaat persoonsgegevens op + V30 account type informatie.
+
+**Functie:** Wie is deze persoon? Welk type account heeft deze persoon?
 
 ```sql
 CREATE TABLE participants (
+    -- Identificatie
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    naam VARCHAR(255) NOT NULL,
-    email VARCHAR(255) NOT NULL,
-    telefoon VARCHAR(50),
-    rol VARCHAR(100),
-    afstand VARCHAR(50),
-    ondersteuning TEXT,
-    bijzonderheden TEXT,
-    steps INTEGER DEFAULT 0,
-    status VARCHAR(50) DEFAULT 'actief',
-    notities TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    naam TEXT NOT NULL,
+    email TEXT NOT NULL,
+    telefoon TEXT,
+    
+    -- V30: Account Type Systeem
+    account_type TEXT NOT NULL DEFAULT 'temporary',  -- 'full' of 'temporary'
+    registration_year INTEGER,                        -- Voor temporary accounts
+    wachtwoord_hash TEXT,                            -- Alleen voor full accounts
+    has_app_access BOOLEAN NOT NULL DEFAULT FALSE,  -- Kan DKL Step App gebruiken?
+    
+    -- RBAC Integration
+    gebruiker_id UUID REFERENCES gebruikers(id),    -- Link naar gebruikers tabel
+    
+    -- Upgrade Tracking
+    upgraded_to_gebruiker_id UUID REFERENCES gebruikers(id),
+    upgraded_at TIMESTAMPTZ,
+    
+    -- Metadata
+    terms BOOLEAN NOT NULL DEFAULT false,
+    test_mode BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Indexes
 CREATE INDEX idx_participants_email ON participants(email);
-CREATE INDEX idx_participants_rol ON participants(rol);
-CREATE INDEX idx_participants_status ON participants(status);
+CREATE INDEX idx_participants_account_type ON participants(account_type);
+CREATE INDEX idx_participants_has_app_access ON participants(has_app_access);
+CREATE INDEX idx_participants_registration_year ON participants(registration_year);
+CREATE INDEX idx_participants_gebruiker_id ON participants(gebruiker_id);
+
+-- Unieke constraint: 1 temporary per email per jaar
+CREATE UNIQUE INDEX idx_participants_temp_year_unique
+ON participants(email, registration_year)
+WHERE account_type = 'temporary';
 ```
+
+**BELANGRIJK:** Event-specifieke velden zoals `rol`, `afstand`, `ondersteuning`, `bijzonderheden`, en `steps` staan **NIET** in deze tabel! Deze staan in `event_registrations`.
+
+**Waarom gescheiden?** Een persoon kan bij meerdere evenementen deelnemen in verschillende rollen met verschillende afstanden.
 
 #### `participant_antwoorden`
 Responses to participants.
@@ -438,34 +463,72 @@ CREATE TABLE participant_antwoorden (
 CREATE INDEX idx_participant_antwoorden_participant ON participant_antwoorden(participant_id);
 ```
 
-#### `event_registrations`
-Event registrations linking participants to events.
+#### `event_registrations` - DE DEELNAME AAN EEN EVENT
+Slaat op **hoe** een participant deelneemt aan een specifiek evenement.
+
+**Functie:** Welke rol heeft deze persoon? Welke afstand? Hoeveel stappen?
 
 ```sql
 CREATE TABLE event_registrations (
+    -- Identificatie
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
     participant_id UUID NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
-    status VARCHAR(50) DEFAULT 'pending',
-    tracking_status VARCHAR(50) DEFAULT 'registered',
-    distance_route VARCHAR(50),
-    participant_role VARCHAR(100),
-    registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    check_in_time TIMESTAMP,
-    start_time TIMESTAMP,
-    finish_time TIMESTAMP,
-    steps INTEGER DEFAULT 0,
+    
+    -- Event-specifieke keuzes (V28 verplaatst van participants)
+    participant_role_name TEXT,              -- "Deelnemer", "Begeleider", "Vrijwilliger"
+    distance_route TEXT,                     -- "2.5 KM", "6 KM", "10 KM", "15 KM"
+    ondersteuning TEXT,                      -- "Ja", "Nee", "Anders"
+    bijzonderheden TEXT,                     -- Extra info bij ondersteuning
+    
+    -- Status & Tracking
+    status TEXT DEFAULT 'registered',        -- Registratie status
+    tracking_status VARCHAR(50) DEFAULT 'registered',  -- GPS tracking status
+    
+    -- **STAPPEN WORDEN HIER BIJGEHOUDEN!**
+    steps INTEGER DEFAULT 0,                 -- Real-time stappen count via WebSocket
+    
+    -- GPS & Distance Tracking
     total_distance DECIMAL(10,2) DEFAULT 0,
-    last_location_update TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(event_id, participant_id)
+    last_location_update TIMESTAMPTZ,
+    
+    -- Timestamps
+    registered_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    check_in_time TIMESTAMPTZ,
+    start_time TIMESTAMPTZ,
+    finish_time TIMESTAMPTZ,
+    
+    -- Admin velden
+    notities TEXT,
+    behandeld_door TEXT,
+    behandeld_op TIMESTAMPTZ,
+    email_verzonden BOOLEAN DEFAULT false,
+    email_verzonden_op TIMESTAMPTZ,
+    
+    -- Metadata
+   test_mode BOOLEAN DEFAULT false,
+    
+    UNIQUE(event_id, participant_id)  -- 1 participant = 1 registratie per event
 );
 
+-- Indexes
 CREATE INDEX idx_event_registrations_event ON event_registrations(event_id);
 CREATE INDEX idx_event_registrations_participant ON event_registrations(participant_id);
 CREATE INDEX idx_event_registrations_status ON event_registrations(status);
 CREATE INDEX idx_event_registrations_tracking ON event_registrations(tracking_status);
+CREATE INDEX idx_event_registrations_participant_role ON event_registrations(participant_role_name);
+CREATE INDEX idx_event_registrations_distance ON event_registrations(distance_route);
+CREATE INDEX idx_event_registrations_steps ON event_registrations(steps) WHERE steps > 0;
+```
+
+**STAPPEN TRACKING:** Stappen worden bijgehouden in `event_registrations.steps` omdat deze event-specifiek zijn. Jeffrey kan 50.000 stappen hebben bij DKL 2026 en 75.000 bij DKL 2027. Dit zijn twee aparte `event_registrations` records.
+
+**WebSocket Update:** Wanneer de app stappen update via `/api/ws/steps`:
+```sql
+UPDATE event_registrations
+SET steps = <nieuwe_waarde>, last_location_update = NOW()
+WHERE participant_id = <participant_id>
+  AND event_id = <actief_event_id>;
 ```
 
 #### `participant_roles`
@@ -1228,7 +1291,43 @@ Located in `database/migrations/`:
 - `V08__migrate_and_assign_user_roles.sql` - User roles
 - `V09__create_refresh_tokens_table.sql` - Token storage
 - `V10__create_uploaded_images_table.sql` - Image tracking
-- And more...
+- ... (V11-V29 various incremental updates)
+- **`V30__dual_registration_system_with_rbac.sql`** - Dual account system (see [V30 RBAC Integration](../V30_RBAC_INTEGRATION.md))
+- **`V31__complete_v28_participant_refactor.sql`** - Data separation fix (see [V31 Migration Docs](../migrations/V31_PARTICIPANT_REFACTOR.md))
+- **`V32__final_schema_alignment_fixes.sql`** - Schema alignment (see [V32 Migration Docs](../migrations/V32_SCHEMA_CHANGES.md))
+- **`V33__create_auto_responses_table.sql`** - Auto responses feature (see [Auto Response API](../api/AUTO_RESPONSES.md))
+- **`V34__remove_legacy_participant_columns.sql`** - Schema cleanup (see [V34 Breaking Changes](../migrations/V34_BREAKING_CHANGES.md))
+
+### Recent Critical Migrations (V30-V34)
+
+**V30-V34 Migration Series** represents a major architectural evolution:
+
+1. **V30:** Introduced dual registration system with RBAC
+   - Added account_type system (temporary/full)
+   - Integrated participants with RBAC permissions
+   - [Complete Documentation](../V30_RBAC_INTEGRATION.md)
+
+2. **V31:** Completed participant/event data separation
+   - Fixed failed V28 migration
+   - Moved event data to event_registrations
+   - [Migration Details](../migrations/V31_PARTICIPANT_REFACTOR.md)
+
+3. **V32:** Aligned schema with documentation
+   - Renamed notification lookup columns
+   - Added missing fields (timestamps, display_order)
+   - [Breaking Changes Guide](../migrations/V32_SCHEMA_CHANGES.md)
+
+4. **V33:** Added auto response functionality
+   - New auto_responses table
+   - Email auto-reply management
+   - [API Documentation](../api/AUTO_RESPONSES.md)
+
+5. **V34:** Removed legacy participant columns
+   - Permanent deletion of 14 columns
+   - **DESTRUCTIVE** migration
+   - [Critical Warnings](../migrations/V34_BREAKING_CHANGES.md)
+
+**Migration Index:** See [Migrations README](../migrations/README.md) for complete overview.
 
 ### Running Migrations
 ```bash

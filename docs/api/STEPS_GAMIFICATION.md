@@ -33,32 +33,23 @@ Update het aantal stappen voor een deelnemer tijdens een evenement.
 
 ```json
 {
-  "delta_steps": 1000
+  "steps": 1000
 }
 ```
 
 **Parameters:**
 - `id`: Event registration ID (UUID)
-- `delta_steps`: Aantal stappen om toe te voegen (kan negatief zijn)
+- `steps`: Aantal stappen om toe te voegen (kan negatief zijn)
 
 **Response:** `200 OK`
 
 ```json
 {
-  "success": true,
-  "data": {
-    "participant_id": "uuid",
-    "naam": "John Doe",
-    "email": "john@example.com",
-    "steps": 5000,
-    "total_distance": 3.5,
-    "target_distance": 10.0,
-    "percentage_complete": 35.0,
-    "achievements_unlocked": ["first_step", "5k_milestone"]
-  },
-  "message": "Steps updated successfully"
+  "steps": 5000
 }
 ```
+
+**OPTIE A Implementatie:** Deze endpoint retourneert alleen het nieuwe totaal aantal stappen voor optimale `syncWithRetry` ondersteuning en 100% waterdichte data-integriteit.
 
 **WebSocket Broadcast:**
 
@@ -590,20 +581,34 @@ Steps updates worden real-time verzonden via WebSocket.
 
 ### Connect to Steps WebSocket
 
-**Endpoint:** `GET /ws/steps?token=<jwt_token>`
+**Endpoints:**
+- `GET /ws/steps` (public alias)
+- `GET /api/ws/steps` (primary route)
 
 **Protocol:** WebSocket
 
-**Authentication:** JWT token via query parameter
+**Authentication:** Optional - supports both authenticated and anonymous connections
 
-**Connection Example:**
+**Connection Examples:**
 
 ```javascript
+// Authenticated connection (for personalized features)
 const token = localStorage.getItem('access_token');
-const ws = new WebSocket(`ws://localhost:8080/ws/steps?token=${token}`);
+const ws = new WebSocket(`wss://dklemailservice.onrender.com/ws/steps?token=${token}`);
+
+// Public/Anonymous connection (for public leaderboard and total steps)
+const wsPublic = new WebSocket(`wss://dklemailservice.onrender.com/ws/steps?user_id=public`);
+// OR simply without any parameters
+const wsAnonymous = new WebSocket(`wss://dklemailservice.onrender.com/ws/steps`);
 
 ws.onopen = () => {
   console.log('Connected to Steps WebSocket');
+  
+  // Subscribe to channels (both authenticated and public users can subscribe)
+  ws.send(JSON.stringify({
+    type: 'subscribe',
+    channels: ['total_updates', 'leaderboard_updates']
+  }));
 };
 
 ws.onmessage = (event) => {
@@ -611,6 +616,14 @@ ws.onmessage = (event) => {
   handleStepsUpdate(message);
 };
 ```
+
+**Available for Public/Anonymous Users:**
+- `total_updates` channel - Total steps counter
+- `leaderboard_updates` channel - Public leaderboard updates
+
+**Requires Authentication:**
+- `step_updates` channel - Individual step updates
+- `badge_earned` channel - Personal badge notifications
 
 ---
 
@@ -817,34 +830,84 @@ Badges zijn beschikbaar in verschillende tiers:
 
 ```typescript
 import { useState, useEffect } from 'react';
-import { useWebSocket } from './useWebSocket';
 
-export function useStepsTracking(participantId: string) {
+export function useStepsTracking(participantId: string, token?: string) {
   const [steps, setSteps] = useState(0);
   const [distance, setDistance] = useState(0);
   const [achievements, setAchievements] = useState([]);
+  const [ws, setWs] = useState<WebSocket | null>(null);
+  const [connected, setConnected] = useState(false);
 
-  const { connected, lastMessage } = useWebSocket('steps', {
-    onMessage: (message) => {
-      if (message.type === 'steps_update' && 
+  useEffect(() => {
+    // Connect to WebSocket (supports both authenticated and anonymous)
+    const wsUrl = token
+      ? `wss://dklemailservice.onrender.com/ws/steps?token=${token}`
+      : `wss://dklemailservice.onrender.com/ws/steps?user_id=public`;
+    
+    const websocket = new WebSocket(wsUrl);
+    
+    websocket.onopen = () => {
+      console.log('Steps WebSocket connected');
+      setConnected(true);
+      
+      // Subscribe to relevant channels
+      websocket.send(JSON.stringify({
+        type: 'subscribe',
+        channels: token
+          ? ['step_updates', 'total_updates', 'leaderboard_updates', 'badge_earned']
+          : ['total_updates', 'leaderboard_updates']
+      }));
+    };
+    
+    websocket.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      
+      if (message.type === 'steps_update' &&
           message.data.participant_id === participantId) {
         setSteps(message.data.steps);
         setDistance(message.data.total_distance);
       }
       
-      if (message.type === 'achievement_unlocked' && 
+      if (message.type === 'achievement_unlocked' &&
           message.data.participant_id === participantId) {
         setAchievements(prev => [...prev, message.data.achievement]);
       }
-    }
-  });
+    };
+    
+    websocket.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      setConnected(false);
+    };
+    
+    websocket.onclose = () => {
+      console.log('WebSocket closed');
+      setConnected(false);
+    };
+    
+    setWs(websocket);
+    
+    return () => {
+      websocket.close();
+    };
+  }, [participantId, token]);
 
   const updateSteps = async (delta: number) => {
-    const response = await api.post(
+    if (!token) {
+      throw new Error('Authentication required to update steps');
+    }
+
+    const response = await fetch(
       `/api/registration/${participantId}/steps`,
-      { delta_steps: delta }
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ steps: delta })
+      }
     );
-    return response.data;
+    return response.json();
   };
 
   return {
@@ -855,6 +918,10 @@ export function useStepsTracking(participantId: string) {
     connected
   };
 }
+
+// Usage examples:
+// Authenticated: const { steps, connected } = useStepsTracking('participant-id', authToken);
+// Anonymous: const { steps } = useStepsTracking('public');
 ```
 
 ### Vue Component Example
@@ -919,11 +986,11 @@ onMounted(async () => {
 ### Manual Testing with cURL
 
 ```bash
-# Update steps
+# Update steps (OPTIE A: retourneert alleen totaal aantal stappen)
 curl -X POST http://localhost:8080/api/registration/{id}/steps \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"delta_steps": 1000}'
+  -d '{"steps": 1000}'
 
 # Get dashboard
 curl http://localhost:8080/api/registration/{id}/dashboard \

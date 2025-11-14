@@ -87,8 +87,9 @@ END $$;
 -- =====================================================
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM events WHERE name = 'De Koninklijke Loop 2025') THEN
+    IF NOT EXISTS (SELECT 1 FROM events WHERE id = 'f1a75cc7-303e-4207-b501-8eea557bff33'::UUID) THEN
         INSERT INTO events (
+        id,
         name,
         description,
         start_time,
@@ -98,6 +99,7 @@ BEGIN
         event_config,
         is_active
         ) VALUES (
+        'f1a75cc7-303e-4207-b501-8eea557bff33'::UUID,
         'De Koninklijke Loop 2025',
         'De jaarlijkse Koninklijke Loop hardloopevenement',
         '2025-05-16 09:00:00+00',

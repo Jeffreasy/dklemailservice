@@ -76,10 +76,11 @@ func (s *StepsService) UpdateSteps(participantID string, deltaSteps int) (*model
 }
 
 // UpdateStepsByUserID werkt stappen bij voor een deelnemer via gebruiker ID
+// OPLOSSING: 'userID' IS in de V34 architectuur de 'participant.id'
 func (s *StepsService) UpdateStepsByUserID(userID string, deltaSteps int) (*models.Participant, error) {
-	// Haal deelnemer op via gebruiker_id
+	// OPLOSSING: Zoek op participant ID, niet op gebruiker_id
 	var participant models.Participant
-	err := s.db.Where("gebruiker_id = ?", userID).First(&participant).Error
+	err := s.db.Where("id = ?", userID).First(&participant).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, fmt.Errorf("geen deelnemersregistratie gevonden voor gebruiker %s - gebruiker is mogelijk geen deelnemer", userID)
@@ -88,8 +89,9 @@ func (s *StepsService) UpdateStepsByUserID(userID string, deltaSteps int) (*mode
 	}
 
 	// Haal event registration op voor stappen bijwerken
+	// CRITICAL FIX: Use participant.ID not userID!
 	var eventReg models.EventRegistration
-	if err := s.db.Where("participant_id = ?", userID).First(&eventReg).Error; err != nil {
+	if err := s.db.Where("participant_id = ?", participant.ID).First(&eventReg).Error; err != nil {
 		return nil, fmt.Errorf("event registration niet gevonden: %w", err)
 	}
 
@@ -105,10 +107,10 @@ func (s *StepsService) UpdateStepsByUserID(userID string, deltaSteps int) (*mode
 		return nil, fmt.Errorf("kon stappen niet bijwerken: %w", err)
 	}
 
-	// Sla wijzigingen op
+	// Sla wijzigingen op (Update in participantRepo doet niets met stappen, maar is goed voor 'updated_at')
 	ctx := context.Background()
 	if err := s.participantRepo.Update(ctx, &participant); err != nil {
-		return nil, fmt.Errorf("kon stappen niet bijwerken: %w", err)
+		return nil, fmt.Errorf("kon participant niet bijwerken: %w", err)
 	}
 
 	// ✨ Broadcast WebSocket update
@@ -147,10 +149,11 @@ func (s *StepsService) GetParticipantDashboard(participantID string) (*models.Pa
 }
 
 // GetParticipantDashboardByUserID haalt dashboard data op voor een deelnemer via gebruiker ID
+// OPLOSSING: 'userID' IS in de V34 architectuur de 'participant.id'
 func (s *StepsService) GetParticipantDashboardByUserID(userID string) (*models.Participant, int, error) {
-	// Haal deelnemer op via gebruiker_id
+	// OPLOSSING: Zoek op participant ID, niet op gebruiker_id
 	var participant models.Participant
-	err := s.db.Where("gebruiker_id = ?", userID).First(&participant).Error
+	err := s.db.Where("id = ?", userID).First(&participant).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, 0, fmt.Errorf("geen deelnemersregistratie gevonden voor gebruiker %s - gebruiker is mogelijk geen deelnemer", userID)
@@ -159,8 +162,9 @@ func (s *StepsService) GetParticipantDashboardByUserID(userID string) (*models.P
 	}
 
 	// Haal event registration op voor afstand
+	// CRITICAL FIX: Use participant.ID not userID!
 	var eventReg models.EventRegistration
-	if err := s.db.Where("participant_id = ?", userID).First(&eventReg).Error; err != nil {
+	if err := s.db.Where("participant_id = ?", participant.ID).First(&eventReg).Error; err != nil {
 		return nil, 0, fmt.Errorf("event registration niet gevonden: %w", err)
 	}
 
@@ -203,13 +207,14 @@ func (s *StepsService) CalculateAllocatedFunds(route string) int {
 // Anders filter op jaar van aanmelding
 func (s *StepsService) GetTotalSteps(year int) (int, error) {
 	var total int
-	query := s.db.Model(&models.Participant{})
+	// FIXED: Query event_registrations tabel want daar staan de steps
+	query := s.db.Model(&models.EventRegistration{})
 
-	// Als year > 0, filter op jaar van aanmelding
+	// Als year > 0, filter op jaar van registratie
 	if year > 0 {
-		query = query.Where("EXTRACT(YEAR FROM created_at) = ?", year)
+		query = query.Where("EXTRACT(YEAR FROM registered_at) = ?", year)
 	}
-	// Anders: tel ALLE stappen op van ALLE deelnemers
+	// Anders: tel ALLE stappen op van ALLE event registraties
 
 	err := query.Select("COALESCE(SUM(steps), 0)").Scan(&total).Error
 	if err != nil {
@@ -259,7 +264,8 @@ func (s *StepsService) GetFundsDistributionProportional() (map[string]int, int, 
 	totalParticipants := 0
 	for _, d := range distances {
 		var count int64
-		s.db.Model(&models.Participant{}).Where("afstand = ?", d.Route).Count(&count)
+		// OPLOSSING: Tel in event_registrations, niet participants
+		s.db.Model(&models.EventRegistration{}).Where("distance_route = ?", d.Route).Count(&count)
 		totalParticipants += int(count)
 		distribution[d.Route] = int(count)
 	}
@@ -270,7 +276,8 @@ func (s *StepsService) GetFundsDistributionProportional() (map[string]int, int, 
 			// Zoek het fondsbedrag voor deze route
 			for _, d := range distances {
 				if d.Route == route {
-					distribution[route] = (d.RegistrationFee * count) / totalParticipants
+					// OPLOSSING: Verdeel het totale fondsbedrag, niet de registratiekosten
+					distribution[route] = (totalFunds * count) / totalParticipants
 					break
 				}
 			}

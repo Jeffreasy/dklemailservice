@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Je inschrijving voor De Koninklijke Loop</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background: #fff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #ff9328 0%, #ff7a00 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+        }
+        .content {
+            padding: 30px;
+        }
+        .success-badge {
+            background: #10b981;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            display: inline-block;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .details {
+            background: #f9fafb;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .details h3 {
+            margin-top: 0;
+            color: #ff9328;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+        .label {
+            font-weight: 600;
+            color: #6b7280;
+        }
+        .info-box {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .upgrade-box {
+            background: #fef3c7;
+            border: 2px solid #fbbf24;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .upgrade-box h3 {
+            margin-top: 0;
+            color: #d97706;
+        }
+        .upgrade-button {
+            display: inline-block;
+            background: #ff9328;
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            background: #f9fafb;
+            color: #6b7280;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✅ Je bent ingeschreven!</h1>
+            <div class="success-badge">Registratie Bevestigd</div>
+        </div>
+        
+        <div class="content">
+            <p>Beste {{.Naam}},</p>
+            
+            <p>Bedankt voor je inschrijving voor De Koninklijke Loop 2026!</p>
+
+            <div class="details">
+                <h3>Je registratiegegevens</h3>
+                <div class="detail-row">
+                    <span class="label">Naam:</span>
+                    <span>{{.Naam}}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Email:</span>
+                    <span>{{.Email}}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Rol:</span>
+                    <span>{{.Rol}}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Afstand:</span>
+                    <span>{{.Afstand}}</span>
+                </div>
+                {{if .Telefoon}}
+                <div class="detail-row">
+                    <span class="label">Telefoon:</span>
+                    <span>{{.Telefoon}}</span>
+                </div>
+                {{end}}
+                <div class="detail-row">
+                    <span class="label">Event datum:</span>
+                    <span>{{.EventDate}}</span>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <p><strong>ℹ️ Over je registratie:</strong></p>
+                <p>Je registratie is geldig voor het evenement van 2026. Deze registratie geeft je toegang tot het evenement, maar niet tot de DKL Step App.</p>
+            </div>
+
+            <div class="upgrade-box">
+                <h3>🚀 Wil je meer?</h3>
+                <p>Upgrade naar een volledig account en krijg toegang tot:</p>
+                <ul style="text-align: left; display: inline-block;">
+                    <li>De DKL Step App</li>
+                    <li>Stappen tracking</li>
+                    <li>Badges en achievements</li>
+                    <li>Community features</li>
+                </ul>
+                <br>
+                <a href="https://dekoninklijkeloop.nl/upgrade" class="upgrade-button">Upgrade nu!</a>
+            </div>
+
+            <div class="info-box">
+                <p><strong>📍 Startlocatie:</strong></p>
+                <p>
+                    Grote Kerk<br>
+                    Loolaan 16<br>
+                    7315 AB Apeldoorn
+                </p>
+            </div>
+
+            <p>Houd onze website <a href="https://dekoninklijkeloop.nl" style="color: #ff9328;">dekoninklijkeloop.nl</a> in de gaten voor het laatste nieuws!</p>
+
+            <p>Tot 16 mei 2026!<br>
+            Het DKL Team</p>
+        </div>
+        
+        <div class="footer">
+            <p>De Koninklijke Loop 2026</p>
+            <p><a href="https://dekoninklijkeloop.nl" style="color: #ff9328;">www.dekoninklijkeloop.nl</a> | info@dekoninklijkeloop.nl</p>
+            <p style="font-size: 12px; color: #9ca3af;">Dit is een automatisch gegenereerde email</p>
+        </div>
+    </div>
+</body>
+</html>

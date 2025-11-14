@@ -37,13 +37,14 @@ func (h *StepsHandler) RegisterRoutes(app *fiber.App) {
 
 	// POST /api/steps - Update stappen voor ingelogde deelnemer (geen ID nodig!)
 	// POST /api/steps/:id - Update stappen voor specifieke deelnemer (admin/staff)
-	stepsGroup.Post("/steps", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "steps", "write"), h.UpdateSteps)
-	stepsGroup.Post("/steps/:id", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "steps", "write"), h.UpdateSteps)
+	// OPLOSSING: Zorg dat de permissie 'steps:create' is (past bij onze V36 migratie)
+	stepsGroup.Post("/steps", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "steps", "create"), h.UpdateSteps)
+	stepsGroup.Post("/steps/:id", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "steps", "create"), h.UpdateSteps) // Admin mag dit ook
 
 	// GET /api/participant/dashboard - Dashboard voor ingelogde deelnemer (geen ID nodig!)
 	// GET /api/participant/:id/dashboard - Dashboard voor specifieke deelnemer (admin/staff)
-	stepsGroup.Get("/participant/dashboard", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "steps", "read"), h.GetParticipantDashboard)
-	stepsGroup.Get("/participant/:id/dashboard", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "steps", "read"), h.GetParticipantDashboard)
+	stepsGroup.Get("/participant/dashboard", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "steps", "view_own"), h.GetParticipantDashboard)
+	stepsGroup.Get("/participant/:id/dashboard", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "steps", "view_own"), h.GetParticipantDashboard) // Admin mag dit ook
 
 	// GET /api/total-steps - Totaal aantal stappen (PUBLIC - geen authenticatie vereist)
 	stepsGroup.Get("/total-steps", h.GetTotalSteps)
@@ -52,7 +53,8 @@ func (h *StepsHandler) RegisterRoutes(app *fiber.App) {
 	stepsGroup.Get("/funds-distribution", h.GetFundsDistribution)
 
 	// Admin endpoints voor route fund beheer
-	adminGroup := stepsGroup.Group("/steps/admin", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "steps", "write"))
+	// OPLOSSING: 'steps:manage' is de juiste permissie (uit V13), niet 'steps:write'
+	adminGroup := stepsGroup.Group("/steps/admin", AuthMiddleware(h.authService), PermissionMiddleware(h.permissionService, "steps", "manage"))
 	adminGroup.Get("/route-funds", h.GetRouteFunds)
 	adminGroup.Post("/route-funds", h.CreateRouteFund)
 	adminGroup.Put("/route-funds/:route", h.UpdateRouteFund)
@@ -67,7 +69,7 @@ func (h *StepsHandler) RegisterRoutes(app *fiber.App) {
 // @Produce json
 // @Param id path string true "Deelnemer ID"
 // @Param request body object{steps=int} true "Stappen delta"
-// @Success 200 {object} models.Aanmelding
+// @Success 200 {object} models.Participant
 // @Failure 400 {object} map[string]interface{}
 // @Failure 401 {object} map[string]interface{}
 // @Failure 403 {object} map[string]interface{}
@@ -189,7 +191,7 @@ func (h *StepsHandler) GetParticipantDashboard(c *fiber.Ctx) error {
 	// Haal dashboard voor ingelogde deelnemer op
 	participant, allocatedFunds, err := h.stepsService.GetParticipantDashboardByUserID(userID)
 	if err != nil {
-		logger.Error("Fout bij ophalen dashboard", "error", err, "id", userID)
+		logger.Error("Fout bij ophalen dashboard", "error", err, "user_id", userID)
 		// Check if this is a "not found" error (user is not a participant)
 		if strings.Contains(err.Error(), "geen deelnemersregistratie gevonden") {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
@@ -204,9 +206,10 @@ func (h *StepsHandler) GetParticipantDashboard(c *fiber.Ctx) error {
 	}
 
 	// Haal event registration data op voor stappen en afstand
+	// OPLOSSING: Gebruik participant.ID die we zojuist hebben opgehaald
 	var eventReg models.EventRegistration
-	if err := h.stepsService.GetDB().Where("participant_id = ?", id).First(&eventReg).Error; err != nil {
-		logger.Error("Fout bij ophalen event registration", "error", err, "participant_id", id)
+	if err := h.stepsService.GetDB().Where("participant_id = ?", participant.ID).First(&eventReg).Error; err != nil {
+		logger.Error("Fout bij ophalen event registration", "error", err, "participant_id", participant.ID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Kon event registration data niet ophalen",
 			"code":  "INTERNAL_ERROR",

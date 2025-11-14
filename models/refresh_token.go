@@ -3,9 +3,10 @@ package models
 import "time"
 
 // RefreshToken representeert een refresh token voor JWT authenticatie
+// V34: OwnerID kan zowel gebruikers.id als participants.id bevatten
 type RefreshToken struct {
 	ID        string     `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	UserID    string     `json:"user_id" gorm:"not null;type:uuid;index"`
+	OwnerID   string     `json:"owner_id" gorm:"column:owner_id;not null;type:uuid;index"` // V34: Was UserID, nu OwnerID (kan gebruiker of participant zijn)
 	Token     string     `json:"token" gorm:"not null;uniqueIndex"`
 	ExpiresAt time.Time  `json:"expires_at" gorm:"not null;index"`
 	CreatedAt time.Time  `json:"created_at" gorm:"autoCreateTime"`

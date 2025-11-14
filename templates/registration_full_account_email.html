@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welkom bij De Koninklijke Loop</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background: #fff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #ff9328 0%, #ff7a00 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+        }
+        .content {
+            padding: 30px;
+        }
+        .highlight-box {
+            background: #fff7ed;
+            border-left: 4px solid #ff9328;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .highlight-box strong {
+            color: #ff9328;
+        }
+        .details {
+            background: #f9fafb;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .details h3 {
+            margin-top: 0;
+            color: #ff9328;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+        .label {
+            font-weight: 600;
+            color: #6b7280;
+        }
+        .app-download {
+            background: #ff9328;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .app-download h3 {
+            margin: 0 0 10px 0;
+        }
+        .button {
+            display: inline-block;
+            background: white;
+            color: #ff9328;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: bold;
+            margin: 10px 5px;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            background: #f9fafb;
+            color: #6b7280;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎉 Welkom bij De Koninklijke Loop!</h1>
+            <p>Je account is aangemaakt</p>
+        </div>
+        
+        <div class="content">
+            <p>Beste {{.Naam}},</p>
+            
+            <p>Wat geweldig dat je je hebt ingeschreven voor De Koninklijke Loop 2026 met een volledig account!</p>
+            
+            <div class="highlight-box">
+                <p><strong>🎊 Je hebt nu toegang tot de DKL Step App!</strong></p>
+                <p>Met de app kun je:</p>
+                <ul>
+                    <li>Je dagelijkse stappen bijhouden</li>
+                    <li>Je voortgang volgen tot het evenement</li>
+                    <li>Badges en achievements verdienen</li>
+                    <li>Meedoen aan uitdagingen</li>
+                    <li>Deel uitmaken van de DKL community</li>
+                </ul>
+            </div>
+
+            <div class="details">
+                <h3>Je registratiegegevens</h3>
+                <div class="detail-row">
+                    <span class="label">Naam:</span>
+                    <span>{{.Naam}}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Email:</span>
+                    <span>{{.Email}}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Rol:</span>
+                    <span>{{.Rol}}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Afstand:</span>
+                    <span>{{.Afstand}}</span>
+                </div>
+                {{if .Telefoon}}
+                <div class="detail-row">
+                    <span class="label">Telefoon:</span>
+                    <span>{{.Telefoon}}</span>
+                </div>
+                {{end}}
+                <div class="detail-row">
+                    <span class="label">Event datum:</span>
+                    <span>{{.EventDate}}</span>
+                </div>
+            </div>
+
+            <div class="app-download">
+                <h3>📱 Download de DKL Step App</h3>
+                <p>Begin vandaag nog met stappen verzamelen!</p>
+                <a href="#" class="button">iOS App Store</a>
+                <a href="#" class="button">Google Play</a>
+            </div>
+
+            <div class="highlight-box">
+                <p><strong>Inloggegevens voor de app:</strong></p>
+                <p>Email: {{.Email}}<br>
+                Wachtwoord: Het wachtwoord dat je hebt ingesteld</p>
+            </div>
+
+            <p>Houd onze website <a href="https://dekoninklijkeloop.nl" style="color: #ff9328;">dekoninklijkeloop.nl</a> in de gaten voor het laatste nieuws en updates!</p>
+
+            <p>Tot 16 mei 2026!<br>
+            Het DKL Team</p>
+        </div>
+        
+        <div class="footer">
+            <p>De Koninklijke Loop 2026</p>
+            <p><a href="https://dekoninklijkeloop.nl" style="color: #ff9328;">www.dekoninklijkeloop.nl</a> | info@dekoninklijkeloop.nl</p>
+            <p style="font-size: 12px; color: #9ca3af;">Dit is een automatisch gegenereerde email</p>
+        </div>
+    </div>
+</body>
+</html>

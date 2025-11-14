@@ -29,6 +29,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS auto_responses_updated_at ON auto_responses;
+
 CREATE TRIGGER auto_responses_updated_at
     BEFORE UPDATE ON auto_responses
     FOR EACH ROW

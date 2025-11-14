@@ -30,58 +30,69 @@ func NewStepsWebSocketHandler(
 
 // RegisterRoutes registreert WebSocket routes
 func (h *StepsWebSocketHandler) RegisterRoutes(app *fiber.App) {
-	// WebSocket upgrade check middleware
-	app.Use("/api/ws/steps", func(c *fiber.Ctx) error {
-		if websocket.IsWebSocketUpgrade(c) {
-			// Optioneel: JWT validatie voor WebSocket
-			// Token kan komen van query parameter of header
-			token := c.Query("token")
-			if token == "" {
-				authHeader := c.Get("Authorization")
-				if strings.HasPrefix(authHeader, "Bearer ") {
-					token = strings.TrimPrefix(authHeader, "Bearer ")
-				}
-			}
-
-			// Als token aanwezig is, valideer het (maar sta ook anonymous toe)
-			if token != "" {
-				userID, err := h.authService.ValidateToken(token)
-				if err != nil {
-					logger.Error("WebSocket auth failed", "error", err, "token_length", len(token))
-					// Don't reject - allow anonymous connections voor public leaderboard
-					// return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-					// 	"error": "Invalid token",
-					// })
-				} else {
-					// Store user info in context voor gebruik in handler
-					c.Locals("userID", userID)
-				}
-			}
-
-			return c.Next()
+	// WebSocket upgrade handler with authentication
+	wsHandler := func(c *fiber.Ctx) error {
+		// Check if this is a WebSocket upgrade request
+		if !websocket.IsWebSocketUpgrade(c) {
+			return fiber.ErrUpgradeRequired
 		}
-		return fiber.ErrUpgradeRequired
-	})
 
-	// WebSocket endpoint
-	app.Get("/api/ws/steps", websocket.New(h.HandleWebSocket))
+		// Token kan komen van query parameter of header
+		token := c.Query("token")
 
-	logger.Info("WebSocket endpoint registered", "path", "/api/ws/steps")
+		// Trim whitespace en check of token niet leeg is
+		token = strings.TrimSpace(token)
+
+		// Als token leeg is in query, probeer Authorization header
+		if token == "" {
+			authHeader := c.Get("Authorization")
+			if strings.HasPrefix(authHeader, "Bearer ") {
+				token = strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
+			}
+		}
+
+		// Validate token and store userID for the handler
+		var authenticatedUserID string
+		if token != "" {
+			userID, err := h.authService.ValidateToken(token)
+			if err != nil {
+				logger.Warn("WebSocket auth failed, allowing anonymous access",
+					"error", err,
+					"token_length", len(token),
+					"remote_addr", c.IP())
+				// Allow anonymous connections for public leaderboard/stats
+			} else {
+				authenticatedUserID = userID
+				logger.Debug("WebSocket authenticated user", "user_id", userID)
+			}
+		} else {
+			logger.Debug("WebSocket anonymous connection", "remote_addr", c.IP())
+		}
+
+		// Upgrade to WebSocket with authentication context
+		return websocket.New(func(conn *websocket.Conn) {
+			h.handleWebSocketConnection(conn, authenticatedUserID)
+		})(c)
+	}
+
+	// WebSocket endpoint (primary route)
+	app.Get("/api/ws/steps", wsHandler)
+
+	// Public alias for frontend compatibility (without /api prefix)
+	app.Get("/ws/steps", wsHandler)
+
+	logger.Info("WebSocket endpoints registered", "paths", "/api/ws/steps, /ws/steps (both support anonymous & authenticated)")
 }
 
-// HandleWebSocket handles de WebSocket connectie
-func (h *StepsWebSocketHandler) HandleWebSocket(c *websocket.Conn) {
+// handleWebSocketConnection handles de WebSocket connectie met authenticated user context
+func (h *StepsWebSocketHandler) handleWebSocketConnection(c *websocket.Conn, authenticatedUserID string) {
 	// Extract user info from query params
 	userID := c.Query("user_id")
 	participantID := c.Query("participant_id")
 
-	// Als userID niet in query, probeer uit context (van auth middleware)
+	// Als userID niet in query params, gebruik authenticated user ID from token
 	if userID == "" {
-		if uid := c.Locals("userID"); uid != nil {
-			if uidStr, ok := uid.(string); ok {
-				userID = uidStr
-			}
-		}
+		userID = authenticatedUserID
 	}
 
 	logger.Info("WebSocket client connecting",

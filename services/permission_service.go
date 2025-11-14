@@ -6,18 +6,22 @@ import (
 	"dklautomationgo/models"
 	"dklautomationgo/repository"
 	"encoding/json"
+	"errors" // OPLOSSING: Importeer errors package
 	"fmt"
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"gorm.io/gorm" // OPLOSSING: Importeer gorm
 )
 
 // PermissionServiceImpl implementeert de PermissionService interface
+// V30+RBAC: Uitgebreid met participant repository voor app access checks
 type PermissionServiceImpl struct {
 	rbacRoleRepo       repository.RBACRoleRepository
 	permissionRepo     repository.PermissionRepository
 	rolePermissionRepo repository.RolePermissionRepository
 	userRoleRepo       repository.UserRoleRepository
+	participantRepo    repository.ParticipantRepository // V30+RBAC: Voor participant app access checks
 	redisClient        *redis.Client
 	cacheEnabled       bool
 }
@@ -40,11 +44,25 @@ func NewPermissionServiceWithRedis(
 	userRoleRepo repository.UserRoleRepository,
 	redisClient *redis.Client,
 ) PermissionService {
+	return NewPermissionServiceWithParticipantSupport(rbacRoleRepo, permissionRepo, rolePermissionRepo, userRoleRepo, nil, redisClient)
+}
+
+// NewPermissionServiceWithParticipantSupport maakt een nieuwe PermissionService met volledige participant integratie
+// V30+RBAC: Voegt participant repository toe voor app access validatie
+func NewPermissionServiceWithParticipantSupport(
+	rbacRoleRepo repository.RBACRoleRepository,
+	permissionRepo repository.PermissionRepository,
+	rolePermissionRepo repository.RolePermissionRepository,
+	userRoleRepo repository.UserRoleRepository,
+	participantRepo repository.ParticipantRepository,
+	redisClient *redis.Client,
+) PermissionService {
 	impl := &PermissionServiceImpl{
 		rbacRoleRepo:       rbacRoleRepo,
 		permissionRepo:     permissionRepo,
 		rolePermissionRepo: rolePermissionRepo,
 		userRoleRepo:       userRoleRepo,
+		participantRepo:    participantRepo, // V30+RBAC
 		redisClient:        redisClient,
 		cacheEnabled:       redisClient != nil,
 	}
@@ -65,6 +83,7 @@ func NewPermissionServiceWithRedis(
 }
 
 // HasPermission controleert of een gebruiker een specifieke permissie heeft
+// OPLOSSING: Logica aangepast om correct onderscheid te maken tussen Participant en Gebruiker
 func (s *PermissionServiceImpl) HasPermission(ctx context.Context, userID, resource, action string) bool {
 	// Probeer eerst uit cache te halen
 	if s.cacheEnabled {
@@ -78,24 +97,70 @@ func (s *PermissionServiceImpl) HasPermission(ctx context.Context, userID, resou
 		}
 	}
 
-	// Haal permissies op uit database
+	var hasPermission bool
+
+	// OPLOSSING: Eerst checken of het een participant is
+	if s.participantRepo != nil {
+		logger.Debug("Attempting participant lookup", "user_id", userID)
+		participant, err := s.participantRepo.GetByID(ctx, userID)
+
+		if err == nil && participant != nil {
+			// ===================================
+			// PAD A: Gebruiker IS een Participant
+			// ===================================
+			hasPermission = s.checkParticipantPermission(participant, resource, action)
+
+			if !hasPermission {
+				logger.Warn("Permission denied (participant)",
+					"user_id", userID,
+					"resource", resource,
+					"action", action,
+					"account_type", participant.AccountType,
+					"has_app_access", participant.HasAppAccess)
+			} else {
+				logger.Debug("Permission granted (participant)",
+					"user_id", userID,
+					"resource", resource,
+					"action", action)
+			}
+
+			// Cache het resultaat en return
+			if s.cacheEnabled {
+				s.cachePermission(userID, resource, action, hasPermission)
+			}
+			return hasPermission
+
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			// Er is een ECHTE databasefout opgetreden bij het zoeken naar participant
+			logger.Error("Fout bij ophalen participant in HasPermission", "user_id", userID, "error", err)
+			return false // Fail closed
+		}
+
+		// Als we hier zijn, betekent het: err == gorm.ErrRecordNotFound
+		// Dit is dus GEEN participant, en we gaan door naar de RBAC check hieronder.
+		logger.Debug("Participant not found, proceeding with RBAC check", "user_id", userID)
+	}
+
+	// ===================================
+	// PAD B: Gebruiker is een Gebruiker (Admin/Staff)
+	// ===================================
 	permissions, err := s.userRoleRepo.GetUserPermissions(ctx, userID)
 	if err != nil {
-		logger.Error("Fout bij ophalen user permissions", "user_id", userID, "error", err)
+		logger.Error("Fout bij ophalen user permissions (RBAC)", "user_id", userID, "error", err)
 		return false
 	}
 
-	hasPermission := s.checkPermissionInList(permissions, resource, action)
+	hasPermission = s.checkPermissionInList(permissions, resource, action)
 
 	// Log alleen bij permission denied voor debugging
 	if !hasPermission {
-		logger.Warn("Permission denied",
+		logger.Warn("Permission denied (RBAC)",
 			"user_id", userID,
 			"resource", resource,
 			"action", action,
 			"permissions_count", len(permissions))
 	} else {
-		logger.Debug("Permission granted",
+		logger.Debug("Permission granted (RBAC)",
 			"user_id", userID,
 			"resource", resource,
 			"action", action)
@@ -116,6 +181,50 @@ func (s *PermissionServiceImpl) checkPermissionInList(permissions []*models.User
 			return true
 		}
 	}
+	return false
+}
+
+// checkParticipantPermission controleert participant permissions (V34)
+// OPLOSSING 2: Gebruikt de nieuwe centrale permissie-map
+func (s *PermissionServiceImpl) checkParticipantPermission(participant *models.Participant, resource, action string) bool {
+	// Check 1: Must have app access
+	if !participant.HasAppAccess {
+		return false
+	}
+
+	// Check 2: Must be full account
+	if participant.AccountType != "full" {
+		return false
+	}
+
+	// OPLOSSING 2: Check permissies tegen de centrale map
+	// Speciale mapping: 'profile:read' en 'profile:update' zijn aliassen
+	// voor 'participant:read' en 'participant:write'
+	effectiveResource := resource
+	effectiveAction := action
+	if resource == "profile" {
+		effectiveResource = "participant"
+		if action == "update" {
+			effectiveAction = "update_own" // Gecorrigeerd naar de juiste 'action'
+		}
+		if action == "read" {
+			effectiveAction = "view_own" // Gecorrigeerd naar de juiste 'action'
+		}
+	}
+
+	// Check if resource exists
+	actions, exists := participantPermissionsMap[effectiveResource]
+	if !exists {
+		return false
+	}
+
+	// Check if action is allowed
+	for _, allowedAction := range actions {
+		if allowedAction == effectiveAction {
+			return true
+		}
+	}
+
 	return false
 }
 
@@ -399,6 +508,26 @@ func (s *PermissionServiceImpl) GetPermissions(ctx context.Context, limit, offse
 	return s.permissionRepo.List(ctx, limit, offset)
 }
 
+// GetRoleByName haalt een rol op basis van naam
+func (s *PermissionServiceImpl) GetRoleByName(ctx context.Context, name string) (*models.RBACRole, error) {
+	role, err := s.rbacRoleRepo.GetByName(ctx, name)
+	if err != nil {
+		logger.Error("Fout bij ophalen rol op naam", "name", name, "error", err)
+		return nil, err
+	}
+	return role, nil
+}
+
+// GetPermissionsByRole haalt alle permissies op voor een specifieke rol
+func (s *PermissionServiceImpl) GetPermissionsByRole(ctx context.Context, roleID string) ([]*models.Permission, error) {
+	permissions, err := s.rolePermissionRepo.GetPermissionsByRole(ctx, roleID)
+	if err != nil {
+		logger.Error("Fout bij ophalen permissies voor rol", "role_id", roleID, "error", err)
+		return nil, err
+	}
+	return permissions, nil
+}
+
 // getCachedPermission haalt een permissie uit de Redis cache
 func (s *PermissionServiceImpl) getCachedPermission(userID, resource, action string) *bool {
 	if !s.cacheEnabled {
@@ -524,4 +653,64 @@ func (s *PermissionServiceImpl) refreshUsersWithRole(ctx context.Context, roleID
 	}
 
 	logger.Debug("User role cache refresh completed", "role_id", roleID, "users_affected", len(userRoles))
+}
+
+// ==============================================================================
+// V30+RBAC: PARTICIPANT-SPECIFIEKE PERMISSION CHECKS
+// ==============================================================================
+
+// HasParticipantAppAccess controleert of een gebruiker app toegang heeft via participant account
+// V30+RBAC: Combineert RBAC permission check met participant account type check
+func (s *PermissionServiceImpl) HasParticipantAppAccess(ctx context.Context, userID string) bool {
+	// Check 1: RBAC permission check - heeft user de 'app:access' permission?
+	if !s.HasPermission(ctx, userID, "app", "access") {
+		logger.Debug("User heeft geen app:access permission", "user_id", userID)
+		return false
+	}
+
+	// Check 2: Participant account type check (alleen als participant repo beschikbaar)
+	if s.participantRepo == nil {
+		logger.Debug("Participant repository niet beschikbaar, allow access op basis van permission alleen", "user_id", userID)
+		return true
+	}
+
+	// Haal gebruiker email op
+	// Dit vereist een lookup - we kunnen dit optimaliseren door email in JWT claims te hebben
+	// Voor nu doen we het via participant lookup
+
+	// TODO: Implementeer GetByGebruikerID in participant repository voor betere performance
+	// Voor nu: return true als permission check geslaagd is (participant check gebeurt al in auth service login)
+	return true
+}
+
+// CanParticipantRegisterForEvent controleert of een participant zich kan registreren voor een event
+// V30+RBAC: Zowel full als temporary accounts kunnen zich registreren, maar met verschillende rechten
+func (s *PermissionServiceImpl) CanParticipantRegisterForEvent(ctx context.Context, userID string) bool {
+	// Full account users kunnen altijd registreren (via participant:register_event permission)
+	if s.HasPermission(ctx, userID, "participant", "register_event") {
+		return true
+	}
+
+	// Voor temporary accounts: public endpoint heeft geen user ID, dus dit is niet van toepassing
+	// Temporary registratie gebeurt via public endpoint zonder authenticatie
+	return false
+}
+
+// GetParticipantPermissionLevel bepaalt het permission level van een participant
+// V30+RBAC: Returns 'full', 'temporary', of 'none'
+func (s *PermissionServiceImpl) GetParticipantPermissionLevel(ctx context.Context, userID string) string {
+	if s.participantRepo == nil {
+		// Geen participant repo = legacy user
+		if s.HasPermission(ctx, userID, "app", "access") {
+			return "full"
+		}
+		return "none"
+	}
+
+	// Check app access permission
+	if !s.HasPermission(ctx, userID, "app", "access") {
+		return "none"
+	}
+
+	return "full"
 }

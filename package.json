@@ -1,0 +1,16 @@
+{
+  "name": "dkl-email-service-tests",
+  "version": "1.0.0",
+  "description": "Test utilities for DKL Email Service",
+  "private": true,
+  "scripts": {
+    "test:websocket": "node tests/websocket_test.js",
+    "test": "npm run test:websocket"
+  },
+  "devDependencies": {
+    "ws": "^8.18.0",
+    "node-fetch": "^2.7.0"
+  },
+  "keywords": ["websocket", "testing"],
+  "author": "DKL Email Service Team"
+}

@@ -48,6 +48,7 @@ type EmailMetricsService interface {
 }
 
 // AuthService definieert de interface voor authenticatie operaties
+// V30+RBAC: Uitgebreid met participant-specifieke methoden
 type AuthService interface {
 	// Login authenticeert een gebruiker en geeft een access token en refresh token terug
 	Login(ctx context.Context, email, wachtwoord string) (accessToken string, refreshToken string, err error)
@@ -79,6 +80,9 @@ type AuthService interface {
 	RefreshAccessToken(ctx context.Context, refreshToken string) (accessToken string, newRefreshToken string, err error)
 	RevokeRefreshToken(ctx context.Context, refreshToken string) error
 	RevokeAllUserRefreshTokens(ctx context.Context, userID string) error
+
+	// V30+RBAC: Participant-specifieke methoden
+	GetParticipantByGebruikerID(ctx context.Context, gebruikerID string) (*models.Participant, error)
 }
 
 // EmailSender definieert de generieke interface voor het versturen van e-mails.
@@ -164,6 +168,7 @@ type NotificationService interface {
 }
 
 // PermissionService definieert de interface voor RBAC permission operaties
+// V30+RBAC: Uitgebreid met participant-specifieke permission checks
 type PermissionService interface {
 	// HasPermission controleert of een gebruiker een specifieke permissie heeft
 	HasPermission(ctx context.Context, userID, resource, action string) bool
@@ -206,6 +211,11 @@ type PermissionService interface {
 
 	// RefreshCache vernieuwt alle caches
 	RefreshCache(ctx context.Context) error
+
+	// V30+RBAC: Participant-specifieke permission checks
+	HasParticipantAppAccess(ctx context.Context, userID string) bool
+	CanParticipantRegisterForEvent(ctx context.Context, userID string) bool
+	GetParticipantPermissionLevel(ctx context.Context, userID string) string
 }
 
 // ChatService defines the interface for chat operations

@@ -1,0 +1,33 @@
+# .air.toml
+# Configuraties voor Air - de Go hot-reloader
+
+# Werkmap (root van het project)
+root = "."
+# Tijdelijke map voor de build
+tmp_dir = "tmp"
+
+[build]
+# Commando om je app te bouwen. Bouwt main.go en plaatst het in tmp/
+cmd = "go build -o ./tmp/main ."
+# Het binaire bestand dat air moet uitvoeren
+bin = "./tmp/main"
+# Log output
+log = "air_errors.log"
+# Wacht 250ms na een wijziging voordat er opnieuw wordt gebouwd
+delay = 250 # ms
+
+[watch]
+# Extensies om in de gaten te houden
+include_ext = ["go", "tpl", "html", ".env"]
+# Mappen om te negeren
+exclude_dir = ["tmp", "vendor", "node_modules", "public"]
+# Bestanden om te negeren
+exclude_file = []
+
+[log]
+# Toon de log in kleur
+color = true
+
+[misc]
+# Verwijder de tmp map bij het afsluiten
+clean_on_exit = true

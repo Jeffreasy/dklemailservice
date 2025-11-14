@@ -12,20 +12,30 @@ Production: wss://api.dklemailservice.com/ws/{channel}
 ```
 
 **Available Channels:**
-- `/ws/notulen` - Meeting notes real-time updates
-- `/ws/steps` - Steps application real-time updates
+- `/api/ws/notulen` - Meeting notes real-time updates (requires authentication)
+- `/ws/steps` or `/api/ws/steps` - Steps application real-time updates (supports public access)
 
 ### Authentication
 
-WebSocket connections require JWT authentication via query parameter:
+**Steps WebSocket** supports both authenticated and anonymous (public) connections:
 
 ```javascript
-// Steps WebSocket
+// Authenticated connection (recommended for personalized features)
 const wsSteps = new WebSocket('ws://localhost:8080/ws/steps?token=YOUR_JWT_TOKEN');
 
-// Notulen WebSocket
+// Anonymous/Public connection (for public leaderboard/stats)
+const wsStepsPublic = new WebSocket('ws://localhost:8080/ws/steps?user_id=public');
+// OR without any parameters
+const wsStepsAnonymous = new WebSocket('ws://localhost:8080/ws/steps');
+```
+
+**Notulen WebSocket** requires JWT authentication:
+
+```javascript
 const wsNotulen = new WebSocket('ws://localhost:8080/api/ws/notulen?token=YOUR_JWT_TOKEN');
 ```
+
+**Note:** Empty tokens (e.g., `?token=`) are treated as anonymous connections for Steps WebSocket.
 
 ---
 

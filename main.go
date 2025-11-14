@@ -275,6 +275,21 @@ func main() {
 		repoFactory.EventRegistration,
 		serviceFactory.AuthService,
 		serviceFactory.PermissionService,
+		stepsService,
+	)
+
+	// V30: Initialiseer de PublicRegistrationHandler voor publieke registratie (duaal systeem)
+	// V30+RBAC: Nu met volledige RBAC integratie voor automatische rol toewijzing
+	publicRegistrationHandler := handlers.NewPublicRegistrationHandler(
+		repoFactory.Participant,
+		repoFactory.EventRegistration,
+		repoFactory.Event,
+		repoFactory.Gebruiker,
+		serviceFactory.EmailService,
+		serviceFactory.NotificationService,
+		serviceFactory.PermissionService, // V30+RBAC: Voor rol assignment
+		repoFactory.RBACRole,             // V30+RBAC: Voor rol lookups
+		repoFactory.UserRole,             // V30+RBAC: Voor user-role koppeling
 	)
 
 	// Initialiseer steps handler
@@ -467,13 +482,20 @@ func main() {
 
 	// Registreer routes voor contact en participant beheer
 	contactHandler.RegisterRoutes(app)
+
+	// CRITICAL FIX: Register stepsHandler BEFORE participantHandler
+	// to ensure /api/participant/dashboard is handled by steps handler
+	// instead of being caught by participant's /:id route
+	stepsHandler.RegisterRoutes(app)
+
 	participantHandler.RegisterRoutes(app) // Hernoemd
 
 	// ✨ NIEUW: Registreer de routes voor de EventRegistrationHandler
 	eventRegistrationHandler.RegisterRoutes(app)
 
-	// Registreer routes voor stappen beheer
-	stepsHandler.RegisterRoutes(app)
+	// V30: Registreer de publieke registratie routes (GEEN authenticatie vereist)
+	publicRegistrationHandler.RegisterRoutes(app)
+	logger.Info("Public registration routes registered - /api/public/aanmelden endpoint active")
 
 	// Initialiseer en registreer WebSocket handler voor steps
 	stepsWsHandler := handlers.NewStepsWebSocketHandler(stepsHub, serviceFactory.AuthService)
@@ -678,6 +700,13 @@ func main() {
 		serviceFactory.AuthService,
 		serviceFactory.PermissionService,
 	)
+
+	// Register public under-construction routes FIRST (before RegisterRoutes)
+	// These must be accessible without authentication for maintenance mode checks
+	api.Get("/under-construction/active", underConstructionHandler.GetActiveUnderConstruction)
+	api.Get("/under-construction", underConstructionHandler.GetActiveUnderConstruction) // Alias
+
+	// Now register the admin routes
 	underConstructionHandler.RegisterRoutes(app)
 
 	autoResponseHandler := handlers.NewAutoResponseHandler(

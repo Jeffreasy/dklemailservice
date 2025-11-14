@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Je account is geüpgraded!</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background: #fff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+        }
+        .content {
+            padding: 30px;
+        }
+        .success-badge {
+            background: #10b981;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            display: inline-block;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .highlight-box {
+            background: #d1fae5;
+            border-left: 4px solid #10b981;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .highlight-box strong {
+            color: #059669;
+        }
+        .app-download {
+            background: #ff9328;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .app-download h3 {
+            margin: 0 0 10px 0;
+        }
+        .button {
+            display: inline-block;
+            background: white;
+            color: #ff9328;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: bold;
+            margin: 10px 5px;
+        }
+        .features-list {
+            background: #f9fafb;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .features-list h3 {
+            margin-top: 0;
+            color: #ff9328;
+        }
+        .features-list ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .features-list li {
+            padding: 5px 0;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            background: #f9fafb;
+            color: #6b7280;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎉 Je account is geüpgraded!</h1>
+            <div class="success-badge">Upgrade Succesvol</div>
+        </div>
+        
+        <div class="content">
+            <p>Beste {{.Naam}},</p>
+            
+            <p>Fantastisch nieuws! Je tijdelijke registratie is succesvol geüpgraded naar een volledig account.</p>
+            
+            <div class="highlight-box">
+                <p><strong>✨ Je hebt nu toegang tot de DKL Step App!</strong></p>
+                <p>Al je eerdere registratiegegevens zijn behouden en gekoppeld aan je nieuwe account.</p>
+            </div>
+
+            <div class="features-list">
+                <h3>Wat kun je nu doen?</h3>
+                <ul>
+                    <li>📱 <strong>Download de DKL Step App</strong> - Begin met stappen verzamelen</li>
+                    <li>🏃 <strong>Track je dagelijkse voortgang</strong> - Zie hoeveel stappen je zet</li>
+                    <li>🏆 <strong>Verdien badges</strong> - Unlock achievements terwijl je traint</li>
+                    <li>👥 <strong>Join de community</strong> - Connecteer met andere deelnemers</li>
+                    <li>📊 <strong>Zie je statistieken</strong> - Volg je training tot het evenement</li>
+                </ul>
+            </div>
+
+            <div class="app-download">
+                <h3>📱 Download de DKL Step App</h3>
+                <p>Begin vandaag nog met stappen verzamelen!</p>
+                <a href="#" class="button">iOS App Store</a>
+                <a href="#" class="button">Google Play</a>
+            </div>
+
+            <div class="highlight-box">
+                <p><strong>🔐 Inloggegevens voor de app:</strong></p>
+                <p>
+                    Email: {{.Email}}<br>
+                    Wachtwoord: Het wachtwoord dat je zojuist hebt ingesteld
+                </p>
+            </div>
+
+            <p>Al je eerdere registratiegegevens blijven behouden:</p>
+            <div class="features-list">
+                <ul style="margin: 10px 0;">
+                    <li>Rol: {{.Rol}}</li>
+                    <li>Afstand: {{.Afstand}}</li>
+                    <li>Event: De Koninklijke Loop 2026</li>
+                </ul>
+            </div>
+
+            <p>Houd onze website <a href="https://dekoninklijkeloop.nl" style="color: #ff9328;">dekoninklijkeloop.nl</a> in de gaten voor het laatste nieuws en updates!</p>
+
+            <p>Tot 16 mei 2026!<br>
+            Het DKL Team</p>
+        </div>
+        
+        <div class="footer">
+            <p>De Koninklijke Loop 2026</p>
+            <p><a href="https://dekoninklijkeloop.nl" style="color: #ff9328;">www.dekoninklijkeloop.nl</a> | info@dekoninklijkeloop.nl</p>
+            <p style="font-size: 12px; color: #9ca3af;">Dit is een automatisch gegenereerde email</p>
+        </div>
+    </div>
+</body>
+</html>

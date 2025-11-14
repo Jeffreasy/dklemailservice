@@ -89,15 +89,87 @@ func (h *AuthHandler) HandleLogin(c *fiber.Ctx) error {
 		}
 	}
 
-	// Haal gebruiker op voor response
-	gebruiker, err := h.authService.GetUserFromToken(c.Context(), token)
+	// V34: Valideer token en haal claims op om user type te bepalen
+	userID, err := h.authService.ValidateToken(token)
 	if err != nil {
-		logger.Error("Fout bij ophalen gebruiker na login", "email", loginData.Email, "error", err)
+		logger.Error("Fout bij valideren token na login", "email", loginData.Email, "error", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Login succesvol maar kon gebruiker niet ophalen",
+			"error": "Login succesvol maar token validatie gefaald",
 		})
 	}
 
+	// Probeer eerst gebruiker op te halen (admin/staff)
+	gebruiker, err := h.authService.GetUser(c.Context(), userID)
+
+	// Als gebruiker niet gevonden, check of het een participant is
+	if err != nil || gebruiker == nil {
+		// V34: Return participant login response
+		return h.handleParticipantLoginResponse(c, token, refreshToken, userID, loginData.Email)
+	}
+
+	// Standard gebruiker login response (admin/staff)
+	return h.handleGebruikerLoginResponse(c, token, refreshToken, gebruiker)
+}
+
+// handleParticipantLoginResponse creates response for participant logins (V34)
+func (h *AuthHandler) handleParticipantLoginResponse(c *fiber.Ctx, token, refreshToken, participantID, email string) error {
+	// Stel cookie in met token
+	cookie := fiber.Cookie{
+		Name:     "auth_token",
+		Value:    token,
+		Path:     "/",
+		Expires:  time.Now().Add(20 * time.Minute),
+		HTTPOnly: true,
+		Secure:   c.Protocol() == "https",
+		SameSite: "Strict",
+	}
+	c.Cookie(&cookie)
+
+	// OPLOSSING 2: Gebruik de centrale helper voor een consistente permissielijst
+	permissionList := services.GetParticipantPermissionsList()
+
+	// Participants krijgen participant_user rol
+	roleList := []map[string]interface{}{
+		{
+			"id":          "participant-role",
+			"name":        "participant_user",
+			"description": "Participant with app access",
+		},
+	}
+
+	// Audit: Successful participant login
+	logger.Audit(c.Context(), logger.AuditEvent{
+		EventType:  logger.AuditLoginSuccess,
+		ActorID:    participantID,
+		ActorEmail: email,
+		IPAddress:  c.IP(),
+		UserAgent:  c.Get("User-Agent"),
+		Result:     logger.ResultSuccess,
+		Metadata: map[string]interface{}{
+			"user_type":         "participant",
+			"roles_count":       len(roleList),
+			"permissions_count": len(permissionList),
+		},
+	})
+
+	// Return participant login response
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"success":       true,
+		"token":         token,
+		"refresh_token": refreshToken,
+		"user": fiber.Map{
+			"id":          participantID,
+			"email":       email,
+			"naam":        "",             // Frontend can call /api/participants/me to get full data
+			"permissions": permissionList, // <-- Nu 100% consistent
+			"roles":       roleList,
+			"is_actief":   true,
+		},
+	})
+}
+
+// handleGebruikerLoginResponse creates response for gebruiker logins (admin/staff)
+func (h *AuthHandler) handleGebruikerLoginResponse(c *fiber.Ctx, token, refreshToken string, gebruiker *models.Gebruiker) error {
 	// Haal permissies op
 	permissions, err := h.permissionService.GetUserPermissions(c.Context(), gebruiker.ID)
 	if err != nil {
@@ -152,6 +224,7 @@ func (h *AuthHandler) HandleLogin(c *fiber.Ctx) error {
 		UserAgent:  c.Get("User-Agent"),
 		Result:     logger.ResultSuccess,
 		Metadata: map[string]interface{}{
+			"user_type":         "gebruiker",
 			"roles_count":       len(roleList),
 			"permissions_count": len(permissionList),
 		},

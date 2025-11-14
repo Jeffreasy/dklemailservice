@@ -19,6 +19,7 @@ func NewPostgresParticipantRepository(base *PostgresRepository) *PostgresPartici
 
 // Standaard kolommen voor een Participant "Persoon"
 // Alle event-specifieke data (steps, status, route) is hier bewust weggelaten.
+// V30: Uitgebreid met duaal registratiesysteem velden
 var participantColumns = []string{
 	"id",
 	"created_at",
@@ -29,6 +30,13 @@ var participantColumns = []string{
 	"terms",
 	"gebruiker_id",
 	"test_mode",
+	// V30: Duaal registratiesysteem
+	"account_type",
+	"registration_year",
+	"wachtwoord_hash",
+	"has_app_access",
+	"upgraded_to_gebruiker_id",
+	"upgraded_at",
 }
 
 // Create slaat een nieuwe participant op

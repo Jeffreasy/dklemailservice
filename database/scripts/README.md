@@ -78,6 +78,39 @@ Na grondige analyse zijn alle 16 database scripts beoordeeld en geconsolideerd. 
 
 ---
 
+## 🔧 V34 Refresh Token Fix (KRITIEK)
+
+### 6. `fix_v34_refresh_tokens.sql` - V34 Login Fix
+**Status:** 🔴 KRITIEK - MOET UITGEVOERD WORDEN
+- **Functie:** Verwijdert FK constraint op refresh_tokens voor participant support
+- **Probleem:** `refresh_tokens.user_id` heeft FK naar `gebruikers.id`, maar moet ook `participants.id` accepteren
+- **Oplossing:**
+  - Verwijdert foreign key constraint `refresh_tokens_user_id_fkey`
+  - Hernoemt kolom `user_id` → `owner_id` (duidelijkheid)
+  - Voegt index toe voor performance
+- **⚠️ URGENT:** Zonder deze fix kunnen participants NIET inloggen!
+- **Gebruik Local:**
+  ```bash
+  docker exec -i dkl-postgres psql -U postgres -d dkl_db \
+    < database/scripts/fix_v34_refresh_tokens.sql
+  ```
+- **Gebruik Production:**
+  ```bash
+  # Via Render Shell
+  psql $DATABASE_URL < fix_v34_refresh_tokens.sql
+  ```
+
+### 7. `rollback_v34_refresh_tokens.sql` - V34 Rollback
+**Status:** ⚠️ ROLLBACK BESCHIKBAAR
+- **Functie:** Rollback van V34 fix (indien nodig)
+- **⚠️ WAARSCHUWING:** Verwijdert ALLE participant refresh tokens!
+- **Wanneer gebruiken:** Alleen bij kritieke problemen
+- **Gebruik:** `psql $DATABASE_URL -f database/scripts/rollback_v34_refresh_tokens.sql`
+
+**Documentatie:** Zie [`docs/V34_LOGIN_FIX_INSTRUCTIONS.md`](../../docs/V34_LOGIN_FIX_INSTRUCTIONS.md)
+
+---
+
 ## 🗑️ Scripts die VERWIJDERD zijn (11 scripts)
 
 ### Eenmalige Hotfixes (al uitgevoerd in migrations)

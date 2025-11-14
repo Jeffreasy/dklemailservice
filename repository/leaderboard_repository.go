@@ -30,20 +30,22 @@ func NewLeaderboardRepository(db *gorm.DB) LeaderboardRepository {
 func (r *PostgresLeaderboardRepository) GetLeaderboard(ctx context.Context, filters models.LeaderboardFilters) (*models.LeaderboardResponse, error) {
 	var entries []models.LeaderboardEntry
 
-	// Build query met filters
+	// Build query met filters - FIXED: Join with event_registrations for steps and distance_route
 	query := `
 		SELECT
-			a.id,
-			a.naam,
-			a.afstand as route,
-			a.steps,
+			p.id,
+			p.naam,
+			COALESCE(er.distance_route, 'Unknown') as route,
+			COALESCE(er.steps, 0) as steps,
 			COALESCE(SUM(b.points), 0) as achievement_points,
-			a.steps + COALESCE(SUM(b.points), 0) as total_score,
-			RANK() OVER (ORDER BY (a.steps + COALESCE(SUM(b.points), 0)) DESC) as rank,
+			COALESCE(er.steps, 0) + COALESCE(SUM(b.points), 0) as total_score,
+			RANK() OVER (ORDER BY (COALESCE(er.steps, 0) + COALESCE(SUM(b.points), 0)) DESC) as rank,
 			COUNT(pa.id) as badge_count,
-			a.created_at as joined_at
-		FROM participants a
-		LEFT JOIN participant_achievements pa ON a.id = pa.participant_id
+			COALESCE(er.registered_at, p.created_at) as joined_at
+		FROM participants p
+		LEFT JOIN event_registrations er ON p.id = er.participant_id
+			AND er.event_id = (SELECT get_active_event())
+		LEFT JOIN participant_achievements pa ON p.id = pa.participant_id
 		LEFT JOIN badges b ON pa.badge_id = b.id AND b.is_active = true
 		WHERE 1=1
 	`
@@ -52,27 +54,27 @@ func (r *PostgresLeaderboardRepository) GetLeaderboard(ctx context.Context, filt
 
 	// Filter op route
 	if filters.Route != nil {
-		query += " AND a.afstand = ?"
+		query += " AND er.distance_route = ?"
 		args = append(args, *filters.Route)
 	}
 
 	// Filter op year (als je created_at gebruikt voor jaar filtering)
 	if filters.Year != nil {
-		query += " AND EXTRACT(YEAR FROM a.created_at) = ?"
+		query += " AND EXTRACT(YEAR FROM COALESCE(er.registered_at, p.created_at)) = ?"
 		args = append(args, *filters.Year)
 	}
 
 	query += `
-		GROUP BY a.id, a.naam, a.afstand, a.steps, a.created_at
+		GROUP BY p.id, p.naam, er.distance_route, er.steps, er.registered_at, p.created_at
 	`
 
 	// Filter op minimum steps
 	if filters.MinSteps != nil {
-		query += " HAVING a.steps >= ?"
+		query += " HAVING COALESCE(er.steps, 0) >= ?"
 		args = append(args, *filters.MinSteps)
 	}
 
-	query += " ORDER BY total_score DESC, a.steps DESC"
+	query += " ORDER BY total_score DESC, steps DESC"
 
 	// Limit voor top N
 	if filters.TopN != nil {
@@ -95,19 +97,21 @@ func (r *PostgresLeaderboardRepository) GetLeaderboard(ctx context.Context, filt
 	// Tel totaal entries (zonder limit)
 	var totalCount int64
 	countQuery := `
-		SELECT COUNT(DISTINCT a.id)
-		FROM participants a
+		SELECT COUNT(DISTINCT p.id)
+		FROM participants p
+		LEFT JOIN event_registrations er ON p.id = er.participant_id
+			AND er.event_id = (SELECT get_active_event())
 		WHERE 1=1
 	`
 	countArgs := []interface{}{}
 
 	if filters.Route != nil {
-		countQuery += " AND a.afstand = ?"
+		countQuery += " AND er.distance_route = ?"
 		countArgs = append(countArgs, *filters.Route)
 	}
 
 	if filters.Year != nil {
-		countQuery += " AND EXTRACT(YEAR FROM a.created_at) = ?"
+		countQuery += " AND EXTRACT(YEAR FROM COALESCE(er.registered_at, p.created_at)) = ?"
 		countArgs = append(countArgs, *filters.Year)
 	}
 
@@ -138,23 +142,25 @@ func (r *PostgresLeaderboardRepository) GetLeaderboard(ctx context.Context, filt
 func (r *PostgresLeaderboardRepository) GetParticipantRank(ctx context.Context, participantID string) (*models.ParticipantRankInfo, error) {
 	var info models.ParticipantRankInfo
 
-	// Haal rank en scores op voor participant
+	// Haal rank en scores op voor participant - FIXED: Join with event_registrations
 	query := `
 		WITH ranked_participants AS (
 			SELECT
-				a.id,
-				a.naam,
-				a.steps,
+				p.id,
+				p.naam,
+				COALESCE(er.steps, 0) as steps,
 				COALESCE(SUM(b.points), 0) as achievement_points,
-				a.steps + COALESCE(SUM(b.points), 0) as total_score,
+				COALESCE(er.steps, 0) + COALESCE(SUM(b.points), 0) as total_score,
 				COUNT(pa.id) as badge_count,
-				RANK() OVER (ORDER BY (a.steps + COALESCE(SUM(b.points), 0)) DESC) as rank
-			FROM participants a
-			LEFT JOIN participant_achievements pa ON a.id = pa.participant_id
+				RANK() OVER (ORDER BY (COALESCE(er.steps, 0) + COALESCE(SUM(b.points), 0)) DESC) as rank
+			FROM participants p
+			LEFT JOIN event_registrations er ON p.id = er.participant_id
+				AND er.event_id = (SELECT get_active_event())
+			LEFT JOIN participant_achievements pa ON p.id = pa.participant_id
 			LEFT JOIN badges b ON pa.badge_id = b.id AND b.is_active = true
-			GROUP BY a.id, a.naam, a.steps
+			GROUP BY p.id, p.naam, er.steps
 		)
-		SELECT 
+		SELECT
 			id as participant_id,
 			naam,
 			rank,
@@ -174,23 +180,26 @@ func (r *PostgresLeaderboardRepository) GetParticipantRank(ctx context.Context, 
 		return nil, err
 	}
 
-	// Haal participant boven me op
+	// Haal participant boven me op - FIXED: Join with event_registrations
 	var aboveMe models.LeaderboardEntry
 	aboveQuery := `
 		WITH ranked_participants AS (
 			SELECT
-				a.id,
-				a.naam,
-				a.afstand as route,
-				a.steps,
+				p.id,
+				p.naam,
+				COALESCE(er.distance_route, 'Unknown') as route,
+				COALESCE(er.steps, 0) as steps,
 				COALESCE(SUM(b.points), 0) as achievement_points,
-				a.steps + COALESCE(SUM(b.points), 0) as total_score,
+				COALESCE(er.steps, 0) + COALESCE(SUM(b.points), 0) as total_score,
 				COUNT(pa.id) as badge_count,
-				RANK() OVER (ORDER BY (a.steps + COALESCE(SUM(b.points), 0)) DESC) as rank
-			FROM participants a
-			LEFT JOIN participant_achievements pa ON a.id = pa.participant_id
+				COALESCE(er.registered_at, p.created_at) as joined_at,
+				RANK() OVER (ORDER BY (COALESCE(er.steps, 0) + COALESCE(SUM(b.points), 0)) DESC) as rank
+			FROM participants p
+			LEFT JOIN event_registrations er ON p.id = er.participant_id
+				AND er.event_id = (SELECT get_active_event())
+			LEFT JOIN participant_achievements pa ON p.id = pa.participant_id
 			LEFT JOIN badges b ON pa.badge_id = b.id AND b.is_active = true
-			GROUP BY a.id, a.naam, a.afstand, a.steps
+			GROUP BY p.id, p.naam, er.distance_route, er.steps, er.registered_at, p.created_at
 		)
 		SELECT *
 		FROM ranked_participants
@@ -203,23 +212,26 @@ func (r *PostgresLeaderboardRepository) GetParticipantRank(ctx context.Context, 
 		info.AboveMe = &aboveMe
 	}
 
-	// Haal participant onder me op
+	// Haal participant onder me op - FIXED: Join with event_registrations
 	var belowMe models.LeaderboardEntry
 	belowQuery := `
 		WITH ranked_participants AS (
 			SELECT
-				a.id,
-				a.naam,
-				a.afstand as route,
-				a.steps,
+				p.id,
+				p.naam,
+				COALESCE(er.distance_route, 'Unknown') as route,
+				COALESCE(er.steps, 0) as steps,
 				COALESCE(SUM(b.points), 0) as achievement_points,
-				a.steps + COALESCE(SUM(b.points), 0) as total_score,
+				COALESCE(er.steps, 0) + COALESCE(SUM(b.points), 0) as total_score,
 				COUNT(pa.id) as badge_count,
-				RANK() OVER (ORDER BY (a.steps + COALESCE(SUM(b.points), 0)) DESC) as rank
-			FROM participants a
-			LEFT JOIN participant_achievements pa ON a.id = pa.participant_id
+				COALESCE(er.registered_at, p.created_at) as joined_at,
+				RANK() OVER (ORDER BY (COALESCE(er.steps, 0) + COALESCE(SUM(b.points), 0)) DESC) as rank
+			FROM participants p
+			LEFT JOIN event_registrations er ON p.id = er.participant_id
+				AND er.event_id = (SELECT get_active_event())
+			LEFT JOIN participant_achievements pa ON p.id = pa.participant_id
 			LEFT JOIN badges b ON pa.badge_id = b.id AND b.is_active = true
-			GROUP BY a.id, a.naam, a.afstand, a.steps
+			GROUP BY p.id, p.naam, er.distance_route, er.steps, er.registered_at, p.created_at
 		)
 		SELECT *
 		FROM ranked_participants

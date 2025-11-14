@@ -79,19 +79,23 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 	// Initialiseer email batcher
 	emailBatcher := createEmailBatcher(emailService)
 
-	// Initialiseer auth service met RBAC support
-	authService := NewAuthServiceWithRBAC(
+	// Initialiseer auth service met RBAC en participant support
+	// V30+RBAC: Voegt participant repository toe voor app access validatie
+	authService := NewAuthServiceWithParticipantSupport(
 		repoFactory.Gebruiker,
 		repoFactory.RefreshToken,
-		repoFactory.UserRole, // RBAC support voor JWT token generation
+		repoFactory.UserRole,    // RBAC support voor JWT token generation
+		repoFactory.Participant, // V30+RBAC: Voor app access checks bij login
 	)
 
-	// Initialiseer permission service met Redis caching
-	permissionService := NewPermissionServiceWithRedis(
+	// Initialiseer permission service met Redis caching en participant support
+	// V30+RBAC: Voegt participant repository toe voor app access checks
+	permissionService := NewPermissionServiceWithParticipantSupport(
 		repoFactory.RBACRole,
 		repoFactory.Permission,
 		repoFactory.RolePermission,
 		repoFactory.UserRole,
+		repoFactory.Participant, // V30+RBAC: Voor participant app access validatie
 		redisClient,
 	)
 
