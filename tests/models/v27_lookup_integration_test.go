@@ -3,7 +3,6 @@ package models_test
 import (
 	"dklautomationgo/models"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -11,12 +10,7 @@ import (
 // TestEvent_V27_StatusFieldMapping tests that Event.Status maps correctly to database
 func TestEvent_V27_StatusFieldMapping(t *testing.T) {
 	event := &models.Event{
-		ID:          "test-event-id",
-		Name:        "Test Event",
-		Description: "Test Description",
-		StartTime:   time.Now(),
-		Status:      models.EventStatusUpcoming, // Database column: 'status'
-		IsActive:    true,
+		Status: models.EventStatusUpcoming, // Database column: 'status'
 	}
 
 	// Verify Status field is a string (not pointer)
@@ -28,44 +22,33 @@ func TestEvent_V27_StatusFieldMapping(t *testing.T) {
 	assert.Equal(t, models.EventStatusActive, event.Status)
 
 	// Test default status
-	newEvent := &models.Event{
-		ID:        "new-event",
-		Name:      "New Event",
-		StartTime: time.Now(),
-	}
+	newEvent := &models.Event{}
 	// Status should be set via GORM default tag
 	assert.Equal(t, "", newEvent.Status) // Empty until saved to DB
 }
 
 // TestEvent_V27_StatusTypePreload tests StatusType relation can be preloaded
 func TestEvent_V27_StatusTypePreload(t *testing.T) {
-	event := &models.Event{
-		ID:     "test-event",
-		Name:   "Test Event",
-		Status: models.EventStatusActive,
-	}
+	event := &models.Event{}
 
 	// StatusType should be available for preloading
 	assert.NotNil(t, event.StatusType)
 
 	// Simulate preloaded StatusType
 	event.StatusType = models.EventStatusType{
-		Type:        models.EventStatusActive,
+		Status:      models.EventStatusActive,
 		Description: "Event is currently active",
 	}
 
-	assert.Equal(t, models.EventStatusActive, event.StatusType.Type)
+	assert.Equal(t, models.EventStatusActive, event.StatusType.Status)
 	assert.Equal(t, "Event is currently active", event.StatusType.Description)
 }
 
 // TestNotification_V27_TypeAndPriorityFieldMapping tests Notification field mapping
 func TestNotification_V27_TypeAndPriorityFieldMapping(t *testing.T) {
 	notification := &models.Notification{
-		ID:       "test-notification",
 		Type:     models.NotificationTypeContact,  // Database column: 'type'
 		Priority: models.NotificationPriorityHigh, // Database column: 'priority'
-		Title:    "Test Notification",
-		Message:  "Test Message",
 	}
 
 	// Verify fields are strings (not pointers)
@@ -84,20 +67,16 @@ func TestNotification_V27_TypeAndPriorityFieldMapping(t *testing.T) {
 
 // TestNotification_V27_LookupPreload tests lookup relation preloading
 func TestNotification_V27_LookupPreload(t *testing.T) {
-	notification := &models.Notification{
-		ID:       "test-notification",
-		Type:     models.NotificationTypeContact,
-		Priority: models.NotificationPriorityHigh,
-	}
+	notification := &models.Notification{}
 
 	// Simulate preloaded lookups
 	notification.TypeLookup = models.NotificationType{
-		Type:        models.NotificationTypeContact,
+		Name:        models.NotificationTypeContact,
 		Description: "Contact form notification",
 	}
 
 	notification.PriorityLookup = models.NotificationPriorityType{
-		Type:        models.NotificationPriorityHigh,
+		Name:        models.NotificationPriorityHigh,
 		Description: "High priority notification",
 	}
 
@@ -108,12 +87,7 @@ func TestNotification_V27_LookupPreload(t *testing.T) {
 // TestContactFormulier_V27_StatusFieldMapping tests Contact status field
 func TestContactFormulier_V27_StatusFieldMapping(t *testing.T) {
 	contact := &models.ContactFormulier{
-		ID:             "test-contact",
-		Naam:           "Test User",
-		Email:          "test@example.com",
-		Bericht:        "Test message",
-		Status:         "nieuw", // Database column: 'status'
-		PrivacyAkkoord: true,
+		Status: "nieuw", // Database column: 'status'
 	}
 
 	// Verify Status field is a string (not pointer)
@@ -127,14 +101,11 @@ func TestContactFormulier_V27_StatusFieldMapping(t *testing.T) {
 
 // TestContactFormulier_V27_StatusTypePreload tests StatusType relation
 func TestContactFormulier_V27_StatusTypePreload(t *testing.T) {
-	contact := &models.ContactFormulier{
-		ID:     "test-contact",
-		Status: "nieuw",
-	}
+	contact := &models.ContactFormulier{}
 
 	// Simulate preloaded StatusType
 	contact.StatusType = models.ContactStatusType{
-		Type:        "nieuw",
+		Status:      "nieuw",
 		Description: "Nieuwe contactaanvraag",
 	}
 
@@ -144,12 +115,7 @@ func TestContactFormulier_V27_StatusTypePreload(t *testing.T) {
 // TestChatChannel_V27_TypeFieldMapping tests ChatChannel type field
 func TestChatChannel_V27_TypeFieldMapping(t *testing.T) {
 	channel := &models.ChatChannel{
-		ID:        "test-channel",
-		Name:      "Test Channel",
-		Type:      "public", // Database column: 'type'
-		CreatedBy: "user-id",
-		IsActive:  true,
-		IsPublic:  true,
+		Type: "public", // Database column: 'type'
 	}
 
 	// Verify Type field is a string (not pointer)
@@ -163,10 +129,7 @@ func TestChatChannel_V27_TypeFieldMapping(t *testing.T) {
 
 // TestChatChannel_V27_TypeLookupPreload tests TypeLookup relation
 func TestChatChannel_V27_TypeLookupPreload(t *testing.T) {
-	channel := &models.ChatChannel{
-		ID:   "test-channel",
-		Type: "direct",
-	}
+	channel := &models.ChatChannel{}
 
 	// Simulate preloaded TypeLookup
 	channel.TypeLookup = models.ChatChannelType{
@@ -220,10 +183,9 @@ func TestV27_NoPointerFields(t *testing.T) {
 // TestEventResponse_V27_BackwardsCompatibility tests API response structure
 func TestEventResponse_V27_BackwardsCompatibility(t *testing.T) {
 	event := &models.Event{
-		ID:        "test-event",
-		Name:      "Test Event",
-		StartTime: time.Now(),
-		Status:    models.EventStatusActive,
+		ID:     "test-event",
+		Name:   "Test Event",
+		Status: models.EventStatusActive,
 	}
 
 	resp := event.ToResponse()

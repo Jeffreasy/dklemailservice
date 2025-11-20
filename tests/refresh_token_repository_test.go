@@ -17,7 +17,7 @@ import (
 func TestRefreshToken_IsValid_ValidToken(t *testing.T) {
 	token := &models.RefreshToken{
 		ID:        "token-123",
-		UserID:    "user-123",
+		OwnerID:   "user-123",
 		Token:     "valid-token",
 		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
 		IsRevoked: false,
@@ -30,7 +30,7 @@ func TestRefreshToken_IsValid_ValidToken(t *testing.T) {
 func TestRefreshToken_IsValid_ExpiredToken(t *testing.T) {
 	token := &models.RefreshToken{
 		ID:        "token-expired",
-		UserID:    "user-123",
+		OwnerID:    "user-123",
 		Token:     "expired-token",
 		ExpiresAt: time.Now().Add(-1 * time.Hour), // Expired 1 hour ago
 		IsRevoked: false,
@@ -43,7 +43,7 @@ func TestRefreshToken_IsValid_ExpiredToken(t *testing.T) {
 func TestRefreshToken_IsValid_RevokedToken(t *testing.T) {
 	token := &models.RefreshToken{
 		ID:        "token-revoked",
-		UserID:    "user-123",
+		OwnerID:    "user-123",
 		Token:     "revoked-token",
 		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
 		IsRevoked: true, // Revoked
@@ -57,7 +57,7 @@ func TestRefreshToken_IsValid_RevokedToken(t *testing.T) {
 func TestRefreshToken_IsValid_RevokedAndExpired(t *testing.T) {
 	token := &models.RefreshToken{
 		ID:        "token-both",
-		UserID:    "user-123",
+		OwnerID:    "user-123",
 		Token:     "both-invalid",
 		ExpiresAt: time.Now().Add(-1 * time.Hour), // Expired
 		IsRevoked: true,                           // AND revoked
@@ -72,7 +72,7 @@ func TestRefreshToken_IsValid_EdgeCase_ExactlyExpiring(t *testing.T) {
 	// Token expiring in exactly 1 second
 	token := &models.RefreshToken{
 		ID:        "token-edge",
-		UserID:    "user-123",
+		OwnerID:    "user-123",
 		Token:     "edge-token",
 		ExpiresAt: time.Now().Add(1 * time.Second),
 		IsRevoked: false,
@@ -97,7 +97,7 @@ func TestRefreshTokenRepo_Create_Success(t *testing.T) {
 	mockRepo := new(AuthMockRefreshTokenRepository)
 
 	token := &models.RefreshToken{
-		UserID:    "user-create-123",
+		OwnerID:    "user-create-123",
 		Token:     "new-refresh-token",
 		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
 		IsRevoked: false,
@@ -117,7 +117,7 @@ func TestRefreshTokenRepo_GetByToken_Success(t *testing.T) {
 
 	expectedToken := &models.RefreshToken{
 		ID:        "token-get-123",
-		UserID:    "user-123",
+		OwnerID:    "user-123",
 		Token:     "find-this-token",
 		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
 		IsRevoked: false,
@@ -131,7 +131,7 @@ func TestRefreshTokenRepo_GetByToken_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, token)
 	assert.Equal(t, "find-this-token", token.Token)
-	assert.Equal(t, "user-123", token.UserID)
+	assert.Equal(t, "user-123", token.OwnerID)
 	assert.False(t, token.IsRevoked)
 
 	mockRepo.AssertExpectations(t)
@@ -196,7 +196,7 @@ func TestRefreshToken_LifecycleSimulation(t *testing.T) {
 
 	// Step 1: Create token
 	newToken := &models.RefreshToken{
-		UserID:    "user-lifecycle",
+		OwnerID:    "user-lifecycle",
 		Token:     "lifecycle-token",
 		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
 		IsRevoked: false,
@@ -280,7 +280,7 @@ func TestRefreshToken_ExpirationScenarios(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			token := &models.RefreshToken{
-				UserID:    "user-exp",
+				OwnerID:    "user-exp",
 				Token:     "exp-token",
 				ExpiresAt: time.Now().Add(tc.expiresIn),
 				IsRevoked: false,

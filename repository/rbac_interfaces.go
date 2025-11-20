@@ -124,3 +124,24 @@ type UserRoleRepository interface {
 	// GetUserPermissions retrieves all permissions for a user
 	GetUserPermissions(ctx context.Context, userID string) ([]*models.UserPermission, error)
 }
+
+// AccessTokenRepository defines the interface for access token operations
+type AccessTokenRepository interface {
+	// Create creates a new access token
+	Create(ctx context.Context, token *models.AccessToken) error
+
+	// GetByToken retrieves an access token by token string
+	GetByToken(ctx context.Context, token string) (*models.AccessToken, error)
+
+	// UpdateSessionID updates the session ID for an access token
+	UpdateSessionID(ctx context.Context, token, sessionID string) error
+
+	// RevokeToken marks an access token as revoked
+	RevokeToken(ctx context.Context, token string) error
+
+	// RevokeAllUserTokens revokes all access tokens for a user
+	RevokeAllUserTokens(ctx context.Context, userID string) error
+
+	// DeleteExpired removes expired access tokens
+	DeleteExpired(ctx context.Context) error
+}

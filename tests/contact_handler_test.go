@@ -86,7 +86,6 @@ func TestContactHandler_ListContactFormulieren(t *testing.T) {
 	adminUser := &models.Gebruiker{
 		ID:    "admin1",
 		Email: "admin@example.com",
-		Rol:   "admin",
 	}
 
 	// Setup auth mock
@@ -213,7 +212,6 @@ func TestContactHandler_GetContactFormulier(t *testing.T) {
 	adminUser := &models.Gebruiker{
 		ID:    "admin1",
 		Email: "admin@example.com",
-		Rol:   "admin",
 	}
 
 	// Setup auth mock
@@ -318,7 +316,6 @@ func TestContactHandler_UpdateContactFormulier(t *testing.T) {
 	adminUser := &models.Gebruiker{
 		ID:    "admin1",
 		Email: "admin@example.com",
-		Rol:   "admin",
 	}
 
 	// Setup auth mock
@@ -440,7 +437,6 @@ func TestContactHandler_DeleteContactFormulier(t *testing.T) {
 	adminUser := &models.Gebruiker{
 		ID:    "admin1",
 		Email: "admin@example.com",
-		Rol:   "admin",
 	}
 
 	// Setup auth mock
@@ -564,7 +560,6 @@ func TestContactHandler_AddContactAntwoord(t *testing.T) {
 	adminUser := &models.Gebruiker{
 		ID:    "admin1",
 		Email: "admin@example.com",
-		Rol:   "admin",
 	}
 
 	// Setup auth mock
@@ -735,7 +730,6 @@ func TestContactHandler_GetContactFormulierenByStatus(t *testing.T) {
 	adminUser := &models.Gebruiker{
 		ID:    "admin1",
 		Email: "admin@example.com",
-		Rol:   "admin",
 	}
 
 	// Setup auth mock

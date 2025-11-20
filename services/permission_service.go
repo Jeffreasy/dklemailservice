@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors" // OPLOSSING: Importeer errors package
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -108,6 +109,14 @@ func (s *PermissionServiceImpl) HasPermission(ctx context.Context, userID, resou
 			// ===================================
 			// PAD A: Gebruiker IS een Participant
 			// ===================================
+			logger.Info("User is a participant, checking participant permissions",
+				"user_id", userID,
+				"resource", resource,
+				"action", action,
+				"account_type", participant.AccountType,
+				"has_app_access", participant.HasAppAccess,
+				"gebruiker_id", participant.GebruikerID)
+
 			hasPermission = s.checkParticipantPermission(participant, resource, action)
 
 			if !hasPermission {
@@ -152,13 +161,31 @@ func (s *PermissionServiceImpl) HasPermission(ctx context.Context, userID, resou
 
 	hasPermission = s.checkPermissionInList(permissions, resource, action)
 
-	// Log alleen bij permission denied voor debugging
+	// Log altijd voor debugging van admin toegang problemen
 	if !hasPermission {
-		logger.Warn("Permission denied (RBAC)",
-			"user_id", userID,
-			"resource", resource,
-			"action", action,
-			"permissions_count", len(permissions))
+		// Extra logging voor admin access problemen
+		if resource == "admin" && action == "access" {
+			roles, _ := s.GetUserRoles(ctx, userID)
+			roleNames := make([]string, len(roles))
+			for i, role := range roles {
+				roleNames[i] = role.Role.Name
+			}
+			logger.Warn("ADMIN ACCESS DENIED - Detailed analysis",
+				"user_id", userID,
+				"resource", resource,
+				"action", action,
+				"permissions_count", len(permissions),
+				"roles_count", len(roles),
+				"role_names", roleNames,
+				"available_permissions", s.formatPermissionsList(permissions))
+		} else {
+			logger.Warn("Permission denied (RBAC)",
+				"user_id", userID,
+				"resource", resource,
+				"action", action,
+				"permissions_count", len(permissions),
+				"available_permissions", s.formatPermissionsList(permissions))
+		}
 	} else {
 		logger.Debug("Permission granted (RBAC)",
 			"user_id", userID,
@@ -182,6 +209,20 @@ func (s *PermissionServiceImpl) checkPermissionInList(permissions []*models.User
 		}
 	}
 	return false
+}
+
+// formatPermissionsList formatteert een lijst van permissies voor logging
+func (s *PermissionServiceImpl) formatPermissionsList(permissions []*models.UserPermission) string {
+	if len(permissions) == 0 {
+		return "none"
+	}
+
+	var permStrings []string
+	for _, perm := range permissions {
+		permStrings = append(permStrings, fmt.Sprintf("%s:%s", perm.Resource, perm.Action))
+	}
+
+	return strings.Join(permStrings, ", ")
 }
 
 // checkParticipantPermission controleert participant permissions (V34)
@@ -229,8 +270,17 @@ func (s *PermissionServiceImpl) checkParticipantPermission(participant *models.P
 }
 
 // GetUserPermissions haalt alle permissies op voor een gebruiker
+// RBAC: Only uses user_roles system (legacy role_id removed)
 func (s *PermissionServiceImpl) GetUserPermissions(ctx context.Context, userID string) ([]*models.UserPermission, error) {
-	return s.userRoleRepo.GetUserPermissions(ctx, userID)
+	// Get permissions from user_roles table only
+	permissions, err := s.userRoleRepo.GetUserPermissions(ctx, userID)
+	if err != nil {
+		logger.Error("Error getting user permissions from user_roles", "user_id", userID, "error", err)
+		return nil, err
+	}
+
+	logger.Debug("Retrieved permissions from user_roles", "user_id", userID, "permissions_count", len(permissions))
+	return permissions, nil
 }
 
 // GetUserRoles haalt alle actieve rollen op voor een gebruiker

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestEmailHandlerFlow(t *testing.T) {
@@ -75,6 +76,9 @@ func TestEmailHandlerFlow(t *testing.T) {
 			mockParticipantRepo := new(mocks.MockParticipantRepository)
 			mockEventRegRepo := new(mocks.MockEventRegistrationRepository)
 			mockEventRepo := new(mocks.MockEventRepository)
+
+			// Setup mock expectations
+			mockNotificationService.On("CreateNotification", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&models.Notification{ID: "test-notification"}, nil)
 
 			// Stel shouldFail in als we een error willen simuleren
 			if tt.name == "Email verzending mislukt" {

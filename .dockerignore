@@ -10,12 +10,14 @@
 # Documentation
 *.md
 README.md
-docs/
 
 # Test files
 *_test.go
 tests/
 testscripts/
+
+# API tester (standalone tool with main function)
+api_tester.go
 
 # Build artifacts
 *.exe

@@ -108,7 +108,7 @@ func (h *EventRegistrationHandler) GetRegistration(c *fiber.Ctx) error {
 // @Summary Registratie bijwerken (status, notities)
 // @Tags Registration
 // @Param id path string true "Event Registration ID"
-// @Param body body object{ status_key=string, notities=string } true "Update data"
+// @Param body body models.UpdateEventRegistrationRequest true "Update data"
 // @Router /api/registration/{id} [put]
 // @Security BearerAuth
 func (h *EventRegistrationHandler) UpdateRegistration(c *fiber.Ctx) error {
@@ -136,11 +136,7 @@ func (h *EventRegistrationHandler) UpdateRegistration(c *fiber.Ctx) error {
 	}
 
 	// Haal update gegevens op uit request body
-	var updateData struct {
-		Status   string  `json:"status"` // V27: Direct field (database column is 'status')
-		Notities *string `json:"notities"`
-		// Voeg hier andere update-bare velden toe (bv. Steps, TotalDistance)
-	}
+	var updateData models.UpdateEventRegistrationRequest
 
 	if err := c.BodyParser(&updateData); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Ongeldige gegevens"})

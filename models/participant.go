@@ -22,7 +22,7 @@ type Participant struct {
 	Naam        string    `json:"naam" gorm:"not null"`
 	Email       string    `json:"email" gorm:"not null;index"`
 	Telefoon    string    `json:"telefoon"`
-	Terms       bool      `json:"terms" gorm:"not null"` // 'terms' bleef op Participant (V28)
+	Terms       bool      `json:"terms" gorm:"not null;default:false"` // 'terms' bleef op Participant (V28)
 	GebruikerID *string   `json:"gebruiker_id,omitempty" gorm:"type:uuid;index;column:gebruiker_id"`
 	TestMode    bool      `json:"test_mode" gorm:"default:false"` // Dit veld ontbrak nog (uit V1)
 
@@ -86,6 +86,9 @@ type PublicRegistrationRequest struct {
 	Afstand        string `json:"afstand" binding:"required,oneof='2.5 KM' '6 KM' '10 KM' '15 KM'"`
 	Ondersteuning  string `json:"ondersteuning" binding:"required,oneof=Ja Nee Anders"`
 	Bijzonderheden string `json:"bijzonderheden"` // Verplicht als Ondersteuning = Ja of Anders
+
+	// V37: Transport vraag
+	HeeftVervoer *bool `json:"heeft_vervoer" binding:"required"`
 
 	// Account keuze - V30: Nieuw duaal systeem
 	WantAccount bool    `json:"want_account"` // true = full account, false = temporary

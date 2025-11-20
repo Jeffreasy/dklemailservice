@@ -34,6 +34,7 @@ type ServiceFactory struct {
 	RedisClient         *redis.Client
 	GamificationService *GamificationService
 	NotulenService      *NotulenService
+	DashboardService    *DashboardService
 }
 
 // GetRateLimiter retourneert de RateLimiter als het concrete type
@@ -81,15 +82,26 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 
 	// Initialiseer auth service met RBAC en participant support
 	// V30+RBAC: Voegt participant repository toe voor app access validatie
+	// RBAC: Voegt rbacRoleRepo toe voor role management
+	// Email Verification: Voegt email verification token repository en email service toe
+	// Access Token Rotation: Voegt access token repository toe voor server-side opslag
+	// Session Management: Voegt session repository toe voor multi-device session tracking
 	authService := NewAuthServiceWithParticipantSupport(
 		repoFactory.Gebruiker,
 		repoFactory.RefreshToken,
-		repoFactory.UserRole,    // RBAC support voor JWT token generation
-		repoFactory.Participant, // V30+RBAC: Voor app access checks bij login
+		repoFactory.AccessToken,            // Access Token Rotation: Voor server-side token opslag
+		repoFactory.PasswordResetToken,     // Password reset token support
+		repoFactory.EmailVerificationToken, // Email verification token support
+		repoFactory.UserRole,               // RBAC support voor JWT token generation
+		repoFactory.RBACRole,               // RBAC: Voor role management
+		repoFactory.Participant,            // V30+RBAC: Voor app access checks bij login
+		repoFactory.Session,                // Session Management: Voor session tracking
+		emailService,                       // Email Verification: Voor verzenden verificatie emails
 	)
 
 	// Initialiseer permission service met Redis caching en participant support
 	// V30+RBAC: Voegt participant repository toe voor app access checks
+	// Legacy role_id system removed
 	permissionService := NewPermissionServiceWithParticipantSupport(
 		repoFactory.RBACRole,
 		repoFactory.Permission,
@@ -151,6 +163,18 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 	// Initialize NotulenService
 	notulenService := NewNotulenService(repoFactory.Notulen.(*repository.PostgresNotulenRepository), &authService, permissionService, notulenHub)
 
+	// Initialize DashboardService
+	dashboardService := NewDashboardService(
+		repoFactory.Participant,
+		repoFactory.Event,
+		repoFactory.EventRegistration,
+		repoFactory.Contact,
+		repoFactory.Newsletter,
+		repoFactory.Gebruiker,
+		emailMetrics,
+		rateLimiter,
+	)
+
 	return &ServiceFactory{
 		EmailService:        emailService,
 		SMTPClient:          smtpClient,
@@ -170,6 +194,7 @@ func NewServiceFactory(repoFactory *repository.Repository) *ServiceFactory {
 		RedisClient:         redisClient,
 		GamificationService: gamificationService,
 		NotulenService:      notulenService,
+		DashboardService:    dashboardService,
 	}
 }
 

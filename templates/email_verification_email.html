@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verifieer je email - De Koninklijke Loop</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background: #fff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #ff9328 0%, #ff7a00 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+        }
+        .content {
+            padding: 30px;
+        }
+        .highlight-box {
+            background: #fff7ed;
+            border-left: 4px solid #ff9328;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .highlight-box strong {
+            color: #ff9328;
+        }
+        .verification-section {
+            background: #f9fafb;
+            padding: 25px;
+            border-radius: 8px;
+            margin: 25px 0;
+            text-align: center;
+        }
+        .verification-section h2 {
+            margin-top: 0;
+            color: #ff9328;
+            font-size: 24px;
+        }
+        .button {
+            display: inline-block;
+            background: #ff9328;
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 16px;
+            margin: 15px 5px;
+            transition: background-color 0.3s ease;
+        }
+        .button:hover {
+            background: #ff7a00;
+        }
+        .alternative-text {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-family: monospace;
+            word-break: break-all;
+        }
+        .warning-box {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .warning-box strong {
+            color: #d97706;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            background: #f9fafb;
+            color: #6b7280;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 Verifieer je email</h1>
+            <p>Welkom bij De Koninklijke Loop!</p>
+        </div>
+
+        <div class="content">
+            <p>Beste {{.Naam}},</p>
+
+            <p>Bedankt voor je registratie bij De Koninklijke Loop! Voordat je kunt beginnen met het gebruiken van je account, moeten we je email adres verifiëren.</p>
+
+            <div class="highlight-box">
+                <p><strong>📧 Klik op de onderstaande knop om je email te verifiëren:</strong></p>
+            </div>
+
+            <div class="verification-section">
+                <h2>Verificatie Link</h2>
+                <p>Klik op de knop hieronder om je account te activeren:</p>
+                <a href="{{.VerificationLink}}" class="button">Verifieer mijn email</a>
+            </div>
+
+            <div class="warning-box">
+                <p><strong>⚠️ Belangrijk:</strong> Deze verificatie link verloopt over {{.ExpiryHours}} uur. Zorg ervoor dat je je email verifieert voordat de link verloopt.</p>
+            </div>
+
+            <p>Als de knop niet werkt, kopieer dan de volgende link en plak deze in je browser:</p>
+
+            <div class="alternative-text">
+                {{.VerificationLink}}
+            </div>
+
+            <p><strong>Wat gebeurt er na verificatie?</strong></p>
+            <ul>
+                <li>Je account wordt geactiveerd</li>
+                <li>Je kunt inloggen op de website en app</li>
+                <li>Je ontvangt toegang tot alle DKL functies</li>
+                <li>Je kunt beginnen met het verdienen van badges en achievements</li>
+            </ul>
+
+            <p>Als je geen account hebt aangemaakt bij De Koninklijke Loop, negeer dan deze email.</p>
+
+            <p>Heb je problemen met de verificatie? Neem dan contact met ons op via <a href="mailto:info@dekoninklijkeloop.nl" style="color: #ff9328;">info@dekoninklijkeloop.nl</a>.</p>
+
+            <p>We kijken ernaar uit om je te verwelkomen in de DKL community!</p>
+
+            <p>Met sportieve groet,<br>
+            Het DKL Team</p>
+        </div>
+
+        <div class="footer">
+            <p>De Koninklijke Loop 2026</p>
+            <p><a href="https://dekoninklijkeloop.nl" style="color: #ff9328;">www.dekoninklijkeloop.nl</a> | info@dekoninklijkeloop.nl</p>
+            <p style="font-size: 12px; color: #9ca3af;">Deze email is automatisch verzonden. Beantwoord deze email niet.</p>
+        </div>
+    </div>
+</body>
+</html>

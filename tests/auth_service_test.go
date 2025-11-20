@@ -134,7 +134,6 @@ func TestAuthService_Login_Success(t *testing.T) {
 		Email:          "test@dekoninklijkeloop.nl",
 		Naam:           "Test User",
 		WachtwoordHash: string(hashedPassword),
-		Rol:            "admin",
 		IsActief:       true,
 		LaatsteLogin:   nil,
 	}
@@ -174,7 +173,6 @@ func TestAuthService_Login_Success(t *testing.T) {
 	require.NoError(t, err)
 	claims := token.Claims.(*services.JWTClaims)
 	assert.Equal(t, "test@dekoninklijkeloop.nl", claims.Email)
-	assert.Equal(t, "admin", claims.Role)
 	assert.Equal(t, []string{"admin"}, claims.Roles)
 	assert.True(t, claims.RBACActive)
 	assert.Equal(t, "user-123", claims.Subject)
@@ -323,7 +321,7 @@ func TestAuthService_ValidateToken_ExpiredToken(t *testing.T) {
 	// Create an expired token manually
 	claims := services.JWTClaims{
 		Email: "expired@dekoninklijkeloop.nl",
-		Role:  "user",
+		Roles: []string{"user"},
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now().Add(-2 * time.Hour)),
@@ -393,13 +391,12 @@ func TestAuthService_RefreshAccessToken_Success(t *testing.T) {
 		ID:       "user-refresh-123",
 		Email:    "refresh@dekoninklijkeloop.nl",
 		Naam:     "Refresh User",
-		Rol:      "user",
 		IsActief: true,
 	}
 
 	validRefreshToken := &models.RefreshToken{
 		ID:        "token-123",
-		UserID:    "user-refresh-123",
+		OwnerID:   "user-refresh-123",
 		Token:     "valid-refresh-token-xyz",
 		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
 		IsRevoked: false,
@@ -449,7 +446,7 @@ func TestAuthService_RefreshAccessToken_ExpiredToken(t *testing.T) {
 
 	expiredRefreshToken := &models.RefreshToken{
 		ID:        "token-expired",
-		UserID:    "user-123",
+		OwnerID:   "user-123",
 		Token:     "expired-token",
 		ExpiresAt: time.Now().Add(-1 * time.Hour), // Expired 1 hour ago
 		IsRevoked: false,
@@ -481,7 +478,7 @@ func TestAuthService_RefreshAccessToken_InactiveUser(t *testing.T) {
 	}
 
 	validRefreshToken := &models.RefreshToken{
-		UserID:    "user-inactive-456",
+		OwnerID:   "user-inactive-456",
 		Token:     "valid-but-user-inactive",
 		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
 		IsRevoked: false,
@@ -603,7 +600,6 @@ func TestAuthService_Login_WithRBACRoles(t *testing.T) {
 		ID:             "user-rbac-123",
 		Email:          "rbac@dekoninklijkeloop.nl",
 		WachtwoordHash: string(hashedPassword),
-		Rol:            "admin",
 		IsActief:       true,
 	}
 
@@ -666,7 +662,6 @@ func TestAuthService_Login_WithoutRBAC_FallbackToLegacy(t *testing.T) {
 		ID:             "user-legacy-123",
 		Email:          "legacy@dekoninklijkeloop.nl",
 		WachtwoordHash: string(hashedPassword),
-		Rol:            "user",
 		IsActief:       true,
 	}
 
@@ -689,8 +684,7 @@ func TestAuthService_Login_WithoutRBAC_FallbackToLegacy(t *testing.T) {
 	require.NoError(t, err)
 
 	claims := token.Claims.(*services.JWTClaims)
-	assert.Equal(t, "user", claims.Role) // Legacy field
-	assert.Empty(t, claims.Roles)        // No RBAC roles
+	assert.Empty(t, claims.Roles) // No RBAC roles
 	assert.False(t, claims.RBACActive)
 
 	mockUserRepo.AssertExpectations(t)

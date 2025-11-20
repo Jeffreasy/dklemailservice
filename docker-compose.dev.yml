@@ -87,11 +87,11 @@ services:
       INFO_EMAIL_PASSWORD: ${INFO_EMAIL_PASSWORD}
       INSCHRIJVING_EMAIL: ${INSCHRIJVING_EMAIL}
       INSCHRIJVING_EMAIL_PASSWORD: ${INSCHRIJVING_EMAIL_PASSWORD}
-      IMAP_SERVER: ${IMAP_SERVER:-imap.gmail.com}
+      IMAP_SERVER: ${IMAP_SERVER:-imap.hostnet.nl}
       IMAP_PORT: ${IMAP_PORT:-993}
 
-      # Disable auto email fetch in development
-      DISABLE_AUTO_EMAIL_FETCH: "true"
+      # Enable auto email fetch for debugging
+      DISABLE_AUTO_EMAIL_FETCH: "false"
 
       # Notifications (optional)
       ENABLE_NOTIFICATIONS: ${ENABLE_NOTIFICATIONS:-false}

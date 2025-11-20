@@ -52,17 +52,17 @@ func (h *ParticipantHandler) RegisterRoutes(app *fiber.App) {
 	participantApi := app.Group("/api/participant", AuthMiddleware(h.authService))
 
 	participantApi.Get("/",
-		PermissionMiddleware(h.permissionService, "participant", "read"),
+		PermissionMiddleware(h.permissionService, "participant", "view_all_registrations"),
 		h.ListParticipants)
 
 	// GET /api/participant/emails - Specifieke route VOOR generieke /:id route
 	// Dit voorkomt dat /emails wordt gematcht als /:id met id="emails"
 	participantApi.Get("/emails",
-		PermissionMiddleware(h.permissionService, "participant", "read"),
+		AdminOrStaffPermissionMiddleware(h.permissionService),
 		h.GetParticipantEmails)
 
 	participantApi.Get("/:id",
-		PermissionMiddleware(h.permissionService, "participant", "read"),
+		PermissionMiddleware(h.permissionService, "participant", "view_all_registrations"),
 		h.GetParticipant)
 
 	participantApi.Post("/:id/antwoord",
@@ -81,16 +81,16 @@ func (h *ParticipantHandler) RegisterRoutes(app *fiber.App) {
 	participantsApi := app.Group("/api/participants", AuthMiddleware(h.authService))
 
 	participantsApi.Get("/",
-		PermissionMiddleware(h.permissionService, "participant", "read"),
+		PermissionMiddleware(h.permissionService, "participant", "view_all_registrations"),
 		h.ListParticipants)
 
 	// Specifieke /emails route ook voor plural alias
 	participantsApi.Get("/emails",
-		PermissionMiddleware(h.permissionService, "participant", "read"),
+		AdminOrStaffPermissionMiddleware(h.permissionService),
 		h.GetParticipantEmails)
 
 	participantsApi.Get("/:id",
-		PermissionMiddleware(h.permissionService, "participant", "read"),
+		PermissionMiddleware(h.permissionService, "participant", "view_all_registrations"),
 		h.GetParticipant)
 
 	participantsApi.Post("/:id/antwoord",

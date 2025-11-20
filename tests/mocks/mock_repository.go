@@ -730,6 +730,21 @@ func (m *MockPermissionService) RefreshCache(ctx context.Context) error {
 	return nil
 }
 
+// CanParticipantRegisterForEvent controleert of een participant zich kan registreren voor een event
+func (m *MockPermissionService) CanParticipantRegisterForEvent(ctx context.Context, userID string) bool {
+	return true
+}
+
+// GetParticipantPermissionLevel haalt het permission level van een participant op
+func (m *MockPermissionService) GetParticipantPermissionLevel(ctx context.Context, userID string) string {
+	return "full"
+}
+
+// HasParticipantAppAccess controleert of een participant app toegang heeft
+func (m *MockPermissionService) HasParticipantAppAccess(ctx context.Context, userID string) bool {
+	return true
+}
+
 // MockEventRepository is een mock implementatie van EventRepository
 type MockEventRepository struct {
 	db *MockDB

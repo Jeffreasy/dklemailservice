@@ -167,7 +167,7 @@ func (h *SponsorHandler) GetSponsor(c *fiber.Ctx) error {
 // @Summary Create sponsor
 // @Description Creates a new sponsor. Supports both JSON and multipart/form-data for logo upload.
 // @Tags Sponsors
-// @Accept json,multipartFormData
+// @Accept json,multipart/form-data
 // @Produce json
 // @Param sponsor body models.Sponsor true "Sponsor data (JSON)"
 // @Param logo formData file false "Logo image file"

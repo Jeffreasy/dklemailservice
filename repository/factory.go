@@ -46,11 +46,15 @@ type Repository struct {
 	Leaderboard LeaderboardRepository
 
 	// RBAC repositories
-	RBACRole       RBACRoleRepository
-	Permission     PermissionRepository
-	RolePermission RolePermissionRepository
-	UserRole       UserRoleRepository
-	RefreshToken   RefreshTokenRepository
+	RBACRole               RBACRoleRepository
+	Permission             PermissionRepository
+	RolePermission         RolePermissionRepository
+	UserRole               UserRoleRepository
+	Session                SessionRepository
+	RefreshToken           RefreshTokenRepository
+	AccessToken            AccessTokenRepository
+	PasswordResetToken     PasswordResetTokenRepository
+	EmailVerificationToken EmailVerificationTokenRepository
 
 	// Notulen repository
 	Notulen NotulenRepository
@@ -99,11 +103,15 @@ func NewRepository(db *gorm.DB) *Repository {
 		Badge: NewBadgeRepository(db),
 
 		// RBAC repositories
-		RBACRole:       NewRBACRoleRepository(db),
-		Permission:     NewPermissionRepository(db),
-		RolePermission: NewRolePermissionRepository(db),
-		UserRole:       NewUserRoleRepository(db),
-		RefreshToken:   NewPostgresRefreshTokenRepository(baseRepo),
+		RBACRole:               NewRBACRoleRepository(db),
+		Permission:             NewPermissionRepository(db),
+		RolePermission:         NewRolePermissionRepository(db),
+		UserRole:               NewUserRoleRepository(db),
+		Session:                NewPostgresSessionRepository(baseRepo),
+		RefreshToken:           NewPostgresRefreshTokenRepository(baseRepo),
+		AccessToken:            NewPostgresAccessTokenRepository(baseRepo),
+		PasswordResetToken:     NewPostgresPasswordResetTokenRepository(baseRepo),
+		EmailVerificationToken: NewPostgresEmailVerificationTokenRepository(baseRepo),
 
 		// Notulen repository
 		Notulen: NewPostgresNotulenRepository(baseRepo),

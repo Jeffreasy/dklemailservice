@@ -5,13 +5,19 @@ System architecture and design documentation for the DKL Email Service.
 ## Overview
 
 The DKL Email Service is a comprehensive backend system built with Go, providing:
-- RESTful API endpoints
-- WebSocket real-time communication
-- JWT-based authentication with RBAC
-- PostgreSQL database with advanced features
-- Redis caching
-- Cloudinary media integration
-- Email template management
+- RESTful API endpoints with Fiber v2 framework
+- WebSocket real-time communication for live updates
+- Advanced JWT-based authentication with multi-session support
+- Dual account system (temporary/full accounts) with RBAC
+- PostgreSQL 17 database with advanced features and UUIDs
+- Redis caching and session management
+- Cloudinary media integration for image/video storage
+- Email template management with SMTP integration
+- Event management with GPS tracking and geofencing
+- Gamification system with achievements and leaderboards
+- CMS functionality for content management
+- Automated email fetching via IMAP
+- Audit logging and security monitoring
 
 ## Architecture Components
 
@@ -59,42 +65,59 @@ Business logic organization:
 │                        Frontend Layer                        │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
 │  │  Web Client  │  │ Mobile Client│  │  Admin Panel │     │
+│  │  (React/Vue) │  │   (React     │  │  (Admin UI)  │     │
+│  │              │  │   Native)    │  │              │     │
 │  └──────────────┘  └──────────────┘  └──────────────┘     │
 └────────────┬──────────────┬────────────────┬───────────────┘
-             │              │                │
-             │ REST API     │ WebSocket      │ REST API
-             │              │                │
+              │              │                │
+              │ REST API     │ WebSocket      │ REST API
+              │ (JWT Auth)   │ (Real-time)    │ (JWT Auth)
+              │              │                │
 ┌────────────┴──────────────┴────────────────┴───────────────┐
 │                      API Gateway Layer                       │
 │  ┌────────────────────────────────────────────────────┐    │
-│  │           JWT Authentication Middleware             │    │
-│  │           Rate Limiting & CORS                      │    │
+│  │        JWT Multi-Session Authentication             │    │
+│  │        RBAC Authorization Middleware                │    │
+│  │        Rate Limiting & CORS                         │    │
+│  │        Request Logging & Audit                      │    │
 │  └────────────────────────────────────────────────────┘    │
 └────────────┬──────────────┬────────────────┬───────────────┘
-             │              │                │
+              │              │                │
 ┌────────────┴──────────────┴────────────────┴───────────────┐
 │                    Application Layer (Go)                    │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
 │  │   Handlers   │  │   Services   │  │  WebSocket   │     │
-│  │              │  │              │  │   Manager    │     │
+│  │  (HTTP API)  │  │  (Business   │  │   Manager    │     │
+│  │              │  │   Logic)     │  │  (Real-time) │     │
 │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘     │
 │         │                  │                  │              │
 │  ┌──────┴──────────────────┴──────────────────┴───────┐    │
-│  │              Repository Layer                       │    │
+│  │              Repository Layer (GORM)                 │    │
 │  │        (Data Access & Business Logic)               │    │
 │  └───────────────────────────┬─────────────────────────┘    │
 └──────────────────────────────┼──────────────────────────────┘
-                               │
-        ┌──────────────────────┼──────────────────────┐
-        │                      │                      │
+                                │
+         ┌──────────────────────┼──────────────────────┐
+         │                      │                      │
 ┌───────┴────────┐  ┌─────────┴────────┐  ┌─────────┴────────┐
 │   PostgreSQL   │  │      Redis       │  │   Cloudinary     │
 │   Database     │  │   Cache/Queue    │  │  Media Storage   │
+│   (UUID, JSONB)│  │   (Sessions)     │  │   (CDN)         │
 │                │  │                  │  │                  │
 │ • Users        │  │ • Sessions       │  │ • Images         │
-│ • Permissions  │  │ • Rate Limits    │  │ • Videos         │
-│ • Content      │  │ • WebSocket      │  │ • Transformations│
-│ • Events       │  │   State          │  │                  │
+│ • Participants │  │ • Rate Limits    │  │ • Videos         │
+│ • Permissions  │  │ • WebSocket      │  │ • Transformations│
+│ • Events       │  │ • Cache          │  │ • Auto-upload    │
+│ • Content      │  │                  │  │                  │
+│ • Audit Logs   │  │                  │  │                  │
+└────────────────┘  └──────────────────┘  └──────────────────┘
+                                │
+         ┌──────────────────────┼──────────────────────┐
+         │                      │                      │
+┌───────┴────────┐  ┌─────────┴────────┐  ┌─────────┴────────┐
+│   IMAP Email   │  │   SMTP Email     │  │   External APIs  │
+│   Fetching     │  │   Sending        │  │   (YouTube, etc) │
+│   (Automated)  │  │   (Templates)    │  │                  │
 └────────────────┘  └──────────────────┘  └──────────────────┘
 ```
 
@@ -102,10 +125,13 @@ Business logic organization:
 
 ### Backend
 - **Language**: Go 1.23.0
-- **Web Framework**: Fiber v2
-- **Database**: PostgreSQL 17
-- **Cache**: Redis 7+
-- **WebSocket**: Fiber WebSocket (Gorilla WebSocket compatible)
+- **Web Framework**: Fiber v2 (high-performance web framework)
+- **Database**: PostgreSQL 17 with UUID support and advanced features
+- **ORM**: GORM v2 (with custom logger integration)
+- **Cache**: Redis 7+ (session management, caching)
+- **WebSocket**: Fiber WebSocket (real-time communication)
+- **Authentication**: JWT with multi-session support
+- **Authorization**: RBAC (Role-Based Access Control) with granular permissions
 
 ### Infrastructure
 - **Containerization**: Docker
@@ -114,9 +140,10 @@ Business logic organization:
 - **CI/CD**: GitHub Actions
 
 ### Third-Party Services
-- **Media Storage**: Cloudinary
-- **Email**: SMTP (configurable)
-- **Monitoring**: Custom logging + ELK Stack ready
+- **Media Storage**: Cloudinary (image/video upload, transformation, storage)
+- **Email**: SMTP (configurable providers, template management)
+- **Monitoring**: Custom structured logging with JSON output
+- **External APIs**: IMAP for email fetching, YouTube for video content
 
 ## Design Patterns
 

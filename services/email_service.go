@@ -74,6 +74,8 @@ func NewEmailServiceWithTemplatesDir(smtpClient SMTPClient, metrics *EmailMetric
 		"contact_email",
 		"aanmelding_admin_email",
 		"aanmelding_email",
+		"password_reset_email",
+		"email_verification_email",
 		"wfc_order_confirmation",
 		"wfc_order_admin",
 		"newsletter",
@@ -272,6 +274,60 @@ func (s *EmailService) GetTemplate(name string) *template.Template {
 		return nil
 	}
 	return tmpl
+}
+
+// SendPasswordResetEmail verzendt een wachtwoord reset email
+func (s *EmailService) SendPasswordResetEmail(email string, resetLink string) error {
+	logger.Debug("Sending password reset email", "email", email)
+
+	// Controleer rate limits
+	if !s.rateLimiter.AllowEmail("password_reset", email) {
+		logger.Warn("Rate limit exceeded for password reset email", "email", email)
+		return fmt.Errorf("rate limit exceeded")
+	}
+
+	// Prepare template data
+	templateData := map[string]interface{}{
+		"ResetLink": resetLink,
+	}
+
+	// Send email
+	err := s.SendTemplateEmail(email, "Wachtwoord Reset - De Koninklijke Loop", "password_reset_email", templateData)
+	if err != nil {
+		logger.Error("Failed to send password reset email", "email", email, "error", err)
+		return err
+	}
+
+	logger.Info("Password reset email sent successfully", "email", email)
+	return nil
+}
+
+// SendEmailVerificationEmail verzendt een email verificatie email
+func (s *EmailService) SendEmailVerificationEmail(email, naam, verificationLink string, expiryHours int) error {
+	logger.Debug("Sending email verification email", "email", email, "naam", naam)
+
+	// Controleer rate limits
+	if !s.rateLimiter.AllowEmail("email_verification", email) {
+		logger.Warn("Rate limit exceeded for email verification", "email", email)
+		return fmt.Errorf("rate limit exceeded")
+	}
+
+	// Prepare template data
+	templateData := map[string]interface{}{
+		"Naam":             naam,
+		"VerificationLink": verificationLink,
+		"ExpiryHours":      expiryHours,
+	}
+
+	// Send email
+	err := s.SendTemplateEmail(email, "Verifieer je email - De Koninklijke Loop", "email_verification_email", templateData)
+	if err != nil {
+		logger.Error("Failed to send email verification email", "email", email, "error", err)
+		return err
+	}
+
+	logger.Info("Email verification email sent successfully", "email", email)
+	return nil
 }
 
 // ValidateTemplate valideert of een template correct kan worden uitgevoerd met de gegeven data

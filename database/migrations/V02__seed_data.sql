@@ -5,14 +5,14 @@
 -- Controleer of er al een admin gebruiker is
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM gebruikers WHERE rol = 'admin') THEN
+    IF NOT EXISTS (SELECT 1 FROM gebruikers WHERE email = 'admin@dekoninklijkeloop.nl') THEN
         -- Maak admin gebruiker aan (wachtwoord: admin)
-        INSERT INTO gebruikers (naam, email, wachtwoord_hash, rol, is_actief, created_at, updated_at)
+        -- NOTE: rol column wordt later toegevoegd en gemigreerd naar RBAC systeem
+        INSERT INTO gebruikers (naam, email, wachtwoord_hash, is_actief, created_at, updated_at)
         VALUES (
             'Admin',
             'admin@dekoninklijkeloop.nl',
             '$2a$10$5Yse5i2BJV.bwTzbmywa9e/3G.XxzQPayGPlTsut/nBrZr05pKMCK',
-            'admin',
             TRUE,
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP

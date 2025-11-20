@@ -34,7 +34,6 @@ func TestAuthHandler_HandleLogin_Success(t *testing.T) {
 		ID:       "user-123",
 		Email:    "test@dekoninklijkeloop.nl",
 		Naam:     "Test User",
-		Rol:      "admin",
 		IsActief: true,
 	}
 
@@ -46,6 +45,10 @@ func TestAuthHandler_HandleLogin_Success(t *testing.T) {
 	// Mock expectations
 	mockAuthService.On("Login", mock.Anything, "test@dekoninklijkeloop.nl", "password123").
 		Return("access-token-xyz", "refresh-token-abc", nil)
+	mockAuthService.On("ValidateToken", "access-token-xyz").
+		Return("user-123", nil)
+	mockAuthService.On("GetUser", mock.Anything, "user-123").
+		Return(testUser, nil)
 	mockAuthService.On("GetUserFromToken", mock.Anything, "access-token-xyz").
 		Return(testUser, nil)
 	mockPermService.On("GetUserPermissions", mock.Anything, "user-123").
@@ -414,7 +417,6 @@ func TestAuthHandler_HandleGetProfile_Success(t *testing.T) {
 		ID:       "user-456",
 		Naam:     "Profile User",
 		Email:    "profile@dekoninklijkeloop.nl",
-		Rol:      "admin",
 		IsActief: true,
 		LaatsteLogin: func() *time.Time {
 			t := time.Now().Add(-1 * time.Hour)

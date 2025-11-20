@@ -76,7 +76,6 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 	var req struct {
 		Email                string `json:"email"`
 		Naam                 string `json:"naam"`
-		Rol                  string `json:"rol"`
 		Password             string `json:"password"`
 		IsActief             bool   `json:"is_actief"`
 		NewsletterSubscribed bool   `json:"newsletter_subscribed"`
@@ -92,7 +91,6 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 	gebruiker := &models.Gebruiker{
 		Email:                req.Email,
 		Naam:                 req.Naam,
-		Rol:                  req.Rol,
 		IsActief:             req.IsActief,
 		NewsletterSubscribed: req.NewsletterSubscribed,
 	}
@@ -134,7 +132,6 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	var req struct {
 		Email                *string `json:"email,omitempty"`
 		Naam                 *string `json:"naam,omitempty"`
-		Rol                  *string `json:"rol,omitempty"`
 		IsActief             *bool   `json:"is_actief,omitempty"`
 		NewsletterSubscribed *bool   `json:"newsletter_subscribed,omitempty"`
 		Password             *string `json:"password,omitempty"`
@@ -152,9 +149,6 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	}
 	if req.Naam != nil {
 		user.Naam = *req.Naam
-	}
-	if req.Rol != nil {
-		user.Rol = *req.Rol
 	}
 	if req.IsActief != nil {
 		user.IsActief = *req.IsActief

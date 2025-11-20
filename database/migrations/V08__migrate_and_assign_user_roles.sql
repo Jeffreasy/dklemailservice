@@ -5,26 +5,41 @@
 -- wordt meegenomen in "Stap 1" van dit script.
 
 -- Stap 1: Voeg user_roles toe voor alle bestaande gebruikers met legacy roles
-INSERT INTO user_roles (user_id, role_id, is_active, assigned_at)
-SELECT 
-    g.id as user_id,
-    r.id as role_id,
-    true as is_active,
-    COALESCE(g.created_at, NOW()) as assigned_at
-FROM gebruikers g
-JOIN roles r ON LOWER(r.name) = LOWER(g.rol)
-WHERE g.rol IS NOT NULL 
-  AND g.rol != ''
-  -- Voorkom duplicaten
-  AND NOT EXISTS (
-    SELECT 1 FROM user_roles ur 
-    WHERE ur.user_id = g.id AND ur.role_id = r.id
-  )
-ON CONFLICT (user_id, role_id) DO NOTHING;
+-- NOTE: Deze stap wordt overgeslagen als de 'rol' kolom niet bestaat (verwijderd in V38)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'gebruikers' AND column_name = 'rol'
+    ) THEN
+        -- Legacy rol kolom bestaat nog, voer migratie uit
+        INSERT INTO user_roles (user_id, role_id, is_active, assigned_at)
+        SELECT
+            g.id as user_id,
+            r.id as role_id,
+            true as is_active,
+            COALESCE(g.created_at, NOW()) as assigned_at
+        FROM gebruikers g
+        JOIN roles r ON LOWER(r.name) = LOWER(g.rol)
+        WHERE g.rol IS NOT NULL
+          AND g.rol != ''
+          -- Voorkom duplicaten
+          AND NOT EXISTS (
+            SELECT 1 FROM user_roles ur
+            WHERE ur.user_id = g.id AND ur.role_id = r.id
+          )
+        ON CONFLICT (user_id, role_id) DO NOTHING;
+
+        RAISE NOTICE 'Legacy role migration completed';
+    ELSE
+        RAISE NOTICE 'Legacy rol column does not exist, skipping legacy role migration';
+    END IF;
+END $$;
 
 -- Stap 2: Voeg standaard 'user' role toe voor gebruikers zonder specifieke rol
+-- NOTE: Aangepast voor het geval de 'rol' kolom niet bestaat - geef alle gebruikers zonder rol de 'user' rol
 INSERT INTO user_roles (user_id, role_id, is_active, assigned_at)
-SELECT 
+SELECT
     g.id as user_id,
     r.id as role_id,
     true as is_active,
@@ -33,15 +48,28 @@ FROM gebruikers g
 CROSS JOIN roles r
 WHERE r.name = 'user'
   AND r.is_system_role = true
-  AND (g.rol IS NULL OR g.rol = '' OR g.rol = 'gebruiker')
   -- Voorkom duplicaten (checkt of gebruiker AL EEN ROL HEEFT)
   AND NOT EXISTS (
-    SELECT 1 FROM user_roles ur 
+    SELECT 1 FROM user_roles ur
     WHERE ur.user_id = g.id
   )
 ON CONFLICT (user_id, role_id) DO NOTHING;
 
--- Stap 3: Wijs 'staff' rol toe aan 'jeffrey@dekoninklijkeloop.nl' (van V1_27)
+-- Stap 3: Wijs 'admin' rol toe aan 'admin@dekoninklijkeloop.nl'
+INSERT INTO user_roles (user_id, role_id, assigned_at, is_active)
+SELECT u.id, r.id, CURRENT_TIMESTAMP, true
+FROM gebruikers u
+CROSS JOIN roles r
+WHERE u.email = 'admin@dekoninklijkeloop.nl'
+  AND r.name = 'admin'
+  AND r.is_system_role = true
+  AND NOT EXISTS (
+    SELECT 1 FROM user_roles ur
+    WHERE ur.user_id = u.id AND ur.role_id = r.id
+  )
+ON CONFLICT (user_id, role_id) DO NOTHING;
+
+-- Stap 4: Wijs 'staff' rol toe aan 'jeffrey@dekoninklijkeloop.nl' (van V1_27)
 INSERT INTO user_roles (user_id, role_id, assigned_at, is_active)
 SELECT u.id, r.id, CURRENT_TIMESTAMP, true
 FROM gebruikers u
@@ -56,7 +84,7 @@ WHERE u.email = 'jeffrey@dekoninklijkeloop.nl'
 ON CONFLICT (user_id, role_id) DO NOTHING;
 
 
--- Stap 4: Log de migratie resultaten
+-- Stap 5: Log de migratie resultaten
 DO $$
 DECLARE
     migrated_count INTEGER;
@@ -84,42 +112,35 @@ BEGIN
     END IF;
 END $$;
 
--- Stap 5: Maak een view voor gemakkelijke controle van de migratie
+-- Stap 6: Maak een view voor gemakkelijke controle van de migratie
+-- NOTE: Aangepast voor het geval de 'rol' kolom niet bestaat
 CREATE OR REPLACE VIEW v_user_role_migration_status AS
-SELECT 
+SELECT
     g.id as user_id,
     g.email,
     g.naam,
-    g.rol as legacy_role,
+    NULL as legacy_role,
     COALESCE(
-        STRING_AGG(r.name, ', ' ORDER BY r.name), 
+        STRING_AGG(r.name, ', ' ORDER BY r.name),
         'GEEN RBAC ROL'
     ) as rbac_roles,
     COUNT(ur.id) as rbac_role_count,
-    CASE 
+    CASE
         WHEN COUNT(ur.id) = 0 THEN 'MISSING RBAC'
-        WHEN g.rol IS NULL OR g.rol = '' THEN 'NO LEGACY'
-        WHEN EXISTS (
-            SELECT 1 FROM user_roles ur2
-            JOIN roles r2 ON ur2.role_id = r2.id
-            WHERE ur2.user_id = g.id 
-            AND LOWER(r2.name) = LOWER(g.rol)
-            AND ur2.is_active = true
-        ) THEN 'MIGRATED'
-        ELSE 'MISMATCH'
+        ELSE 'NO LEGACY'
     END as migration_status
 FROM gebruikers g
 LEFT JOIN user_roles ur ON g.id = ur.user_id AND ur.is_active = true
 LEFT JOIN roles r ON ur.role_id = r.id
-GROUP BY g.id, g.email, g.naam, g.rol
-ORDER BY 
-    CASE 
+GROUP BY g.id, g.email, g.naam
+ORDER BY
+    CASE
         WHEN COUNT(ur.id) = 0 THEN 1
         ELSE 2
     END,
     g.email;
 
--- Stap 6: Toon migratie status overzicht
+-- Stap 7: Toon migratie status overzicht
 DO $$
 DECLARE
     status_record RECORD;
@@ -143,7 +164,7 @@ BEGIN
     END LOOP;
 END $$;
 
--- Stap 7: Toon problematische gevallen
+-- Stap 8: Toon problematische gevallen
 DO $$
 DECLARE
     problem_record RECORD;
@@ -174,7 +195,7 @@ BEGIN
     END IF;
 END $$;
 
--- Stap 8: Toon instructies voor vervolgstappen
+-- Stap 9: Toon instructies voor vervolgstappen
 DO $$
 BEGIN
     RAISE NOTICE '';

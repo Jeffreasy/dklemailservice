@@ -22,10 +22,20 @@ type EventRegistration struct {
 	TotalDistance      float64    `json:"total_distance" gorm:"type:decimal(10,2);default:0"`
 
 	// --- Velden verplaatst van 'Aanmelding' (nu Participant) ---
-	Steps            int        `json:"steps" gorm:"default:0"` // V16
-	TestMode         bool       `json:"test_mode" gorm:"type:boolean;not null;default:false"`
-	Ondersteuning    string     `json:"ondersteuning"`
-	Bijzonderheden   string     `json:"bijzonderheden" gorm:"type:text"`
+	Steps          int    `json:"steps" gorm:"default:0"` // V16
+	TestMode       bool   `json:"test_mode" gorm:"type:boolean;not null;default:false"`
+	Ondersteuning  string `json:"ondersteuning"`
+	Bijzonderheden string `json:"bijzonderheden" gorm:"type:text"`
+
+	// V37: Terms veld behouden in event_registrations
+	Terms bool `json:"terms" gorm:"not null;default:false"`
+
+	// Antwoorden count voor tracking
+	AntwoordenCount int `json:"antwoorden_count" gorm:"default:0"`
+
+	// V37: Transport vraag
+	HeeftVervoer *bool `json:"heeft_vervoer" gorm:"type:boolean"`
+
 	Notities         *string    `json:"notities" gorm:"type:text"`
 	BehandeldDoor    *string    `json:"behandeld_door"`
 	BehandeldOp      *time.Time `json:"behandeld_op"`
@@ -48,6 +58,12 @@ type EventRegistration struct {
 	// --- GORM Relaties ---
 	Participant Participant `json:"participant,omitempty" gorm:"foreignKey:ParticipantID"`
 	Event       Event       `json:"event,omitempty" gorm:"foreignKey:EventID"`
+}
+
+// UpdateEventRegistrationRequest represents the request body for updating an event registration
+type UpdateEventRegistrationRequest struct {
+	Status   string  `json:"status" example:"confirmed"`
+	Notities *string `json:"notities" example:"Some notes about the registration"`
 }
 
 // TableName specificeert de tabelnaam voor GORM

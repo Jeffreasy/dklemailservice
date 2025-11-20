@@ -1352,7 +1352,7 @@ Deze software is eigendom van De Koninklijke Loop en mag niet worden gebruikt, g
 ## 📚 Documentatie
 
 Uitgebreide documentatie is beschikbaar in de `/docs` directory:
-- `API.md` - API documentatie (Bijgewerkt met Contact, Aanmelding, Chat en Nieuwsbrief endpoints)
+- `api/API_DOCUMENTATION.md` - Complete API documentatie (geconsolideerd)
 - `DEPLOYMENT.md` - Deployment instructies
 - `DEVELOPMENT.md` - Development guidelines
 - `MONITORING.md` - Monitoring setup

@@ -78,16 +78,20 @@ func (d *EmailDecoder) DecodeEmail(m *mail.Message) (*DecodedEmail, error) {
 		logger.Warn("Could not parse 'From' header", "value", m.Header.Get("From"), "error", err)
 	}
 
-	if to, err := m.Header.AddressList("To"); err == nil {
-		result.To = to
-	} else {
-		logger.Warn("Could not parse 'To' header", "value", m.Header.Get("To"), "error", err)
+	if toHeader := m.Header.Get("To"); toHeader != "" {
+		if to, err := m.Header.AddressList("To"); err == nil {
+			result.To = to
+		} else {
+			logger.Warn("Could not parse 'To' header", "value", toHeader, "error", err)
+		}
 	}
 
-	if cc, err := m.Header.AddressList("Cc"); err == nil {
-		result.Cc = cc
-	} else {
-		logger.Warn("Could not parse 'Cc' header", "value", m.Header.Get("Cc"), "error", err)
+	if ccHeader := m.Header.Get("Cc"); ccHeader != "" {
+		if cc, err := m.Header.AddressList("Cc"); err == nil {
+			result.Cc = cc
+		} else {
+			logger.Warn("Could not parse 'Cc' header", "value", ccHeader, "error", err)
+		}
 	}
 	// --- End Header Decoding ---
 

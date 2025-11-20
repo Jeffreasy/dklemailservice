@@ -643,6 +643,111 @@ func (m *MockAuthService) SearchUsers(ctx context.Context, query string, limit i
 	return args.Get(0).([]*models.Gebruiker), args.Error(1)
 }
 
+func (m *MockAuthService) GetParticipantByGebruikerID(ctx context.Context, gebruikerID string) (*models.Participant, error) {
+	args := m.Called(ctx, gebruikerID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Participant), args.Error(1)
+}
+
+func (m *MockAuthService) DeleteUserAccount(ctx context.Context, userID, password, reason string) error {
+	args := m.Called(ctx, userID, password, reason)
+	return args.Error(0)
+}
+
+func (m *MockAuthService) GetGebruikerByEmail(ctx context.Context, email string) (*models.Gebruiker, error) {
+	args := m.Called(ctx, email)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Gebruiker), args.Error(1)
+}
+
+func (m *MockAuthService) GetParticipantByEmail(ctx context.Context, email string) ([]*models.Participant, error) {
+	args := m.Called(ctx, email)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.Participant), args.Error(1)
+}
+
+func (m *MockAuthService) IsEmailVerified(ctx context.Context, email, userType string) (bool, error) {
+	args := m.Called(ctx, email, userType)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *MockAuthService) RequestPasswordReset(ctx context.Context, email string) error {
+	args := m.Called(ctx, email)
+	return args.Error(0)
+}
+
+func (m *MockAuthService) ResetPasswordWithToken(ctx context.Context, token, newPassword string) error {
+	args := m.Called(ctx, token, newPassword)
+	return args.Error(0)
+}
+
+func (m *MockAuthService) SendEmailVerification(ctx context.Context, email, userID, userType string) error {
+	args := m.Called(ctx, email, userID, userType)
+	return args.Error(0)
+}
+
+func (m *MockAuthService) VerifyEmailWithToken(ctx context.Context, token string) error {
+	args := m.Called(ctx, token)
+	return args.Error(0)
+}
+
+func (m *MockAuthService) ResendEmailVerification(ctx context.Context, email, userID, userType string) error {
+	args := m.Called(ctx, email, userID, userType)
+	return args.Error(0)
+}
+
+func (m *MockAuthService) RevokeAllUserAccessTokens(ctx context.Context, userID string) error {
+	args := m.Called(ctx, userID)
+	return args.Error(0)
+}
+
+func (m *MockAuthService) ValidateAccessToken(ctx context.Context, token string) error {
+	args := m.Called(ctx, token)
+	return args.Error(0)
+}
+
+func (m *MockAuthService) CreateSessionForLogin(ctx context.Context, userID, userType, accessToken, ipAddress, userAgent string) (*models.Session, error) {
+	args := m.Called(ctx, userID, userType, accessToken, ipAddress, userAgent)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Session), args.Error(1)
+}
+
+func (m *MockAuthService) ListUserSessions(ctx context.Context, userID string) ([]*models.Session, error) {
+	args := m.Called(ctx, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.Session), args.Error(1)
+}
+
+func (m *MockAuthService) RevokeSession(ctx context.Context, sessionID string) error {
+	args := m.Called(ctx, sessionID)
+	return args.Error(0)
+}
+
+func (m *MockAuthService) RevokeAllUserSessions(ctx context.Context, userID string) error {
+	args := m.Called(ctx, userID)
+	return args.Error(0)
+}
+
+func (m *MockAuthService) RevokeOtherUserSessions(ctx context.Context, userID, currentSessionID string) error {
+	args := m.Called(ctx, userID, currentSessionID)
+	return args.Error(0)
+}
+
+func (m *MockAuthService) UpdateAccessTokenWithSession(ctx context.Context, token, sessionID string) error {
+	args := m.Called(ctx, token, sessionID)
+	return args.Error(0)
+}
+
 // MockPermissionService is a mock implementation of services.PermissionService
 type MockPermissionService struct {
 	mock.Mock
@@ -746,4 +851,22 @@ func (m *MockPermissionService) InvalidateUserCache(userID string) {
 func (m *MockPermissionService) RefreshCache(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
+}
+
+// CanParticipantRegisterForEvent mocks checking if a participant can register for an event
+func (m *MockPermissionService) CanParticipantRegisterForEvent(ctx context.Context, userID string) bool {
+	args := m.Called(ctx, userID)
+	return args.Bool(0)
+}
+
+// GetParticipantPermissionLevel mocks getting participant permission level
+func (m *MockPermissionService) GetParticipantPermissionLevel(ctx context.Context, userID string) string {
+	args := m.Called(ctx, userID)
+	return args.String(0)
+}
+
+// HasParticipantAppAccess mocks checking if participant has app access
+func (m *MockPermissionService) HasParticipantAppAccess(ctx context.Context, userID string) bool {
+	args := m.Called(ctx, userID)
+	return args.Bool(0)
 }

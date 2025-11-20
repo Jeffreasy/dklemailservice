@@ -95,3 +95,18 @@ func (m *AuthMockPermissionService) RefreshCache(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
 }
+
+func (m *AuthMockPermissionService) CanParticipantRegisterForEvent(ctx context.Context, userID string) bool {
+	args := m.Called(ctx, userID)
+	return args.Bool(0)
+}
+
+func (m *AuthMockPermissionService) GetParticipantPermissionLevel(ctx context.Context, userID string) string {
+	args := m.Called(ctx, userID)
+	return args.String(0)
+}
+
+func (m *AuthMockPermissionService) HasParticipantAppAccess(ctx context.Context, userID string) bool {
+	args := m.Called(ctx, userID)
+	return args.Bool(0)
+}

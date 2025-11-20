@@ -7,7 +7,7 @@ import (
 	"dklautomationgo/models"
 	"dklautomationgo/repository"
 	"encoding/base64"
-	"errors" // Import toegevoegd
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -16,7 +16,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm" // Import toegevoegd
+	"gorm.io/gorm"
 )
 
 var (
@@ -35,43 +35,61 @@ var (
 
 // JWTClaims definieert de claims in het JWT token
 type JWTClaims struct {
-	Email string `json:"email"`
-	// DEPRECATED: Legacy field - will be removed in future version
-	// Frontend should only use Roles array
-	Role       string   `json:"role,omitempty"` // DEPRECATED - use Roles instead
-	Roles      []string `json:"roles"`          // RBAC roles from user_roles table
-	RBACActive bool     `json:"rbac_active"`    // Indicates if RBAC system is active
+	Email      string   `json:"email"`
+	Roles      []string `json:"roles"`       // RBAC roles from user_roles table
+	RBACActive bool     `json:"rbac_active"` // Indicates if RBAC system is active
 	jwt.RegisteredClaims
 }
 
 // AuthServiceImpl implementeert de AuthService interface
 // V30+RBAC: Uitgebreid met participant repository voor app access checks
+// RBAC: Uitgebreid met rbacRoleRepo voor role management
+// Email Verification: Uitgebreid met email verification token repository en email service
+// Access Token Rotation: Uitgebreid met access token repository voor server-side opslag
+// Session Management: Uitgebreid met session repository voor multi-device session tracking
 type AuthServiceImpl struct {
-	gebruikerRepo    repository.GebruikerRepository
-	refreshTokenRepo repository.RefreshTokenRepository
-	userRoleRepo     repository.UserRoleRepository
-	participantRepo  repository.ParticipantRepository // V30+RBAC: Voor participant app access checks
-	jwtSecret        []byte
-	tokenExpiry      time.Duration
+	gebruikerRepo              repository.GebruikerRepository
+	refreshTokenRepo           repository.RefreshTokenRepository
+	accessTokenRepo            repository.AccessTokenRepository // Access Token Rotation: Voor server-side token opslag
+	passwordResetTokenRepo     repository.PasswordResetTokenRepository
+	emailVerificationTokenRepo repository.EmailVerificationTokenRepository
+	userRoleRepo               repository.UserRoleRepository
+	rbacRoleRepo               repository.RBACRoleRepository    // RBAC: Voor role management
+	participantRepo            repository.ParticipantRepository // V30+RBAC: Voor participant app access checks
+	sessionRepo                repository.SessionRepository     // Session Management: Voor session tracking
+	emailService               EmailSender                      // Email Verification: Voor verzenden verificatie emails
+	jwtSecret                  []byte
+	tokenExpiry                time.Duration
+	frontendURL                string // Voor dynamische email links
 }
 
 // NewAuthService maakt een nieuwe AuthService
 func NewAuthService(gebruikerRepo repository.GebruikerRepository, refreshTokenRepo repository.RefreshTokenRepository) AuthService {
-	return NewAuthServiceWithRBAC(gebruikerRepo, refreshTokenRepo, nil)
+	return NewAuthServiceWithRBAC(gebruikerRepo, refreshTokenRepo, nil, nil)
 }
 
 // NewAuthServiceWithRBAC maakt een nieuwe AuthService met RBAC support
-func NewAuthServiceWithRBAC(gebruikerRepo repository.GebruikerRepository, refreshTokenRepo repository.RefreshTokenRepository, userRoleRepo repository.UserRoleRepository) AuthService {
-	return NewAuthServiceWithParticipantSupport(gebruikerRepo, refreshTokenRepo, userRoleRepo, nil)
+func NewAuthServiceWithRBAC(gebruikerRepo repository.GebruikerRepository, refreshTokenRepo repository.RefreshTokenRepository, userRoleRepo repository.UserRoleRepository, rbacRoleRepo repository.RBACRoleRepository) AuthService {
+	return NewAuthServiceWithParticipantSupport(gebruikerRepo, refreshTokenRepo, nil, nil, nil, userRoleRepo, rbacRoleRepo, nil, nil, nil)
 }
 
 // NewAuthServiceWithParticipantSupport maakt een nieuwe AuthService met volledige participant integratie
 // V30+RBAC: Voegt participant repository toe voor app access validatie
+// RBAC: Voegt rbacRoleRepo toe voor role management
+// Email Verification: Voegt email verification token repository en email service toe
+// Access Token Rotation: Voegt access token repository toe voor server-side opslag
+// Session Management: Voegt session repository toe voor multi-device session tracking
 func NewAuthServiceWithParticipantSupport(
 	gebruikerRepo repository.GebruikerRepository,
 	refreshTokenRepo repository.RefreshTokenRepository,
+	accessTokenRepo repository.AccessTokenRepository,
+	passwordResetTokenRepo repository.PasswordResetTokenRepository,
+	emailVerificationTokenRepo repository.EmailVerificationTokenRepository,
 	userRoleRepo repository.UserRoleRepository,
+	rbacRoleRepo repository.RBACRoleRepository,
 	participantRepo repository.ParticipantRepository,
+	sessionRepo repository.SessionRepository,
+	emailService EmailSender,
 ) AuthService {
 	// Haal JWT secret uit omgevingsvariabele - VERPLICHT
 	jwtSecret := os.Getenv("JWT_SECRET")
@@ -82,6 +100,13 @@ func NewAuthServiceWithParticipantSupport(
 	// Valideer minimale lengte voor security
 	if len(jwtSecret) < 32 {
 		logger.Fatal("JWT_SECRET moet minimaal 32 karakters bevatten voor adequate security", "length", len(jwtSecret))
+	}
+
+	// Haal frontend URL uit omgevingsvariabele voor email links
+	frontendURL := os.Getenv("FRONTEND_URL")
+	if frontendURL == "" {
+		frontendURL = "https://dekoninklijkeloop.nl" // Default fallback
+		logger.Warn("FRONTEND_URL omgevingsvariabele niet ingesteld, gebruik default", "default", frontendURL)
 	}
 
 	// Haal token expiry uit omgevingsvariabele of gebruik een standaard waarde (20 minuten)
@@ -96,12 +121,19 @@ func NewAuthServiceWithParticipantSupport(
 	}
 
 	return &AuthServiceImpl{
-		gebruikerRepo:    gebruikerRepo,
-		refreshTokenRepo: refreshTokenRepo,
-		userRoleRepo:     userRoleRepo,
-		participantRepo:  participantRepo, // V30+RBAC
-		jwtSecret:        []byte(jwtSecret),
-		tokenExpiry:      tokenExpiry,
+		gebruikerRepo:              gebruikerRepo,
+		refreshTokenRepo:           refreshTokenRepo,
+		accessTokenRepo:            accessTokenRepo, // Access Token Rotation
+		passwordResetTokenRepo:     passwordResetTokenRepo,
+		emailVerificationTokenRepo: emailVerificationTokenRepo,
+		userRoleRepo:               userRoleRepo,
+		rbacRoleRepo:               rbacRoleRepo,    // RBAC Optimization
+		participantRepo:            participantRepo, // V30+RBAC
+		sessionRepo:                sessionRepo,     // Session Management
+		emailService:               emailService,    // Email Verification
+		jwtSecret:                  []byte(jwtSecret),
+		tokenExpiry:                tokenExpiry,
+		frontendURL:                frontendURL,
 	}
 }
 
@@ -113,8 +145,6 @@ func (s *AuthServiceImpl) Login(ctx context.Context, email, wachtwoord string) (
 	// =========================================================================
 	// OPLOSSING 1: STAP 1 (VOORHEEN STAP 2)
 	// Probeer EERST gebruiker login (admin/staff accounts)
-	// Dit voorkomt dat een admin die ook een participant-record heeft,
-	// wordt ingelogd als participant.
 	// =========================================================================
 	gebruiker, err := s.gebruikerRepo.GetByEmail(ctx, email)
 
@@ -138,9 +168,15 @@ func (s *AuthServiceImpl) Login(ctx context.Context, email, wachtwoord string) (
 			}
 
 			// Genereer JWT access token
-			accessToken, err := s.generateToken(gebruiker)
+			accessToken, err := s.generateToken(ctx, gebruiker) // << AANGEPAST: ctx toegevoegd
 			if err != nil {
 				logger.Error("Fout bij genereren access token", "email", email, "error", err)
+				return "", "", err
+			}
+
+			// Sla access token op in database voor server-side validatie
+			if err := s.storeAccessToken(ctx, accessToken, gebruiker.ID); err != nil {
+				logger.Error("Fout bij opslaan access token", "email", email, "error", err)
 				return "", "", err
 			}
 
@@ -237,6 +273,12 @@ func (s *AuthServiceImpl) generateParticipantTokens(ctx context.Context, partici
 		return "", "", err
 	}
 
+	// Sla access token op in database voor server-side validatie
+	if err := s.storeAccessToken(ctx, accessToken, participant.ID); err != nil {
+		logger.Error("Fout bij opslaan participant access token", "email", participant.Email, "error", err)
+		return "", "", err
+	}
+
 	// Genereer refresh token
 	refreshToken, err := s.GenerateRefreshToken(ctx, participant.ID)
 	if err != nil {
@@ -254,7 +296,6 @@ func (s *AuthServiceImpl) generateParticipantToken(participant *models.Gebruiker
 	// Participants krijgen participant_user rol in JWT
 	claims := JWTClaims{
 		Email:      participant.Email,
-		Role:       "participant_user",           // Voor backward compatibility
 		Roles:      []string{"participant_user"}, // Participant krijgt altijd deze rol
 		RBACActive: false,                        // Geen RBAC voor participants
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -405,20 +446,13 @@ func (s *AuthServiceImpl) ResetPassword(ctx context.Context, email, nieuwWachtwo
 
 // generateToken genereert een JWT token voor een gebruiker
 // Deze functie is nu ALLEEN voor Gebruikers (admins/staff)
-func (s *AuthServiceImpl) generateToken(gebruiker *models.Gebruiker) (string, error) {
+func (s *AuthServiceImpl) generateToken(ctx context.Context, gebruiker *models.Gebruiker) (string, error) { // << AANGEPAST: ctx toegevoegd
 	// Haal RBAC roles op voor de gebruiker
-	rbacRoles := s.getUserRBACRoles(gebruiker.ID)
-
-	// Fallback: als geen RBAC roles, gebruik eerste role name of lege string
-	legacyRole := ""
-	if len(rbacRoles) > 0 {
-		legacyRole = rbacRoles[0] // Eerste role voor backward compatibility
-	}
+	rbacRoles := s.getUserRBACRoles(ctx, gebruiker.ID) // << AANGEPAST: ctx doorgegeven
 
 	// Maak claims - RBAC is de primary bron van truth
 	claims := JWTClaims{
 		Email:      gebruiker.Email,
-		Role:       legacyRole,         // DEPRECATED - alleen voor backward compatibility
 		Roles:      rbacRoles,          // RBAC - primary bron
 		RBACActive: len(rbacRoles) > 0, // True als RBAC roles aanwezig
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -443,20 +477,23 @@ func (s *AuthServiceImpl) generateToken(gebruiker *models.Gebruiker) (string, er
 }
 
 // getUserRBACRoles haalt de RBAC role namen op voor een gebruiker
-func (s *AuthServiceImpl) getUserRBACRoles(userID string) []string {
-	// Als userRoleRepo niet beschikbaar is, return lege array
+// Legacy role_id system removed - only uses user_roles
+func (s *AuthServiceImpl) getUserRBACRoles(ctx context.Context, userID string) []string {
+	// Als userRoleRepo niet beschikbaar is, return empty roles
 	if s.userRoleRepo == nil {
+		logger.Warn("UserRole repository niet beschikbaar, geen roles voor JWT", "user_id", userID)
 		return []string{}
 	}
 
-	// Gebruik context met timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	// Gebruik de doorgegeven context (met eventuele timeout/cancellation)
+	// We gebruiken hier een timeout van 2 seconden voor de DB-queries om excessieve latentie te voorkomen.
+	ctxTimeout, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	// Haal actieve user roles op
-	userRoles, err := s.userRoleRepo.ListActiveByUser(ctx, userID)
+	// Get active user_roles
+	userRoles, err := s.userRoleRepo.ListActiveByUser(ctxTimeout, userID)
 	if err != nil {
-		logger.Warn("Kon RBAC roles niet ophalen voor JWT", "user_id", userID, "error", err)
+		logger.Warn("Error getting user_roles for JWT", "user_id", userID, "error", err)
 		return []string{}
 	}
 
@@ -468,6 +505,7 @@ func (s *AuthServiceImpl) getUserRBACRoles(userID string) []string {
 		}
 	}
 
+	logger.Debug("Retrieved roles from user_roles", "user_id", userID, "roles", roleNames)
 	return roleNames
 }
 
@@ -586,9 +624,15 @@ func (s *AuthServiceImpl) RefreshAccessToken(ctx context.Context, refreshToken s
 	}
 
 	// Genereer nieuwe access token
-	accessToken, err := s.generateToken(gebruiker)
+	accessToken, err := s.generateToken(ctx, gebruiker) // << AANGEPAST: ctx doorgegeven
 	if err != nil {
 		logger.Error("Fout bij genereren nieuwe access token", "user_id", gebruiker.ID, "error", err)
+		return "", "", err
+	}
+
+	// Sla nieuwe access token op in database voor server-side validatie
+	if err := s.storeAccessToken(ctx, accessToken, gebruiker.ID); err != nil {
+		logger.Error("Fout bij opslaan nieuwe access token", "user_id", gebruiker.ID, "error", err)
 		return "", "", err
 	}
 
@@ -635,6 +679,12 @@ func (s *AuthServiceImpl) refreshParticipantToken(ctx context.Context, participa
 		return "", "", err
 	}
 
+	// Sla nieuwe access token op in database voor server-side validatie
+	if err := s.storeAccessToken(ctx, accessToken, participant.ID); err != nil {
+		logger.Error("Fout bij opslaan nieuwe participant access token", "participant_id", participant.ID, "error", err)
+		return "", "", err
+	}
+
 	// Genereer nieuwe refresh token
 	newRefreshToken, err := s.GenerateRefreshToken(ctx, participant.ID)
 	if err != nil {
@@ -662,6 +712,100 @@ func (s *AuthServiceImpl) RevokeRefreshToken(ctx context.Context, refreshToken s
 	return nil
 }
 
+// ListUserSessions haalt alle actieve sessies op voor een gebruiker
+func (s *AuthServiceImpl) ListUserSessions(ctx context.Context, userID string) ([]*models.Session, error) {
+	if s.sessionRepo == nil {
+		logger.Warn("Session repository niet beschikbaar, sessies kunnen niet worden opgehaald")
+		return []*models.Session{}, nil // Graceful degradation
+	}
+
+	sessions, err := s.sessionRepo.ListByOwnerID(ctx, userID)
+	if err != nil {
+		logger.Error("Fout bij ophalen sessies", "user_id", userID, "error", err)
+		return nil, err
+	}
+
+	logger.Debug("Sessies opgehaald", "user_id", userID, "count", len(sessions))
+	return sessions, nil
+}
+
+// RevokeSession trekt een specifieke sessie in
+func (s *AuthServiceImpl) RevokeSession(ctx context.Context, sessionID string) error {
+	if s.sessionRepo == nil {
+		logger.Warn("Session repository niet beschikbaar, sessie wordt niet ingetrokken")
+		return nil // Graceful degradation
+	}
+
+	// Haal eerst de sessie op om de access token te krijgen
+	session, err := s.sessionRepo.GetByID(ctx, sessionID)
+	if err != nil {
+		logger.Error("Fout bij ophalen sessie voor intrekking", "session_id", sessionID, "error", err)
+		return err
+	}
+
+	if session == nil {
+		logger.Warn("Sessie niet gevonden voor intrekking", "session_id", sessionID)
+		return errors.New("sessie niet gevonden")
+	}
+
+	// Trek de sessie in
+	if err := s.sessionRepo.RevokeByAccessToken(ctx, session.AccessToken); err != nil {
+		logger.Error("Fout bij intrekken sessie", "session_id", sessionID, "error", err)
+		return err
+	}
+
+	// Trek ook de access token in
+	if s.accessTokenRepo != nil {
+		if err := s.accessTokenRepo.RevokeToken(ctx, session.AccessToken); err != nil {
+			logger.Error("Fout bij intrekken access token van sessie", "session_id", sessionID, "error", err)
+			// Continue anyway
+		}
+	}
+
+	logger.Info("Sessie ingetrokken", "session_id", sessionID, "user_id", session.OwnerID)
+	return nil
+}
+
+// RevokeAllUserSessions trekt alle sessies van een gebruiker in
+func (s *AuthServiceImpl) RevokeAllUserSessions(ctx context.Context, userID string) error {
+	if s.sessionRepo == nil {
+		logger.Warn("Session repository niet beschikbaar, sessies worden niet ingetrokken")
+		return nil // Graceful degradation
+	}
+
+	if err := s.sessionRepo.RevokeAllUserSessionsComplete(ctx, userID); err != nil {
+		logger.Error("Fout bij intrekken alle sessies", "user_id", userID, "error", err)
+		return err
+	}
+
+	// Trek ook alle access tokens in
+	if s.accessTokenRepo != nil {
+		if err := s.accessTokenRepo.RevokeAllUserTokens(ctx, userID); err != nil {
+			logger.Error("Fout bij intrekken alle access tokens", "user_id", userID, "error", err)
+			// Continue anyway
+		}
+	}
+
+	logger.Info("Alle sessies ingetrokken", "user_id", userID)
+	return nil
+}
+
+// RevokeOtherUserSessions trekt alle sessies van een gebruiker in behalve de huidige sessie
+func (s *AuthServiceImpl) RevokeOtherUserSessions(ctx context.Context, userID, currentSessionID string) error {
+	if s.sessionRepo == nil {
+		logger.Warn("Session repository niet beschikbaar, andere sessies worden niet ingetrokken")
+		return nil // Graceful degradation
+	}
+
+	if err := s.sessionRepo.RevokeAllUserSessions(ctx, userID, currentSessionID); err != nil {
+		logger.Error("Fout bij intrekken andere sessies", "user_id", userID, "current_session_id", currentSessionID, "error", err)
+		return err
+	}
+
+	logger.Info("Andere sessies ingetrokken", "user_id", userID, "current_session_id", currentSessionID)
+	return nil
+}
+
 // RevokeAllUserRefreshTokens trekt alle refresh tokens van een gebruiker in
 func (s *AuthServiceImpl) RevokeAllUserRefreshTokens(ctx context.Context, userID string) error {
 	if err := s.refreshTokenRepo.RevokeAllUserTokens(ctx, userID); err != nil {
@@ -670,48 +814,6 @@ func (s *AuthServiceImpl) RevokeAllUserRefreshTokens(ctx context.Context, userID
 	}
 	logger.Info("Alle refresh tokens ingetrokken", "user_id", userID)
 	return nil
-}
-
-// ==============================================================================
-// V30+RBAC: PARTICIPANT-SPECIFIEKE HELPER FUNCTIES
-// ==============================================================================
-
-// validateParticipantAppAccess controleert of een gebruiker app toegang heeft via participant record
-// V30+RBAC: Gebruikt voor login validatie - alleen full account participants met app access mogen inloggen
-func (s *AuthServiceImpl) validateParticipantAppAccess(ctx context.Context, gebruikerID string, email string) bool {
-	// Zoek participant records gekoppeld aan deze gebruiker
-	participants, err := s.participantRepo.FindByEmail(ctx, email)
-	if err != nil {
-		logger.Error("Fout bij ophalen participant voor app access check",
-			"gebruiker_id", gebruikerID, "email", email, "error", err)
-		// Bij database fout: allow login (fail-open voor backwards compatibility)
-		return true
-	}
-
-	// Zoek full account participant gekoppeld aan deze gebruiker
-	for _, participant := range participants {
-		if participant.GebruikerID != nil && *participant.GebruikerID == gebruikerID {
-			// Check account type en app access
-			if participant.AccountType == "full" && participant.HasAppAccess {
-				logger.Debug("Participant app access validated",
-					"participant_id", participant.ID,
-					"gebruiker_id", gebruikerID,
-					"account_type", participant.AccountType)
-				return true
-			}
-
-			// Participant gevonden maar geen app access
-			logger.Warn("Participant found but no app access",
-				"participant_id", participant.ID,
-				"account_type", participant.AccountType,
-				"has_app_access", participant.HasAppAccess)
-			return false
-		}
-	}
-
-	// Geen participant gekoppeld aan deze gebruiker - dit is een legacy gebruiker (allow login)
-	logger.Debug("Geen participant gekoppeld aan gebruiker (legacy user)", "gebruiker_id", gebruikerID)
-	return true
 }
 
 // GetParticipantByGebruikerID haalt participant op basis van gebruiker ID
@@ -741,4 +843,705 @@ func (s *AuthServiceImpl) GetParticipantByGebruikerID(ctx context.Context, gebru
 	}
 
 	return nil, errors.New("geen participant gevonden voor deze gebruiker")
+}
+
+// RequestPasswordReset vraagt een wachtwoord reset aan voor een email adres
+func (s *AuthServiceImpl) RequestPasswordReset(ctx context.Context, email string) error {
+	logger.Info("Password reset request", "email", email)
+
+	// Controleer of gebruiker bestaat (zowel admin/staff als participant)
+	var userExists bool
+	var userType string
+
+	// Check admin/staff users
+	if gebruiker, err := s.gebruikerRepo.GetByEmail(ctx, email); err == nil && gebruiker != nil && gebruiker.IsActief {
+		userExists = true
+		userType = "gebruiker"
+		logger.Debug("Found active gebruiker for password reset", "email", email, "user_id", gebruiker.ID)
+	}
+
+	// Check participants if not found as gebruiker
+	if !userExists && s.participantRepo != nil {
+		if participants, err := s.participantRepo.FindByEmail(ctx, email); err == nil {
+			for _, participant := range participants {
+				if participant.AccountType == "full" && participant.HasAppAccess && participant.WachtwoordHash != nil {
+					userExists = true
+					userType = "participant"
+					logger.Debug("Found active participant for password reset", "email", email, "participant_id", participant.ID)
+					break
+				}
+			}
+		}
+	}
+
+	// Als gebruiker niet bestaat, geef geen foutmelding terug voor security (geen email enumeration)
+	if !userExists {
+		logger.Info("Password reset requested for non-existent or inactive user", "email", email)
+		return nil // Silent success voor security
+	}
+
+	// Genereer reset token
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		logger.Error("Failed to generate random bytes for password reset token", "error", err)
+		return errors.New("kon geen reset token genereren")
+	}
+	token := base64.URLEncoding.EncodeToString(tokenBytes)
+
+	// Sla token op in database (1 uur expiry)
+	resetToken := &models.PasswordResetToken{
+		Email:     email,
+		Token:     token,
+		ExpiresAt: time.Now().Add(1 * time.Hour),
+		IsUsed:    false,
+	}
+
+	if err := s.passwordResetTokenRepo.Create(ctx, resetToken); err != nil {
+		logger.Error("Failed to save password reset token", "email", email, "error", err)
+		return errors.New("kon reset token niet opslaan")
+	}
+
+	// Genereer reset link met frontend URL uit config
+	resetLink := fmt.Sprintf("%s/reset-password?token=%s", s.frontendURL, token)
+
+	// TODO: Email service integreren
+	// Voor nu loggen we alleen de link
+	logger.Info("Password reset token generated", "email", email, "token", token, "user_type", userType, "reset_link", resetLink)
+
+	// Hier zou normaal gesproken een email verzonden worden naar de gebruiker
+	// met een link naar de frontend waar ze hun wachtwoord kunnen resetten
+	// Bijvoorbeeld:
+	// if err := s.emailService.SendPasswordResetEmail(email, resetLink); err != nil {
+	// 	logger.Error("Failed to send password reset email", "email", email, "error", err)
+	// 	return errors.New("kon reset email niet verzenden")
+	// }
+
+	return nil
+}
+
+// ResetPasswordWithToken reset het wachtwoord met een geldige reset token
+func (s *AuthServiceImpl) ResetPasswordWithToken(ctx context.Context, token, newPassword string) error {
+	logger.Info("Password reset with token attempt")
+
+	// Haal token op uit database
+	resetToken, err := s.passwordResetTokenRepo.GetByToken(ctx, token)
+	if err != nil {
+		logger.Error("Failed to get password reset token", "error", err)
+		return errors.New("ongeldige reset token")
+	}
+
+	if resetToken == nil {
+		logger.Warn("Password reset token not found", "token", token[:8]+"...")
+		return errors.New("ongeldige reset token")
+	}
+
+	if !resetToken.IsValid() {
+		logger.Warn("Password reset token is invalid or expired", "token", token[:8]+"...", "is_used", resetToken.IsUsed, "expires_at", resetToken.ExpiresAt)
+		return errors.New("reset token is verlopen of al gebruikt")
+	}
+
+	// Controleer wachtwoord sterkte (minimaal 8 karakters)
+	if len(newPassword) < 8 {
+		logger.Warn("Password too short", "email", resetToken.Email)
+		return errors.New("wachtwoord moet minimaal 8 karakters bevatten")
+	}
+
+	// Reset wachtwoord voor gebruiker of participant
+	var resetErr error
+	var userType string
+
+	// Probeer eerst als admin/staff gebruiker
+	if gebruiker, err := s.gebruikerRepo.GetByEmail(ctx, resetToken.Email); err == nil && gebruiker != nil && gebruiker.IsActief {
+		resetErr = s.ResetPassword(ctx, resetToken.Email, newPassword)
+		userType = "gebruiker"
+	} else if s.participantRepo != nil {
+		// Probeer als participant
+		if participants, err := s.participantRepo.FindByEmail(ctx, resetToken.Email); err == nil {
+			for _, participant := range participants {
+				if participant.AccountType == "full" && participant.HasAppAccess && participant.WachtwoordHash != nil {
+					// Hash nieuw wachtwoord
+					hashedPassword, err := s.HashPassword(newPassword)
+					if err != nil {
+						logger.Error("Failed to hash new password for participant", "participant_id", participant.ID, "error", err)
+						resetErr = errors.New("kon wachtwoord niet hashen")
+						break
+					}
+
+					// Update participant wachtwoord
+					participant.WachtwoordHash = &hashedPassword
+					resetErr = s.participantRepo.Update(ctx, participant)
+					userType = "participant"
+					break
+				}
+			}
+		}
+	}
+
+	if resetErr != nil {
+		logger.Error("Failed to reset password", "email", resetToken.Email, "user_type", userType, "error", resetErr)
+		return errors.New("kon wachtwoord niet resetten")
+	}
+
+	// Markeer token als gebruikt
+	if err := s.passwordResetTokenRepo.MarkAsUsed(ctx, token); err != nil {
+		logger.Error("Failed to mark password reset token as used", "token", token[:8]+"...", "error", err)
+		// Dit is niet kritisch, continue
+	}
+
+	logger.Info("Password reset successful", "email", resetToken.Email, "user_type", userType)
+	return nil
+}
+
+// SendEmailVerification verzendt een email verificatie token naar een gebruiker
+func (s *AuthServiceImpl) SendEmailVerification(ctx context.Context, email, userID, userType string) error {
+	logger.Info("Email verification request", "email", email, "user_id", userID, "user_type", userType)
+
+	// Controleer of gebruiker bestaat en actief is
+	var userExists bool
+	if userType == "gebruiker" {
+		gebruiker, err := s.gebruikerRepo.GetByID(ctx, userID)
+		if err != nil || gebruiker == nil || !gebruiker.IsActief {
+			logger.Warn("Gebruiker niet gevonden of inactief voor email verificatie", "user_id", userID)
+			return errors.New("gebruiker niet gevonden of inactief")
+		}
+		userExists = true
+	} else if userType == "participant" && s.participantRepo != nil {
+		participant, err := s.participantRepo.GetByID(ctx, userID)
+		if err != nil || participant == nil || !participant.HasAppAccess {
+			logger.Warn("Participant niet gevonden of geen app toegang voor email verificatie", "user_id", userID)
+			return errors.New("participant niet gevonden of geen app toegang")
+		}
+		userExists = true
+	}
+
+	if !userExists {
+		logger.Warn("Ongeldig user type voor email verificatie", "user_type", userType)
+		return errors.New("ongeldig user type")
+	}
+
+	// Controleer of er al een actieve verificatie token bestaat
+	existingTokens, err := s.emailVerificationTokenRepo.GetByUserID(ctx, userID, userType)
+	if err != nil {
+		logger.Error("Fout bij ophalen bestaande verificatie tokens", "user_id", userID, "error", err)
+		return err
+	}
+
+	// Als er al een actieve token bestaat, geef een foutmelding terug
+	for _, token := range existingTokens {
+		if token.IsValid() {
+			logger.Info("Actieve verificatie token bestaat al", "user_id", userID, "email", email)
+			return errors.New("er is al een actieve verificatie token voor dit account")
+		}
+	}
+
+	// Genereer verificatie token
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		logger.Error("Fout bij genereren random bytes voor verificatie token", "error", err)
+		return errors.New("kon geen verificatie token genereren")
+	}
+	token := base64.URLEncoding.EncodeToString(tokenBytes)
+
+	// Sla token op in database (24 uur expiry)
+	verificationToken := &models.EmailVerificationToken{
+		Email:     email,
+		Token:     token,
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+		IsUsed:    false,
+		UserType:  userType,
+		UserID:    userID,
+	}
+
+	if err := s.emailVerificationTokenRepo.Create(ctx, verificationToken); err != nil {
+		logger.Error("Fout bij opslaan verificatie token", "email", email, "error", err)
+		return errors.New("kon verificatie token niet opslaan")
+	}
+
+	// Genereer verificatie link met frontend URL uit config
+	verificationLink := fmt.Sprintf("%s/verify-email?token=%s", s.frontendURL, token)
+
+	logger.Info("Email verification token generated", "email", email, "token", token[:8]+"...", "user_type", userType, "verification_link", verificationLink)
+
+	// Verstuur verificatie email
+	if s.emailService != nil {
+		// Haal naam op voor personalisatie
+		var naam string
+		if userType == "gebruiker" {
+			if gebruiker, err := s.gebruikerRepo.GetByID(ctx, userID); err == nil && gebruiker != nil {
+				naam = gebruiker.Naam
+			}
+		} else if userType == "participant" && s.participantRepo != nil {
+			if participant, err := s.participantRepo.GetByID(ctx, userID); err == nil && participant != nil {
+				naam = participant.Naam
+			}
+		}
+
+		if naam == "" {
+			naam = "Gebruiker" // Fallback naam
+		}
+
+		// Verstuur email met 24 uur expiry
+		if err := s.emailService.SendEmailVerificationEmail(email, naam, verificationLink, 24); err != nil {
+			logger.Error("Failed to send email verification", "email", email, "error", err)
+			return errors.New("kon verificatie email niet verzenden")
+		}
+	} else {
+		logger.Warn("Email service not available, skipping email verification send", "email", email)
+	}
+
+	return nil
+}
+
+// VerifyEmailWithToken verifieert een email adres met een token
+func (s *AuthServiceImpl) VerifyEmailWithToken(ctx context.Context, token string) error {
+	logger.Info("Email verification attempt with token")
+
+	// Haal token op uit database
+	verificationToken, err := s.emailVerificationTokenRepo.GetByToken(ctx, token)
+	if err != nil {
+		logger.Error("Fout bij ophalen verificatie token", "error", err)
+		return errors.New("ongeldige verificatie token")
+	}
+
+	if verificationToken == nil {
+		logger.Warn("Verificatie token niet gevonden", "token", token[:8]+"...")
+		return errors.New("ongeldige verificatie token")
+	}
+
+	if !verificationToken.IsValid() {
+		logger.Warn("Verificatie token is verlopen of al gebruikt", "token", token[:8]+"...", "is_used", verificationToken.IsUsed, "expires_at", verificationToken.ExpiresAt)
+		return errors.New("verificatie token is verlopen of al gebruikt")
+	}
+
+	// Update user verification status
+	// Opgelost: Gebruik nu een tagged switch op verificationToken.UserType (QF1003)
+	switch verificationToken.UserType {
+	case "gebruiker":
+		// Voor gebruikers: we zouden een email_verified veld kunnen toevoegen aan de gebruiker tabel
+		// Voor nu markeren we alleen de token als gebruikt
+		logger.Info("Gebruiker email verificatie succesvol", "user_id", verificationToken.UserID, "email", verificationToken.Email)
+	case "participant":
+		// Voor participants: update email_verified status
+		if s.participantRepo != nil {
+			participant, err := s.participantRepo.GetByID(ctx, verificationToken.UserID)
+			if err != nil || participant == nil {
+				logger.Error("Participant niet gevonden voor verificatie", "user_id", verificationToken.UserID, "error", err)
+				return errors.New("participant niet gevonden")
+			}
+
+			// Stel email_verified in op true (ervan uitgaande dat dit veld bestaat)
+			// participant.EmailVerified = true
+			// if err := s.participantRepo.Update(ctx, participant); err != nil {
+			// 	logger.Error("Fout bij updaten participant verificatie status", "user_id", verificationToken.UserID, "error", err)
+			// 	return errors.New("kon verificatie status niet updaten")
+			// }
+
+			logger.Info("Participant email verificatie succesvol", "user_id", verificationToken.UserID, "email", verificationToken.Email)
+		}
+	}
+
+	// Markeer token als gebruikt
+	if err := s.emailVerificationTokenRepo.MarkAsUsed(ctx, token); err != nil {
+		logger.Error("Fout bij markeren token als gebruikt", "token", token[:8]+"...", "error", err)
+		// Dit is niet kritisch, continue
+	}
+
+	logger.Info("Email verification successful", "email", verificationToken.Email, "user_type", verificationToken.UserType)
+	return nil
+}
+
+// ResendEmailVerification verzendt een nieuwe verificatie email
+func (s *AuthServiceImpl) ResendEmailVerification(ctx context.Context, email, userID, userType string) error {
+	logger.Info("Resend email verification request", "email", email, "user_id", userID, "user_type", userType)
+
+	// Invalideer bestaande tokens voor deze gebruiker
+	if err := s.emailVerificationTokenRepo.InvalidateUserTokens(ctx, userID, userType); err != nil {
+		logger.Error("Fout bij invalideren bestaande tokens", "user_id", userID, "error", err)
+		// Continue anyway
+	}
+
+	// Verstuur nieuwe verificatie email
+	return s.SendEmailVerification(ctx, email, userID, userType)
+}
+
+// IsEmailVerified controleert of een email adres is geverifieerd
+func (s *AuthServiceImpl) IsEmailVerified(ctx context.Context, userID, userType string) (bool, error) {
+	logger.Debug("Checking email verification status", "user_id", userID, "user_type", userType)
+
+	// Controleer of er gebruikte verificatie tokens bestaan voor deze gebruiker
+	tokens, err := s.emailVerificationTokenRepo.GetByUserID(ctx, userID, userType)
+	if err != nil {
+		logger.Error("Fout bij ophalen verificatie tokens", "user_id", userID, "error", err)
+		return false, err
+	}
+
+	// Als er minstens één gebruikte token is, is de email geverifieerd
+	for _, token := range tokens {
+		if token.IsUsed {
+			return true, nil
+		}
+	}
+
+	// Voorlopig: controleer ook user status (dit zou later vervangen kunnen worden door een dedicated email_verified veld)
+	// Opgelost: Gebruik nu een tagged switch op userType (QF1003)
+	switch userType {
+	case "gebruiker":
+		gebruiker, err := s.gebruikerRepo.GetByID(ctx, userID)
+		if err != nil {
+			return false, err
+		}
+		// Admin/staff accounts worden als geverifieerd beschouwd
+		return gebruiker != nil && gebruiker.IsActief, nil
+	case "participant":
+		participant, err := s.participantRepo.GetByID(ctx, userID)
+		if err != nil {
+			return false, err
+		}
+		// Participants met app access worden als geverifieerd beschouwd (voorlopig)
+		return participant != nil && participant.HasAppAccess, nil
+	default:
+		return false, nil
+	}
+}
+
+// GetGebruikerByEmail haalt een gebruiker op basis van email adres
+func (s *AuthServiceImpl) GetGebruikerByEmail(ctx context.Context, email string) (*models.Gebruiker, error) {
+	return s.gebruikerRepo.GetByEmail(ctx, email)
+}
+
+// GetParticipantByEmail haalt participants op basis van email adres
+func (s *AuthServiceImpl) GetParticipantByEmail(ctx context.Context, email string) ([]*models.Participant, error) {
+	if s.participantRepo == nil {
+		return nil, errors.New("participant repository niet beschikbaar")
+	}
+	return s.participantRepo.FindByEmail(ctx, email)
+}
+
+// ValidateAccessToken controleert of een access token geldig is in de database
+func (s *AuthServiceImpl) ValidateAccessToken(ctx context.Context, token string) error {
+	if s.accessTokenRepo == nil {
+		logger.Warn("Access token repository niet beschikbaar, token validatie overgeslagen")
+		return nil // Graceful degradation
+	}
+
+	accessToken, err := s.accessTokenRepo.GetByToken(ctx, token)
+	if err != nil {
+		logger.Error("Fout bij ophalen access token uit database", "error", err)
+		return errors.New("kon access token niet valideren")
+	}
+
+	if accessToken == nil {
+		logger.Warn("Access token niet gevonden in database")
+		return errors.New("access token niet gevonden")
+	}
+
+	if accessToken.IsRevoked {
+		logger.Warn("Access token is ingetrokken")
+		return errors.New("access token ingetrokken")
+	}
+
+	if !accessToken.IsValid() {
+		logger.Warn("Access token is niet meer geldig")
+		return errors.New("access token niet meer geldig")
+	}
+
+	logger.Debug("Access token validatie succesvol")
+	return nil
+}
+
+// RevokeAllUserAccessTokens trekt alle access tokens van een gebruiker in
+func (s *AuthServiceImpl) RevokeAllUserAccessTokens(ctx context.Context, userID string) error {
+	if s.accessTokenRepo == nil {
+		logger.Warn("Access token repository niet beschikbaar, tokens worden niet ingetrokken")
+		return nil // Graceful degradation
+	}
+
+	if err := s.accessTokenRepo.RevokeAllUserTokens(ctx, userID); err != nil {
+		logger.Error("Fout bij revoken alle access tokens", "user_id", userID, "error", err)
+		return err
+	}
+
+	logger.Info("Alle access tokens ingetrokken", "user_id", userID)
+	return nil
+}
+
+// storeAccessToken slaat een access token op in de database voor server-side validatie
+func (s *AuthServiceImpl) storeAccessToken(ctx context.Context, token, ownerID string) error {
+	if s.accessTokenRepo == nil {
+		logger.Warn("Access token repository niet beschikbaar, token wordt niet opgeslagen")
+		return nil // Graceful degradation
+	}
+
+	accessToken := &models.AccessToken{
+		OwnerID:   ownerID,
+		Token:     token,
+		ExpiresAt: time.Now().Add(s.tokenExpiry),
+		IsRevoked: false,
+	}
+
+	if err := s.accessTokenRepo.Create(ctx, accessToken); err != nil {
+		logger.Error("Fout bij opslaan access token in database", "owner_id", ownerID, "error", err)
+		return err
+	}
+
+	logger.Debug("Access token opgeslagen in database", "owner_id", ownerID)
+	return nil
+}
+
+// CreateSessionForLogin maakt een nieuwe sessie aan voor een login
+func (s *AuthServiceImpl) CreateSessionForLogin(ctx context.Context, userID, userType, accessToken string, ipAddress, userAgent string) (*models.Session, error) {
+	if s.sessionRepo == nil {
+		logger.Warn("Session repository niet beschikbaar, sessie wordt niet aangemaakt")
+		return nil, nil // Graceful degradation
+	}
+
+	session := &models.Session{
+		OwnerID:      userID,
+		AccessToken:  accessToken,
+		IPAddress:    ipAddress,
+		UserAgent:    userAgent,
+		DeviceInfo:   s.extractDeviceInfo(userAgent),
+		IsActive:     true,
+		LastActivity: time.Now(),
+		ExpiresAt:    time.Now().Add(s.tokenExpiry),
+	}
+
+	if err := s.sessionRepo.Create(ctx, session); err != nil {
+		logger.Error("Fout bij aanmaken sessie", "user_id", userID, "error", err)
+		return nil, err
+	}
+
+	logger.Info("Nieuwe sessie aangemaakt", "session_id", session.ID, "user_id", userID, "user_type", userType)
+	return session, nil
+}
+
+// extractDeviceInfo haalt device informatie op uit de user agent string
+func (s *AuthServiceImpl) extractDeviceInfo(userAgent string) models.DeviceInfo {
+	// Eenvoudige device detectie gebaseerd op user agent
+	userAgentLower := strings.ToLower(userAgent)
+
+	var deviceType string
+	if strings.Contains(userAgentLower, "mobile") ||
+		strings.Contains(userAgentLower, "android") ||
+		strings.Contains(userAgentLower, "iphone") {
+		deviceType = "mobile"
+	} else if strings.Contains(userAgentLower, "tablet") ||
+		strings.Contains(userAgentLower, "ipad") {
+		deviceType = "tablet"
+	} else {
+		deviceType = "desktop"
+	}
+
+	// Parse browser info (simplified)
+	var browser, browserVersion string
+	if strings.Contains(userAgentLower, "chrome") {
+		browser = "Chrome"
+	} else if strings.Contains(userAgentLower, "firefox") {
+		browser = "Firefox"
+	} else if strings.Contains(userAgentLower, "safari") && !strings.Contains(userAgentLower, "chrome") {
+		browser = "Safari"
+	} else if strings.Contains(userAgentLower, "edge") {
+		browser = "Edge"
+	} else {
+		browser = "Unknown"
+	}
+
+	// Parse OS info (simplified)
+	var os, platform string
+	if strings.Contains(userAgentLower, "windows") {
+		os = "Windows"
+		platform = "Windows"
+	} else if strings.Contains(userAgentLower, "mac os x") || strings.Contains(userAgentLower, "macos") {
+		os = "macOS"
+		platform = "macOS"
+	} else if strings.Contains(userAgentLower, "linux") {
+		os = "Linux"
+		platform = "Linux"
+	} else if strings.Contains(userAgentLower, "android") {
+		os = "Android"
+		platform = "Android"
+	} else if strings.Contains(userAgentLower, "ios") || strings.Contains(userAgentLower, "iphone") || strings.Contains(userAgentLower, "ipad") {
+		os = "iOS"
+		platform = "iOS"
+	} else {
+		os = "Unknown"
+		platform = "Unknown"
+	}
+
+	return models.DeviceInfo{
+		Browser:        browser,
+		BrowserVersion: browserVersion,
+		OS:             os,
+		OSVersion:      "", // Would need more complex parsing
+		DeviceType:     deviceType,
+		Platform:       platform,
+	}
+}
+
+// UpdateAccessTokenWithSession werkt een access token bij met session informatie
+func (s *AuthServiceImpl) UpdateAccessTokenWithSession(ctx context.Context, token string, sessionID string) error {
+	if s.accessTokenRepo == nil {
+		logger.Warn("Access token repository niet beschikbaar, token wordt niet bijgewerkt met session")
+		return nil // Graceful degradation
+	}
+
+	// Update de access token met session ID
+	if err := s.accessTokenRepo.UpdateSessionID(ctx, token, sessionID); err != nil {
+		logger.Error("Fout bij updaten access token met session ID", "token", token[:8]+"...", "session_id", sessionID, "error", err)
+		return err
+	}
+
+	logger.Debug("Access token bijgewerkt met session ID", "token", token[:8]+"...", "session_id", sessionID)
+	return nil
+}
+
+// DeleteUserAccount verwijdert een gebruikersaccount volledig (GDPR compliance)
+// Ondersteunt zowel admin/staff gebruikers als participants
+func (s *AuthServiceImpl) DeleteUserAccount(ctx context.Context, userID, password, reason string) error {
+	logger.Info("Account deletion request", "user_id", userID)
+
+	// Controleer of gebruiker bestaat (admin/staff)
+	gebruiker, err := s.gebruikerRepo.GetByID(ctx, userID)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		logger.Error("Fout bij ophalen gebruiker voor deletion", "user_id", userID, "error", err)
+		return errors.New("kon gebruiker niet controleren")
+	}
+
+	var userType string
+	var userEmail string
+
+	if gebruiker != nil && gebruiker.IsActief {
+		// Admin/staff gebruiker gevonden
+		userType = "gebruiker"
+		userEmail = gebruiker.Email
+
+		// Verifieer wachtwoord voor admin/staff gebruikers
+		if !s.VerifyPassword(gebruiker.WachtwoordHash, password) {
+			logger.Warn("Ongeldig wachtwoord bij account deletion", "user_id", userID)
+			return errors.New("ongeldige inloggegevens")
+		}
+	} else {
+		// Check of het een participant is
+		if s.participantRepo != nil {
+			participant, err := s.participantRepo.GetByID(ctx, userID)
+			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				logger.Error("Fout bij ophalen participant voor deletion", "user_id", userID, "error", err)
+				return errors.New("kon participant niet controleren")
+			}
+
+			if participant != nil && participant.HasAppAccess && participant.WachtwoordHash != nil {
+				// Participant gevonden
+				userType = "participant"
+				userEmail = participant.Email
+
+				// Verifieer wachtwoord voor participants
+				if !s.VerifyPassword(*participant.WachtwoordHash, password) {
+					logger.Warn("Ongeldig wachtwoord bij participant account deletion", "user_id", userID)
+					return errors.New("ongeldige inloggegevens")
+				}
+			} else {
+				logger.Warn("Geen actief account gevonden voor deletion", "user_id", userID)
+				return errors.New("gebruiker niet gevonden")
+			}
+		} else {
+			logger.Warn("Geen actief account gevonden voor deletion", "user_id", userID)
+			return errors.New("gebruiker niet gevonden")
+		}
+	}
+
+	// Audit log de deletion request
+	logger.Audit(ctx, logger.AuditEvent{
+		EventType:  logger.AuditAccountDeletion,
+		ActorID:    userID,
+		ActorEmail: userEmail,
+		IPAddress:  "", // Wordt gevuld door caller
+		UserAgent:  "", // Wordt gevuld door caller
+		Result:     logger.ResultSuccess,
+		Metadata: map[string]interface{}{
+			"user_type": userType,
+			"reason":    reason,
+		},
+	})
+
+	// Verwijder alle gerelateerde data afhankelijk van user type
+	if userType == "gebruiker" {
+		// Admin/staff gebruiker: verwijder alle gerelateerde data
+		if err := s.deleteGebruikerData(ctx, userID); err != nil {
+			logger.Error("Fout bij verwijderen gebruiker data", "user_id", userID, "error", err)
+			return errors.New("kon gebruiker data niet verwijderen")
+		}
+	} else {
+		// Participant: verwijder alle gerelateerde data
+		if err := s.deleteParticipantData(ctx, userID); err != nil {
+			logger.Error("Fout bij verwijderen participant data", "user_id", userID, "error", err)
+			return errors.New("kon participant data niet verwijderen")
+		}
+	}
+
+	logger.Info("Account succesvol verwijderd", "user_id", userID, "user_type", userType, "email", userEmail)
+	return nil
+}
+
+// deleteGebruikerData verwijdert alle data gerelateerd aan een admin/staff gebruiker
+func (s *AuthServiceImpl) deleteGebruikerData(ctx context.Context, userID string) error {
+	// 1. Verwijder refresh tokens
+	if s.refreshTokenRepo != nil {
+		if err := s.refreshTokenRepo.RevokeAllUserTokens(ctx, userID); err != nil {
+			logger.Error("Fout bij verwijderen refresh tokens", "user_id", userID, "error", err)
+			return err
+		}
+	}
+
+	// 2. Verwijder access tokens
+	if s.accessTokenRepo != nil {
+		if err := s.accessTokenRepo.RevokeAllUserTokens(ctx, userID); err != nil {
+			logger.Error("Fout bij verwijderen access tokens", "user_id", userID, "error", err)
+			return err
+		}
+	}
+
+	// 3. Verwijder user roles
+	if s.userRoleRepo != nil {
+		if err := s.userRoleRepo.DeleteByUser(ctx, userID); err != nil {
+			logger.Error("Fout bij verwijderen user roles", "user_id", userID, "error", err)
+			return err
+		}
+	}
+
+	// 4. Verwijder de gebruiker zelf (dit is de belangrijkste stap voor GDPR)
+	if err := s.gebruikerRepo.Delete(ctx, userID); err != nil {
+		logger.Error("Fout bij verwijderen gebruiker record", "user_id", userID, "error", err)
+		return err
+	}
+
+	return nil
+}
+
+// deleteParticipantData verwijdert alle data gerelateerd aan een participant
+func (s *AuthServiceImpl) deleteParticipantData(ctx context.Context, participantID string) error {
+	// 1. Verwijder refresh tokens
+	if s.refreshTokenRepo != nil {
+		if err := s.refreshTokenRepo.RevokeAllUserTokens(ctx, participantID); err != nil {
+			logger.Error("Fout bij verwijderen participant refresh tokens", "participant_id", participantID, "error", err)
+			return err
+		}
+	}
+
+	// 2. Verwijder access tokens
+	if s.accessTokenRepo != nil {
+		if err := s.accessTokenRepo.RevokeAllUserTokens(ctx, participantID); err != nil {
+			logger.Error("Fout bij verwijderen participant access tokens", "participant_id", participantID, "error", err)
+			return err
+		}
+	}
+
+	// 3. Verwijder de participant zelf (dit is de belangrijkste stap voor GDPR)
+	if s.participantRepo != nil {
+		if err := s.participantRepo.Delete(ctx, participantID); err != nil {
+			logger.Error("Fout bij verwijderen participant record", "participant_id", participantID, "error", err)
+			return err
+		}
+	}
+
+	return nil
 }

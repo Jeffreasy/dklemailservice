@@ -1,0 +1,5952 @@
+basePath: /api
+definitions:
+  handlers.MailResponse:
+    properties:
+      account_type:
+        type: string
+      content_type:
+        type: string
+      created_at:
+        type: string
+      html:
+        description: Gedecodeerde/gesanitized HTML body
+        type: string
+      id:
+        type: string
+      message_id:
+        type: string
+      processed_at:
+        type: string
+      read:
+        type: boolean
+      received_at:
+        type: string
+      sender:
+        type: string
+      subject:
+        type: string
+      to:
+        type: string
+      uid:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  handlers.PaginatedMailResponse:
+    properties:
+      emails:
+        items:
+          $ref: '#/definitions/handlers.MailResponse'
+        type: array
+      totalCount:
+        type: integer
+    type: object
+  models.AccountType:
+    enum:
+    - full
+    - temporary
+    type: string
+    x-enum-comments:
+      AccountTypeFull: Volledige account met app toegang
+      AccountTypeTemporary: Tijdelijke registratie alleen voor event
+    x-enum-descriptions:
+    - Volledige account met app toegang
+    - Tijdelijke registratie alleen voor event
+    x-enum-varnames:
+    - AccountTypeFull
+    - AccountTypeTemporary
+  models.AddPhotoToAlbumRequest:
+    properties:
+      order_number:
+        type: integer
+      photo_id:
+        type: string
+    required:
+    - photo_id
+    type: object
+  models.Album:
+    properties:
+      cover_photo_id:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      order_number:
+        type: integer
+      title:
+        type: string
+      updated_at:
+        type: string
+      visible:
+        type: boolean
+    type: object
+  models.AlbumOrder:
+    properties:
+      id:
+        type: string
+      order_number:
+        minimum: 0
+        type: integer
+    required:
+    - id
+    type: object
+  models.AlbumPhoto:
+    properties:
+      album_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      order_number:
+        type: integer
+      photo_id:
+        type: string
+    type: object
+  models.AlbumWithCover:
+    properties:
+      cover_photo:
+        $ref: '#/definitions/models.Photo'
+      cover_photo_id:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      order_number:
+        type: integer
+      title:
+        type: string
+      updated_at:
+        type: string
+      visible:
+        type: boolean
+    type: object
+  models.AuthDeleteAccountRequest:
+    properties:
+      password:
+        type: string
+      reason:
+        type: string
+    type: object
+  models.AuthLoginResponse:
+    properties:
+      refresh_token:
+        type: string
+      success:
+        type: boolean
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/models.AuthUserResponse'
+    type: object
+  models.AuthProfileResponse:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      is_actief:
+        type: boolean
+      laatste_login:
+        type: string
+      naam:
+        type: string
+      permissions:
+        items:
+          additionalProperties:
+            type: string
+          type: object
+        type: array
+      roles:
+        items:
+          additionalProperties: true
+          type: object
+        type: array
+    type: object
+  models.AuthRefreshRequest:
+    properties:
+      refresh_token:
+        type: string
+    type: object
+  models.AuthRefreshResponse:
+    properties:
+      refresh_token:
+        type: string
+      success:
+        type: boolean
+      token:
+        type: string
+    type: object
+  models.AuthResetPasswordRequest:
+    properties:
+      huidig_wachtwoord:
+        type: string
+      nieuw_wachtwoord:
+        type: string
+    type: object
+  models.AuthUserResponse:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      is_actief:
+        type: boolean
+      naam:
+        type: string
+      permissions:
+        items:
+          additionalProperties:
+            type: string
+          type: object
+        type: array
+      roles:
+        items:
+          additionalProperties: true
+          type: object
+        type: array
+    type: object
+  models.ContactAntwoord:
+    properties:
+      contact_id:
+        type: string
+      email_verzonden:
+        type: boolean
+      id:
+        type: string
+      tekst:
+        type: string
+      verzonden_door:
+        type: string
+      verzonden_op:
+        type: string
+    type: object
+  models.ContactFormulier:
+    properties:
+      antwoord_datum:
+        type: string
+      antwoord_door:
+        type: string
+      antwoord_tekst:
+        type: string
+      antwoorden:
+        description: Relatie met antwoorden
+        items:
+          $ref: '#/definitions/models.ContactAntwoord'
+        type: array
+      beantwoord:
+        description: Nieuwe velden voor antwoorden
+        type: boolean
+      behandeld_door:
+        type: string
+      behandeld_op:
+        type: string
+      bericht:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      email_verzonden:
+        type: boolean
+      email_verzonden_op:
+        type: string
+      id:
+        type: string
+      naam:
+        type: string
+      notities:
+        type: string
+      privacy_akkoord:
+        type: boolean
+      status:
+        description: 'V27: Foreign key to lookup table (database column is ''status'')'
+        type: string
+      status_type:
+        $ref: '#/definitions/models.ContactStatusType'
+      test_mode:
+        description: Test mode veld
+        type: boolean
+      updated_at:
+        type: string
+    type: object
+  models.ContactStatusType:
+    properties:
+      description:
+        type: string
+      status:
+        description: 'Database column: status'
+        type: string
+    type: object
+  models.Distance:
+    properties:
+      fund_amount:
+        description: 'V26_08: Renamed from ''amount'''
+        type: integer
+      registration_fee:
+        type: integer
+      route:
+        type: string
+    type: object
+  models.Event:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      description:
+        type: string
+      end_time:
+        type: string
+      event_config:
+        $ref: '#/definitions/models.EventConfig'
+      geofences:
+        items:
+          $ref: '#/definitions/models.Geofence'
+        type: array
+      id:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      start_time:
+        type: string
+      status:
+        description: 'V27: Foreign key to lookup table (database column is ''status'')'
+        type: string
+      status_type:
+        $ref: '#/definitions/models.EventStatusType'
+      updated_at:
+        type: string
+    type: object
+  models.EventConfig:
+    additionalProperties: true
+    type: object
+  models.EventCreateRequest:
+    properties:
+      description:
+        type: string
+      end_time:
+        type: string
+      event_config:
+        $ref: '#/definitions/models.EventConfig'
+      geofences:
+        items:
+          $ref: '#/definitions/models.Geofence'
+        type: array
+      is_active:
+        type: boolean
+      name:
+        type: string
+      start_time:
+        description: ISO 8601 format
+        type: string
+      status:
+        type: string
+    required:
+    - geofences
+    - name
+    - start_time
+    type: object
+  models.EventParticipantResponse:
+    properties:
+      check_in_time:
+        type: string
+      current_steps:
+        description: Deprecated, kept for backwards compatibility
+        type: integer
+      distance_route:
+        description: 'V26: Distance route'
+        type: string
+      event_id:
+        type: string
+      event_name:
+        type: string
+      finish_time:
+        type: string
+      id:
+        type: string
+      last_location_update:
+        type: string
+      participant_id:
+        type: string
+      participant_name:
+        type: string
+      participant_role:
+        description: 'V26: Role name'
+        type: string
+      participant_role_description:
+        description: 'V26: Role description'
+        type: string
+      registered_at:
+        type: string
+      start_time:
+        type: string
+      status:
+        description: 'V27: Registration status'
+        type: string
+      status_description:
+        description: 'V27: Status lookup description'
+        type: string
+      steps:
+        description: Changed from CurrentSteps to match EventRegistration
+        type: integer
+      total_distance:
+        type: number
+      tracking_status:
+        type: string
+    type: object
+  models.EventRegistration:
+    properties:
+      antwoorden_count:
+        description: Antwoorden count voor tracking
+        type: integer
+      behandeld_door:
+        type: string
+      behandeld_op:
+        type: string
+      bijzonderheden:
+        type: string
+      check_in_time:
+        type: string
+      distance:
+        $ref: '#/definitions/models.Distance'
+      distance_route:
+        description: 'V26: Database column is ''distance_route'''
+        type: string
+      email_verzonden:
+        type: boolean
+      email_verzonden_op:
+        type: string
+      event:
+        $ref: '#/definitions/models.Event'
+      event_id:
+        type: string
+      finish_time:
+        type: string
+      heeft_vervoer:
+        description: 'V37: Transport vraag'
+        type: boolean
+      id:
+        type: string
+      last_location_update:
+        type: string
+      notities:
+        type: string
+      ondersteuning:
+        type: string
+      participant:
+        allOf:
+        - $ref: '#/definitions/models.Participant'
+        description: '--- GORM Relaties ---'
+      participant_id:
+        type: string
+      participant_role_name:
+        description: 'V26: Database column is ''participant_role_name'''
+        type: string
+      registered_at:
+        type: string
+      registration_status:
+        $ref: '#/definitions/models.RegistrationStatusType'
+      role:
+        $ref: '#/definitions/models.ParticipantRole'
+      start_time:
+        type: string
+      status:
+        description: |-
+          --- Foreign Keys (V26 & V27) ---
+          V27: Database column is 'status' (renamed from status_key)
+        type: string
+      steps:
+        description: '--- Velden verplaatst van ''Aanmelding'' (nu Participant) ---'
+        type: integer
+      terms:
+        description: 'V37: Terms veld behouden in event_registrations'
+        type: boolean
+      test_mode:
+        type: boolean
+      total_distance:
+        type: number
+      tracking_status:
+        description: GPS Tracking velden (V23 event_participants)
+        type: string
+    type: object
+  models.EventResponse:
+    properties:
+      description:
+        type: string
+      end_time:
+        type: string
+      event_config:
+        $ref: '#/definitions/models.EventConfig'
+      geofences:
+        items:
+          $ref: '#/definitions/models.Geofence'
+        type: array
+      id:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      start_time:
+        description: ISO 8601 format
+        type: string
+      status:
+        description: 'V27: Direct database column'
+        type: string
+      status_description:
+        description: 'V27: Lookup table description'
+        type: string
+    type: object
+  models.EventStatusType:
+    properties:
+      description:
+        type: string
+      status:
+        description: 'Database column: status'
+        type: string
+    type: object
+  models.EventUpdateRequest:
+    properties:
+      description:
+        type: string
+      end_time:
+        type: string
+      event_config:
+        $ref: '#/definitions/models.EventConfig'
+      geofences:
+        items:
+          $ref: '#/definitions/models.Geofence'
+        type: array
+      is_active:
+        type: boolean
+      name:
+        type: string
+      start_time:
+        type: string
+      status:
+        type: string
+    type: object
+  models.GebruikerLogin:
+    properties:
+      email:
+        type: string
+      wachtwoord:
+        type: string
+    required:
+    - email
+    - wachtwoord
+    type: object
+  models.Geofence:
+    properties:
+      lat:
+        description: Latitude
+        type: number
+      long:
+        description: Longitude
+        type: number
+      name:
+        type: string
+      radius:
+        description: Radius in meters
+        type: number
+      type:
+        description: '"start", "checkpoint", "finish"'
+        type: string
+    type: object
+  models.Participant:
+    properties:
+      account_type:
+        allOf:
+        - $ref: '#/definitions/models.AccountType'
+        description: 'V30: Duaal registratiesysteem velden'
+      antwoorden:
+        description: Relatie met antwoorden
+        items:
+          $ref: '#/definitions/models.ParticipantAntwoord'
+        type: array
+      created_at:
+        type: string
+      email:
+        type: string
+      event_registrations:
+        description: Relatie met event registraties
+        items:
+          $ref: '#/definitions/models.EventRegistration'
+        type: array
+      gebruiker_id:
+        type: string
+      has_app_access:
+        type: boolean
+      id:
+        type: string
+      naam:
+        type: string
+      registration_year:
+        description: 'Voor temporary accounts: evenementjaar'
+        type: integer
+      telefoon:
+        type: string
+      terms:
+        description: '''terms'' bleef op Participant (V28)'
+        type: boolean
+      test_mode:
+        description: Dit veld ontbrak nog (uit V1)
+        type: boolean
+      updated_at:
+        type: string
+      upgraded_at:
+        type: string
+      upgraded_to_gebruiker_id:
+        type: string
+    type: object
+  models.ParticipantAntwoord:
+    properties:
+      email_verzonden:
+        type: boolean
+      id:
+        type: string
+      participant_id:
+        description: Hernoemd
+        type: string
+      tekst:
+        type: string
+      verzonden_door:
+        type: string
+      verzonden_op:
+        type: string
+    type: object
+  models.ParticipantRole:
+    properties:
+      description:
+        type: string
+      is_active:
+        description: Required by repository queries
+        type: boolean
+      name:
+        type: string
+    type: object
+  models.Partner:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      logo:
+        type: string
+      name:
+        type: string
+      order_number:
+        type: integer
+      since:
+        type: string
+      tier:
+        type: string
+      updated_at:
+        type: string
+      visible:
+        type: boolean
+      website:
+        type: string
+    type: object
+  models.Photo:
+    properties:
+      alt_text:
+        type: string
+      cloudinary_folder:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      thumbnail_url:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      url:
+        type: string
+      visible:
+        type: boolean
+      year:
+        type: integer
+    type: object
+  models.PhotoOrder:
+    properties:
+      order_number:
+        minimum: 0
+        type: integer
+      photo_id:
+        type: string
+    required:
+    - photo_id
+    type: object
+  models.PhotoWithAlbumInfo:
+    properties:
+      album_id:
+        type: string
+      alt_text:
+        type: string
+      cloudinary_folder:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      order_number:
+        type: integer
+      thumbnail_url:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      url:
+        type: string
+      visible:
+        type: boolean
+      year:
+        type: integer
+    type: object
+  models.ProgramSchedule:
+    properties:
+      category:
+        type: string
+      created_at:
+        type: string
+      event_description:
+        type: string
+      icon_name:
+        type: string
+      id:
+        type: string
+      latitude:
+        type: number
+      longitude:
+        type: number
+      order_number:
+        type: integer
+      time:
+        type: string
+      updated_at:
+        type: string
+      visible:
+        type: boolean
+    type: object
+  models.PublicRegistrationRequest:
+    properties:
+      afstand:
+        enum:
+        - 2.5 KM
+        - 6 KM
+        - 10 KM
+        - 15 KM
+        type: string
+      bijzonderheden:
+        description: Verplicht als Ondersteuning = Ja of Anders
+        type: string
+      email:
+        type: string
+      event_id:
+        description: Event context
+        type: string
+      heeft_vervoer:
+        description: 'V37: Transport vraag'
+        type: boolean
+      naam:
+        description: Persoonlijke gegevens
+        type: string
+      ondersteuning:
+        enum:
+        - Ja
+        - Nee
+        - Anders
+        type: string
+      rol:
+        description: Event keuzes
+        enum:
+        - Deelnemer
+        - Begeleider
+        - Vrijwilliger
+        type: string
+      telefoon:
+        description: Optioneel, maar verplicht voor Begeleider/Vrijwilliger
+        type: string
+      terms:
+        description: Voorwaarden
+        type: boolean
+      test_mode:
+        description: Test mode
+        type: boolean
+      wachtwoord:
+        description: Verplicht als WantAccount = true
+        type: string
+      want_account:
+        description: 'Account keuze - V30: Nieuw duaal systeem'
+        type: boolean
+    required:
+    - afstand
+    - email
+    - heeft_vervoer
+    - naam
+    - ondersteuning
+    - rol
+    - terms
+    type: object
+  models.PublicRegistrationResponse:
+    properties:
+      account_type:
+        $ref: '#/definitions/models.AccountType'
+      event_date:
+        type: string
+      event_name:
+        description: Event details
+        type: string
+      gebruiker_id:
+        description: Extra info voor full accounts
+        type: string
+      has_app_access:
+        type: boolean
+      message:
+        type: string
+      participant_id:
+        type: string
+      registration_id:
+        description: EventRegistration ID
+        type: string
+      success:
+        type: boolean
+    type: object
+  models.RadioRecording:
+    properties:
+      audio_url:
+        type: string
+      created_at:
+        type: string
+      date:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      order_number:
+        type: integer
+      thumbnail_url:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      visible:
+        type: boolean
+    type: object
+  models.RegistrationStatusType:
+    properties:
+      description:
+        type: string
+      status:
+        description: 'Database column: status'
+        type: string
+    type: object
+  models.ReorderAlbumsRequest:
+    properties:
+      album_order:
+        items:
+          $ref: '#/definitions/models.AlbumOrder'
+        minItems: 1
+        type: array
+    required:
+    - album_order
+    type: object
+  models.ReorderPhotosRequest:
+    properties:
+      photo_order:
+        items:
+          $ref: '#/definitions/models.PhotoOrder'
+        minItems: 1
+        type: array
+    required:
+    - photo_order
+    type: object
+  models.RouteFund:
+    properties:
+      amount:
+        description: Bedrag in euro's
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: string
+      route:
+        description: Bijv. "6 KM", "10 KM", etc.
+        type: string
+      updated_at:
+        type: string
+    type: object
+  models.RouteFundRequest:
+    properties:
+      amount:
+        minimum: 0
+        type: integer
+      route:
+        type: string
+    required:
+    - amount
+    - route
+    type: object
+  models.SocialEmbed:
+    properties:
+      created_at:
+        type: string
+      embed_code:
+        type: string
+      id:
+        type: string
+      order_number:
+        type: integer
+      platform:
+        type: string
+      updated_at:
+        type: string
+      visible:
+        type: boolean
+    type: object
+  models.SocialLink:
+    properties:
+      bg_color_class:
+        type: string
+      created_at:
+        type: string
+      icon_color_class:
+        type: string
+      id:
+        type: string
+      order_number:
+        type: integer
+      platform:
+        type: string
+      updated_at:
+        type: string
+      url:
+        type: string
+      visible:
+        type: boolean
+    type: object
+  models.Sponsor:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      logo_url:
+        type: string
+      name:
+        type: string
+      order_number:
+        type: integer
+      updated_at:
+        type: string
+      visible:
+        type: boolean
+      website_url:
+        type: string
+    type: object
+  models.TitleSection:
+    properties:
+      created_at:
+        type: string
+      detail_1_description:
+        type: string
+      detail_1_title:
+        type: string
+      detail_2_description:
+        type: string
+      detail_2_title:
+        type: string
+      detail_3_description:
+        type: string
+      detail_3_title:
+        type: string
+      event_subtitle:
+        type: string
+      event_title:
+        type: string
+      id:
+        type: string
+      image_alt:
+        type: string
+      image_url:
+        type: string
+      participant_count:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  models.UnderConstruction:
+    properties:
+      contact_email:
+        type: string
+      created_at:
+        type: string
+      expected_date:
+        type: string
+      footer_text:
+        type: string
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      logo_url:
+        type: string
+      message:
+        type: string
+      newsletter_enabled:
+        type: boolean
+      progress_percentage:
+        type: integer
+      social_links:
+        description: JSON string
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  models.UpdateEventRegistrationRequest:
+    properties:
+      notities:
+        example: Some notes about the registration
+        type: string
+      status:
+        example: confirmed
+        type: string
+    type: object
+  models.UpgradeToFullAccountRequest:
+    properties:
+      email:
+        type: string
+      wachtwoord:
+        minLength: 8
+        type: string
+    required:
+    - email
+    - wachtwoord
+    type: object
+  models.UpgradeToFullAccountResponse:
+    properties:
+      gebruiker_id:
+        type: string
+      has_app_access:
+        type: boolean
+      message:
+        type: string
+      participant_id:
+        description: Participant info blijft hetzelfde maar heeft nu app toegang
+        type: string
+      success:
+        type: boolean
+    type: object
+  models.Video:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      order_number:
+        type: integer
+      thumbnail_url:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      url:
+        type: string
+      video_id:
+        type: string
+      visible:
+        type: boolean
+    type: object
+  services.UploadResult:
+    properties:
+      bytes:
+        type: integer
+      format:
+        type: string
+      height:
+        type: integer
+      public_id:
+        type: string
+      secure_url:
+        type: string
+      thumbnail_url:
+        type: string
+      url:
+        type: string
+      width:
+        type: integer
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: info@dekoninklijkeloop.nl
+    name: API Support
+    url: http://www.dekoninklijkeloop.nl
+  description: API voor de De Koninklijke Loop email service - inclusief registratie,
+    deelnemersbeheer, CMS en meer
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: DKL Email Service API
+  version: "1.0"
+paths:
+  /api/albums:
+    get:
+      consumes:
+      - application/json
+      description: Returns all visible albums ordered by order_number. Use ?include_covers=true
+        to include cover photo information.
+      parameters:
+      - description: Include cover photo information
+        in: query
+        name: include_covers
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.AlbumWithCover'
+            type: array
+      summary: Get visible albums
+      tags:
+      - Albums
+    post:
+      consumes:
+      - application/json
+      description: Creates a new album
+      parameters:
+      - description: Album data
+        in: body
+        name: album
+        required: true
+        schema:
+          $ref: '#/definitions/models.Album'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Album'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create album
+      tags:
+      - Albums
+  /api/albums/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes an album
+      parameters:
+      - description: Album ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete album
+      tags:
+      - Albums
+    get:
+      consumes:
+      - application/json
+      description: Returns a specific album by ID
+      parameters:
+      - description: Album ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Album'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get album by ID
+      tags:
+      - Albums
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing album
+      parameters:
+      - description: Album ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Album data
+        in: body
+        name: album
+        required: true
+        schema:
+          $ref: '#/definitions/models.Album'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Album'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update album
+      tags:
+      - Albums
+  /api/albums/{id}/photos:
+    get:
+      consumes:
+      - application/json
+      description: Returns all visible photos for a specific album with relationship
+        data
+      parameters:
+      - description: Album ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.PhotoWithAlbumInfo'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get photos for album
+      tags:
+      - Albums
+    post:
+      consumes:
+      - application/json
+      description: Adds a photo to an album with optional order number
+      parameters:
+      - description: Album ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Photo data
+        in: body
+        name: photo
+        required: true
+        schema:
+          $ref: '#/definitions/models.AddPhotoToAlbumRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.AlbumPhoto'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Add photo to album
+      tags:
+      - Albums
+  /api/albums/{id}/photos/{photoId}:
+    delete:
+      consumes:
+      - application/json
+      description: Removes a photo from an album
+      parameters:
+      - description: Album ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Photo ID
+        in: path
+        name: photoId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Remove photo from album
+      tags:
+      - Albums
+  /api/albums/{id}/photos/reorder:
+    put:
+      consumes:
+      - application/json
+      description: Updates the order of photos in an album
+      parameters:
+      - description: Album ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Photo order data
+        in: body
+        name: order
+        required: true
+        schema:
+          $ref: '#/definitions/models.ReorderPhotosRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Reorder photos in album
+      tags:
+      - Albums
+  /api/albums/admin:
+    get:
+      consumes:
+      - application/json
+      description: Returns a paginated list of all albums
+      parameters:
+      - description: Limit (default 10)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Album'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List all albums
+      tags:
+      - Albums
+  /api/albums/reorder:
+    put:
+      consumes:
+      - application/json
+      description: Updates the order of multiple albums
+      parameters:
+      - description: Album order data
+        in: body
+        name: order
+        required: true
+        schema:
+          $ref: '#/definitions/models.ReorderAlbumsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Reorder albums
+      tags:
+      - Albums
+  /api/auth/account:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes the current user's account (GDPR compliance)
+      parameters:
+      - description: Account deletion confirmation
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.AuthDeleteAccountRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete account
+      tags:
+      - Authentication
+  /api/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates a user and returns access/refresh tokens
+      parameters:
+      - description: Login credentials
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/models.GebruikerLogin'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.AuthLoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            type: object
+      summary: User login
+      tags:
+      - Authentication
+  /api/auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: Logs out the current user and optionally revokes all sessions
+      parameters:
+      - description: Logout options
+        in: body
+        name: options
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: User logout
+      tags:
+      - Authentication
+  /api/auth/profile:
+    get:
+      consumes:
+      - application/json
+      description: Gets the current user's profile information
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.AuthProfileResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get user profile
+      tags:
+      - Authentication
+  /api/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Refreshes access token using refresh token
+      parameters:
+      - description: Refresh token data
+        in: body
+        name: refreshData
+        required: true
+        schema:
+          $ref: '#/definitions/models.AuthRefreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.AuthRefreshResponse'
+        "400":
+          description: Bad Request
+          schema:
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            type: object
+      summary: Refresh access token
+      tags:
+      - Authentication
+  /api/auth/reset-password:
+    post:
+      consumes:
+      - application/json
+      description: Changes the current user's password
+      parameters:
+      - description: Current and new password
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.AuthResetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Change password
+      tags:
+      - Authentication
+  /api/auth/sessions:
+    get:
+      consumes:
+      - application/json
+      description: Lists all active sessions for the current user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List user sessions
+      tags:
+      - Authentication
+  /api/auth/sessions/{sessionId}:
+    delete:
+      consumes:
+      - application/json
+      description: Revokes a specific user session
+      parameters:
+      - description: Session ID
+        in: path
+        name: sessionId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Revoke specific session
+      tags:
+      - Authentication
+  /api/auth/sessions/revoke-others:
+    post:
+      consumes:
+      - application/json
+      description: Revokes all other sessions except the current one
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Revoke other sessions
+      tags:
+      - Authentication
+  /api/contact:
+    get:
+      consumes:
+      - application/json
+      description: Haalt een gepagineerde lijst van contactformulieren op
+      parameters:
+      - description: Aantal resultaten per pagina (standaard 10)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset voor paginering (standaard 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.ContactFormulier'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Lijst van contactformulieren ophalen
+      tags:
+      - Contact
+  /api/contact/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Verwijdert een contactformulier en bijbehorende antwoorden
+      parameters:
+      - description: Contact ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Contactformulier verwijderen
+      tags:
+      - Contact
+    get:
+      consumes:
+      - application/json
+      description: Haalt de details van een specifiek contactformulier op, inclusief
+        antwoorden
+      parameters:
+      - description: Contact ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ContactFormulier'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Details van een specifiek contactformulier ophalen
+      tags:
+      - Contact
+    put:
+      consumes:
+      - application/json
+      description: Werkt een bestaand contactformulier bij (status, notities)
+      parameters:
+      - description: Contact ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Contact gegevens
+        in: body
+        name: contact
+        required: true
+        schema:
+          $ref: '#/definitions/models.ContactFormulier'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ContactFormulier'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Contactformulier bijwerken
+      tags:
+      - Contact
+  /api/contact/{id}/antwoord:
+    post:
+      consumes:
+      - application/json
+      description: Voegt een nieuw antwoord toe aan een contactformulier
+      parameters:
+      - description: Contact ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Antwoord gegevens
+        in: body
+        name: antwoord
+        required: true
+        schema:
+          $ref: '#/definitions/models.ContactAntwoord'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ContactAntwoord'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Antwoord toevoegen aan contactformulier
+      tags:
+      - Contact
+  /api/contact/status/{status}:
+    get:
+      consumes:
+      - application/json
+      description: Haalt een lijst van contactformulieren op gefilterd op status
+      parameters:
+      - description: Status (nieuw, in_behandeling, beantwoord, gesloten)
+        in: path
+        name: status
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.ContactFormulier'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Contactformulieren filteren op status
+      tags:
+      - Contact
+  /api/events:
+    get:
+      consumes:
+      - application/json
+      description: Haalt lijst van alle events op
+      parameters:
+      - default: 50
+        description: Aantal resultaten
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset voor paginatie
+        in: query
+        name: offset
+        type: integer
+      - default: false
+        description: Alleen actieve events
+        in: query
+        name: active_only
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.EventResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Events lijst ophalen
+      tags:
+      - Events
+    post:
+      consumes:
+      - application/json
+      description: Maakt een nieuw event aan (admin only)
+      parameters:
+      - description: Event data
+        in: body
+        name: event
+        required: true
+        schema:
+          $ref: '#/definitions/models.EventCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.EventResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Event aanmaken
+      tags:
+      - Events
+  /api/events/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Verwijdert een event (admin only)
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Event verwijderen
+      tags:
+      - Events
+    get:
+      consumes:
+      - application/json
+      description: Haalt gedetailleerde informatie op voor een specifiek event
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.EventResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Event Details ophalen
+      tags:
+      - Events
+    put:
+      consumes:
+      - application/json
+      description: Werkt een bestaand event bij (admin only)
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Event data
+        in: body
+        name: event
+        required: true
+        schema:
+          $ref: '#/definitions/models.EventUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.EventResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Event bijwerken
+      tags:
+      - Events
+  /api/events/{id}/participants:
+    get:
+      consumes:
+      - application/json
+      description: Haalt lijst van participants voor een event op
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.EventParticipantResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Event Participants ophalen
+      tags:
+      - Events
+  /api/events/active:
+    get:
+      consumes:
+      - application/json
+      description: Haalt het eerstvolgende actieve event op
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.EventResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Actief Event ophalen
+      tags:
+      - Events
+  /api/funds-distribution:
+    get:
+      consumes:
+      - application/json
+      description: Haalt verdeling van fondsen over routes op
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              routes:
+                additionalProperties:
+                  type: integer
+                type: object
+              totalX:
+                type: integer
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Fondsverdeling
+      tags:
+      - Steps
+  /api/images/{public_id}:
+    delete:
+      consumes:
+      - application/json
+      description: Verwijdert een image van Cloudinary
+      parameters:
+      - description: Cloudinary public ID
+        in: path
+        name: public_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Verwijder een image
+      tags:
+      - Images
+    get:
+      consumes:
+      - application/json
+      description: Haalt metadata van een geüploade image op
+      parameters:
+      - description: Cloudinary public ID
+        in: path
+        name: public_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Haal image metadata op
+      tags:
+      - Images
+  /api/images/batch-upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload meerdere images tegelijk naar Cloudinary (max 10). Ondersteunt
+        parallel en sequentiële modes.
+      parameters:
+      - description: Image files (max 10)
+        in: formData
+        name: images
+        required: true
+        type: file
+      - description: 'Upload mode: ''parallel'' (default) or ''sequential'''
+        enum:
+        - parallel
+        - sequential
+        in: query
+        name: mode
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "413":
+          description: Request Entity Too Large
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Upload meerdere images
+      tags:
+      - Images
+  /api/images/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload een image naar Cloudinary
+      parameters:
+      - description: Image file
+        in: formData
+        name: image
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.UploadResult'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "413":
+          description: Request Entity Too Large
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Upload een enkele image
+      tags:
+      - Images
+  /api/mail:
+    get:
+      consumes:
+      - application/json
+      description: Haalt een gepagineerde lijst van emails op
+      parameters:
+      - description: Aantal resultaten per pagina (standaard 10)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset voor paginering (standaard 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.PaginatedMailResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Lijst van emails ophalen
+      tags:
+      - Mail
+  /api/mail/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Verwijdert een email uit het systeem
+      parameters:
+      - description: Email ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Email verwijderen
+      tags:
+      - Mail
+    get:
+      consumes:
+      - application/json
+      description: Haalt de details van een specifieke email op
+      parameters:
+      - description: Email ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MailResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Details van een specifieke email ophalen
+      tags:
+      - Mail
+  /api/mail/{id}/processed:
+    put:
+      consumes:
+      - application/json
+      description: Markeert een email als verwerkt om aan te geven dat deze is afgehandeld
+      parameters:
+      - description: Email ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MailResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Email als verwerkt markeren
+      tags:
+      - Mail
+  /api/mail/account/{type}:
+    get:
+      consumes:
+      - application/json
+      description: Haalt een gepagineerde lijst van emails op voor een specifiek account
+        type
+      parameters:
+      - description: Account Type (bv. 'info', 'inschrijving')
+        in: path
+        name: type
+        required: true
+        type: string
+      - description: Aantal resultaten per pagina (standaard 10)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset voor paginering (standaard 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.PaginatedMailResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Lijst van emails ophalen per account type
+      tags:
+      - Mail
+  /api/mail/fetch:
+    post:
+      consumes:
+      - application/json
+      description: Haalt nieuwe emails op van de mailserver en slaat deze op in de
+        database
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Nieuwe emails ophalen
+      tags:
+      - Mail
+  /api/mail/unprocessed:
+    get:
+      consumes:
+      - application/json
+      description: Haalt een lijst van alle onverwerkte emails op
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.PaginatedMailResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Onverwerkte emails ophalen
+      tags:
+      - Mail
+  /api/participant:
+    get:
+      consumes:
+      - application/json
+      description: Haalt een gepagineerde lijst van participants (personen) op
+      parameters:
+      - description: Aantal resultaten per pagina (standaard 10)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset voor paginering (standaard 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Participant'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Lijst van participants ophalen
+      tags:
+      - Participant
+  /api/participant/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Verwijdert een participant en bijbehorende antwoorden (en via CASCADE
+        ook EventRegistrations)
+      parameters:
+      - description: Participant ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Participant verwijderen
+      tags:
+      - Participant
+    get:
+      consumes:
+      - application/json
+      description: Haalt de details van een specifieke participant op, inclusief antwoorden
+      parameters:
+      - description: Participant ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Participant'
+      security:
+      - BearerAuth: []
+      summary: Details van een specifieke participant ophalen
+      tags:
+      - Participant
+  /api/participant/{id}/antwoord:
+    post:
+      consumes:
+      - application/json
+      description: Voegt een nieuw antwoord toe aan een participant
+      parameters:
+      - description: Participant ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Antwoord gegevens
+        in: body
+        name: antwoord
+        required: true
+        schema:
+          $ref: '#/definitions/models.ParticipantAntwoord'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ParticipantAntwoord'
+      security:
+      - BearerAuth: []
+      summary: Antwoord toevoegen aan participant
+      tags:
+      - Participant
+  /api/participant/{id}/dashboard:
+    get:
+      consumes:
+      - application/json
+      description: Haalt stappen en toegewezen fondsen op voor een deelnemer
+      parameters:
+      - description: Deelnemer ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              allocatedFunds:
+                type: integer
+              route:
+                type: string
+              steps:
+                type: integer
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Dashboard data voor deelnemer
+      tags:
+      - Steps
+  /api/participant/emails:
+    get:
+      consumes:
+      - application/json
+      description: Haalt een lijst van alle participant emails en systeem emails op
+        voor admin gebruik
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              ' all_emails':
+                type: array
+              ' system_emails':
+                type: array
+              participant_emails:
+                type: array
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Alle emails ophalen (participants + systeem)
+      tags:
+      - Participant
+  /api/participant/rol/{rol}:
+    get:
+      responses: {}
+      summary: '[VEROUDERD] Participants filteren op rol'
+      tags:
+      - Participant
+  /api/partners:
+    get:
+      consumes:
+      - application/json
+      description: Returns all visible partners ordered by order_number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Partner'
+            type: array
+      summary: Get visible partners
+      tags:
+      - Partners
+    post:
+      consumes:
+      - application/json
+      description: Creates a new partner
+      parameters:
+      - description: Partner data
+        in: body
+        name: partner
+        required: true
+        schema:
+          $ref: '#/definitions/models.Partner'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Partner'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create partner
+      tags:
+      - Partners
+  /api/partners/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a partner
+      parameters:
+      - description: Partner ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete partner
+      tags:
+      - Partners
+    get:
+      consumes:
+      - application/json
+      description: Returns a specific partner by ID
+      parameters:
+      - description: Partner ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Partner'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get partner by ID
+      tags:
+      - Partners
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing partner
+      parameters:
+      - description: Partner ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Partner data
+        in: body
+        name: partner
+        required: true
+        schema:
+          $ref: '#/definitions/models.Partner'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Partner'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update partner
+      tags:
+      - Partners
+  /api/partners/admin:
+    get:
+      consumes:
+      - application/json
+      description: Returns a paginated list of all partners
+      parameters:
+      - description: Limit (default 10)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Partner'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List all partners
+      tags:
+      - Partners
+  /api/photos:
+    get:
+      consumes:
+      - application/json
+      description: Returns all visible photos with optional filtering by year, title,
+        description, or cloudinary_folder
+      parameters:
+      - description: Filter by year
+        in: query
+        name: year
+        type: integer
+      - description: Filter by title (partial match)
+        in: query
+        name: title
+        type: string
+      - description: Filter by description (partial match)
+        in: query
+        name: description
+        type: string
+      - description: Filter by cloudinary folder
+        in: query
+        name: cloudinary_folder
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Photo'
+            type: array
+      summary: Get visible photos
+      tags:
+      - Photos
+    post:
+      consumes:
+      - application/json
+      description: Creates a new photo
+      parameters:
+      - description: Photo data
+        in: body
+        name: photo
+        required: true
+        schema:
+          $ref: '#/definitions/models.Photo'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Photo'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create photo
+      tags:
+      - Photos
+  /api/photos/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a photo
+      parameters:
+      - description: Photo ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete photo
+      tags:
+      - Photos
+    get:
+      consumes:
+      - application/json
+      description: Returns a specific photo by ID
+      parameters:
+      - description: Photo ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Photo'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get photo by ID
+      tags:
+      - Photos
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing photo
+      parameters:
+      - description: Photo ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Photo data
+        in: body
+        name: photo
+        required: true
+        schema:
+          $ref: '#/definitions/models.Photo'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Photo'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update photo
+      tags:
+      - Photos
+  /api/photos/admin:
+    get:
+      consumes:
+      - application/json
+      description: Returns a paginated list of all photos
+      parameters:
+      - description: Limit (default 10)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Photo'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List all photos
+      tags:
+      - Photos
+  /api/program-schedule:
+    get:
+      consumes:
+      - application/json
+      description: Returns all visible program schedules ordered by order_number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.ProgramSchedule'
+            type: array
+      summary: Get visible program schedules
+      tags:
+      - Program Schedule
+    post:
+      consumes:
+      - application/json
+      description: Creates a new program schedule
+      parameters:
+      - description: Program Schedule data
+        in: body
+        name: schedule
+        required: true
+        schema:
+          $ref: '#/definitions/models.ProgramSchedule'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.ProgramSchedule'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create program schedule
+      tags:
+      - Program Schedule
+  /api/program-schedule/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a program schedule
+      parameters:
+      - description: Program Schedule ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete program schedule
+      tags:
+      - Program Schedule
+    get:
+      consumes:
+      - application/json
+      description: Returns a specific program schedule by ID
+      parameters:
+      - description: Program Schedule ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ProgramSchedule'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get program schedule by ID
+      tags:
+      - Program Schedule
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing program schedule
+      parameters:
+      - description: Program Schedule ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Program Schedule data
+        in: body
+        name: schedule
+        required: true
+        schema:
+          $ref: '#/definitions/models.ProgramSchedule'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ProgramSchedule'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update program schedule
+      tags:
+      - Program Schedule
+  /api/program-schedule/admin:
+    get:
+      consumes:
+      - application/json
+      description: Returns a paginated list of all program schedules
+      parameters:
+      - description: Limit (default 10)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.ProgramSchedule'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List all program schedules
+      tags:
+      - Program Schedule
+  /api/public/aanmelden:
+    post:
+      consumes:
+      - application/json
+      description: Registreert een new deelnemer met keuze tussen full account (met
+        app toegang) of temporary registratie (alleen voor dit jaar)
+      parameters:
+      - description: Registratie gegevens
+        in: body
+        name: registration
+        required: true
+        schema:
+          $ref: '#/definitions/models.PublicRegistrationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.PublicRegistrationResponse'
+      summary: Registreer deelnemer voor evenement
+      tags:
+      - Public Registration
+  /api/public/events/active:
+    get:
+      description: Geeft informatie over het actieve evenement
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Event'
+      summary: Haal actief evenement op
+      tags:
+      - Public Registration
+  /api/public/upgrade-to-full-account:
+    post:
+      consumes:
+      - application/json
+      description: Upgrade een tijdelijke registratie naar een volledig account met
+        app toegang
+      parameters:
+      - description: Upgrade gegevens
+        in: body
+        name: upgrade
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpgradeToFullAccountRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UpgradeToFullAccountResponse'
+      summary: Upgrade naar volledig account
+      tags:
+      - Public Registration
+  /api/radio-recordings:
+    get:
+      consumes:
+      - application/json
+      description: Returns all visible radio recordings ordered by order_number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.RadioRecording'
+            type: array
+      summary: Get visible radio recordings
+      tags:
+      - Radio Recordings
+    post:
+      consumes:
+      - application/json
+      description: Creates a new radio recording
+      parameters:
+      - description: Radio recording data
+        in: body
+        name: recording
+        required: true
+        schema:
+          $ref: '#/definitions/models.RadioRecording'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.RadioRecording'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create radio recording
+      tags:
+      - Radio Recordings
+  /api/radio-recordings/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a radio recording
+      parameters:
+      - description: Radio Recording ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete radio recording
+      tags:
+      - Radio Recordings
+    get:
+      consumes:
+      - application/json
+      description: Returns a specific radio recording by ID
+      parameters:
+      - description: Radio Recording ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.RadioRecording'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get radio recording by ID
+      tags:
+      - Radio Recordings
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing radio recording
+      parameters:
+      - description: Radio Recording ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Radio recording data
+        in: body
+        name: recording
+        required: true
+        schema:
+          $ref: '#/definitions/models.RadioRecording'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.RadioRecording'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update radio recording
+      tags:
+      - Radio Recordings
+  /api/radio-recordings/admin:
+    get:
+      consumes:
+      - application/json
+      description: Returns a paginated list of all radio recordings
+      parameters:
+      - description: Limit (default 10)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.RadioRecording'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List all radio recordings
+      tags:
+      - Radio Recordings
+  /api/register:
+    post:
+      responses: {}
+      summary: Nieuwe participant en event registratie aanmaken
+      tags:
+      - Public
+  /api/registration/{id}:
+    get:
+      parameters:
+      - description: Event Registration ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses: {}
+      security:
+      - BearerAuth: []
+      summary: Details van een specifieke registratie ophalen
+      tags:
+      - Registration
+    put:
+      parameters:
+      - description: Event Registration ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateEventRegistrationRequest'
+      responses: {}
+      security:
+      - BearerAuth: []
+      summary: Registratie bijwerken (status, notities)
+      tags:
+      - Registration
+  /api/registration/{id}/steps:
+    post:
+      consumes:
+      - application/json
+      description: Voegt stappen toe aan een registratie (delta) en retourneert het
+        nieuwe totaal aantal stappen
+      parameters:
+      - description: Event Registration ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Stappen delta
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            steps:
+              type: integer
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              steps:
+                type: integer
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Stappen bijwerken voor registratie
+      tags:
+      - Registration
+  /api/registration/rol/{rol}:
+    get:
+      parameters:
+      - description: Rol (vrijwilliger, deelnemer, etc.)
+        in: path
+        name: rol
+        required: true
+        type: string
+      responses: {}
+      security:
+      - BearerAuth: []
+      summary: Registraties filteren op rol
+      tags:
+      - Registration
+  /api/social-embeds:
+    get:
+      consumes:
+      - application/json
+      description: Returns all visible social embeds ordered by order_number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.SocialEmbed'
+            type: array
+      summary: Get visible social embeds
+      tags:
+      - Social Embeds
+    post:
+      consumes:
+      - application/json
+      description: Creates a new social embed
+      parameters:
+      - description: Social Embed data
+        in: body
+        name: embed
+        required: true
+        schema:
+          $ref: '#/definitions/models.SocialEmbed'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.SocialEmbed'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create social embed
+      tags:
+      - Social Embeds
+  /api/social-embeds/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a social embed
+      parameters:
+      - description: Social Embed ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete social embed
+      tags:
+      - Social Embeds
+    get:
+      consumes:
+      - application/json
+      description: Returns a specific social embed by ID
+      parameters:
+      - description: Social Embed ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.SocialEmbed'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get social embed by ID
+      tags:
+      - Social Embeds
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing social embed
+      parameters:
+      - description: Social Embed ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Social Embed data
+        in: body
+        name: embed
+        required: true
+        schema:
+          $ref: '#/definitions/models.SocialEmbed'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.SocialEmbed'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update social embed
+      tags:
+      - Social Embeds
+  /api/social-embeds/admin:
+    get:
+      consumes:
+      - application/json
+      description: Returns a paginated list of all social embeds
+      parameters:
+      - description: Limit (default 10)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.SocialEmbed'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List all social embeds
+      tags:
+      - Social Embeds
+  /api/social-links:
+    get:
+      consumes:
+      - application/json
+      description: Returns all visible social links ordered by order_number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.SocialLink'
+            type: array
+      summary: Get visible social links
+      tags:
+      - Social Links
+    post:
+      consumes:
+      - application/json
+      description: Creates a new social link
+      parameters:
+      - description: Social Link data
+        in: body
+        name: link
+        required: true
+        schema:
+          $ref: '#/definitions/models.SocialLink'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.SocialLink'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create social link
+      tags:
+      - Social Links
+  /api/social-links/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a social link
+      parameters:
+      - description: Social Link ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete social link
+      tags:
+      - Social Links
+    get:
+      consumes:
+      - application/json
+      description: Returns a specific social link by ID
+      parameters:
+      - description: Social Link ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.SocialLink'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get social link by ID
+      tags:
+      - Social Links
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing social link
+      parameters:
+      - description: Social Link ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Social Link data
+        in: body
+        name: link
+        required: true
+        schema:
+          $ref: '#/definitions/models.SocialLink'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.SocialLink'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update social link
+      tags:
+      - Social Links
+  /api/social-links/admin:
+    get:
+      consumes:
+      - application/json
+      description: Returns a paginated list of all social links
+      parameters:
+      - description: Limit (default 10)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.SocialLink'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List all social links
+      tags:
+      - Social Links
+  /api/sponsors:
+    get:
+      consumes:
+      - application/json
+      description: Returns all visible sponsors ordered by order_number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Sponsor'
+            type: array
+      summary: Get visible sponsors
+      tags:
+      - Sponsors
+    post:
+      consumes:
+      - application/json
+      - multipart/form-data
+      description: Creates a new sponsor. Supports both JSON and multipart/form-data
+        for logo upload.
+      parameters:
+      - description: Sponsor data (JSON)
+        in: body
+        name: sponsor
+        required: true
+        schema:
+          $ref: '#/definitions/models.Sponsor'
+      - description: Logo image file
+        in: formData
+        name: logo
+        type: file
+      - description: Sponsor name (multipart)
+        in: formData
+        name: name
+        type: string
+      - description: Sponsor description (multipart)
+        in: formData
+        name: description
+        type: string
+      - description: Website URL (multipart)
+        in: formData
+        name: website_url
+        type: string
+      - description: Order number (multipart)
+        in: formData
+        name: order_number
+        type: integer
+      - description: Is active (multipart)
+        in: formData
+        name: is_active
+        type: boolean
+      - description: Is visible (multipart)
+        in: formData
+        name: visible
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Sponsor'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create sponsor
+      tags:
+      - Sponsors
+  /api/sponsors/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a sponsor
+      parameters:
+      - description: Sponsor ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete sponsor
+      tags:
+      - Sponsors
+    get:
+      consumes:
+      - application/json
+      description: Returns a specific sponsor by ID
+      parameters:
+      - description: Sponsor ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Sponsor'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get sponsor by ID
+      tags:
+      - Sponsors
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing sponsor
+      parameters:
+      - description: Sponsor ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Sponsor data
+        in: body
+        name: sponsor
+        required: true
+        schema:
+          $ref: '#/definitions/models.Sponsor'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Sponsor'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update sponsor
+      tags:
+      - Sponsors
+  /api/sponsors/admin:
+    get:
+      consumes:
+      - application/json
+      description: Returns a paginated list of all sponsors
+      parameters:
+      - description: Limit (default 10)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Sponsor'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List all sponsors
+      tags:
+      - Sponsors
+  /api/steps/{id}:
+    post:
+      consumes:
+      - application/json
+      description: Voegt stappen toe aan een deelnemer (delta)
+      parameters:
+      - description: Deelnemer ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Stappen delta
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            steps:
+              type: integer
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Participant'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Stappen bijwerken voor deelnemer
+      tags:
+      - Steps
+  /api/steps/admin/route-funds:
+    get:
+      consumes:
+      - application/json
+      description: Haalt alle route fondsallocaties op voor beheer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.RouteFund'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Route fondsallocaties ophalen
+      tags:
+      - Steps Admin
+    post:
+      consumes:
+      - application/json
+      description: Maakt een nieuwe route fondsallocatie aan
+      parameters:
+      - description: Route fund data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.RouteFundRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.RouteFund'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Route fondsallocatie aanmaken
+      tags:
+      - Steps Admin
+  /api/steps/admin/route-funds/{route}:
+    delete:
+      consumes:
+      - application/json
+      description: Verwijdert een route fondsallocatie
+      parameters:
+      - description: Route naam
+        in: path
+        name: route
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Route fondsallocatie verwijderen
+      tags:
+      - Steps Admin
+    put:
+      consumes:
+      - application/json
+      description: Werkt een bestaande route fondsallocatie bij
+      parameters:
+      - description: Route naam
+        in: path
+        name: route
+        required: true
+        type: string
+      - description: Route fund data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.RouteFundRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.RouteFund'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Route fondsallocatie bijwerken
+      tags:
+      - Steps Admin
+  /api/title-sections:
+    get:
+      consumes:
+      - application/json
+      description: Returns the title section content
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.TitleSection'
+      summary: Get title section
+      tags:
+      - Title Sections
+    post:
+      consumes:
+      - application/json
+      description: Creates a new title section
+      parameters:
+      - description: Title section data
+        in: body
+        name: titleSection
+        required: true
+        schema:
+          $ref: '#/definitions/models.TitleSection'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.TitleSection'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create title section
+      tags:
+      - Title Sections
+    put:
+      consumes:
+      - application/json
+      description: Updates the existing title section
+      parameters:
+      - description: Title section data
+        in: body
+        name: titleSection
+        required: true
+        schema:
+          $ref: '#/definitions/models.TitleSection'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.TitleSection'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update title section
+      tags:
+      - Title Sections
+  /api/title-sections/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a title section by ID
+      parameters:
+      - description: Title section ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete title section
+      tags:
+      - Title Sections
+  /api/title-sections/admin:
+    get:
+      consumes:
+      - application/json
+      description: Returns the title section content for admin management
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.TitleSection'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get title section for admin
+      tags:
+      - Title Sections
+  /api/total-steps:
+    get:
+      consumes:
+      - application/json
+      description: Haalt totaal aantal stappen op voor een jaar
+      parameters:
+      - description: Jaar (standaard huidig jaar)
+        in: query
+        name: year
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              total_steps:
+                type: integer
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Totaal aantal stappen
+      tags:
+      - Steps
+  /api/under-construction:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new under construction record
+      parameters:
+      - description: Under Construction data
+        in: body
+        name: uc
+        required: true
+        schema:
+          $ref: '#/definitions/models.UnderConstruction'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.UnderConstruction'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create under construction
+      tags:
+      - Under Construction
+  /api/under-construction/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes an under construction record
+      parameters:
+      - description: Under Construction ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete under construction
+      tags:
+      - Under Construction
+    get:
+      consumes:
+      - application/json
+      description: Returns a specific under construction record by ID
+      parameters:
+      - description: Under Construction ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UnderConstruction'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get under construction by ID
+      tags:
+      - Under Construction
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing under construction record
+      parameters:
+      - description: Under Construction ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Under Construction data
+        in: body
+        name: uc
+        required: true
+        schema:
+          $ref: '#/definitions/models.UnderConstruction'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UnderConstruction'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update under construction
+      tags:
+      - Under Construction
+  /api/under-construction/active:
+    get:
+      consumes:
+      - application/json
+      description: Returns the active under construction record if any
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UnderConstruction'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get active under construction
+      tags:
+      - Under Construction
+  /api/under-construction/admin:
+    get:
+      consumes:
+      - application/json
+      description: Returns a paginated list of all under construction records
+      parameters:
+      - description: Limit (default 10)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.UnderConstruction'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List all under construction records
+      tags:
+      - Under Construction
+  /api/videos:
+    get:
+      consumes:
+      - application/json
+      description: Returns all visible videos ordered by order_number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Video'
+            type: array
+      summary: Get visible videos
+      tags:
+      - Videos
+    post:
+      consumes:
+      - application/json
+      description: Creates a new video
+      parameters:
+      - description: Video data
+        in: body
+        name: video
+        required: true
+        schema:
+          $ref: '#/definitions/models.Video'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Video'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create video
+      tags:
+      - Videos
+  /api/videos/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a video
+      parameters:
+      - description: Video ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete video
+      tags:
+      - Videos
+    get:
+      consumes:
+      - application/json
+      description: Returns a specific video by ID
+      parameters:
+      - description: Video ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Video'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get video by ID
+      tags:
+      - Videos
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing video
+      parameters:
+      - description: Video ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Video data
+        in: body
+        name: video
+        required: true
+        schema:
+          $ref: '#/definitions/models.Video'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Video'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update video
+      tags:
+      - Videos
+  /api/videos/admin:
+    get:
+      consumes:
+      - application/json
+      description: Returns a paginated list of all videos
+      parameters:
+      - description: Limit (default 10)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Video'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List all videos
+      tags:
+      - Videos
+securityDefinitions:
+  BearerAuth:
+    description: JWT Bearer token voor geauthenticeerde endpoints
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

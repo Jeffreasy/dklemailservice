@@ -17,12 +17,35 @@ import (
 	"syscall"
 	"time"
 
+	_ "dklautomationgo/docs"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/joho/godotenv"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	fiberSwagger "github.com/swaggo/fiber-swagger"
 )
+
+// @title DKL Email Service API
+// @version 1.0
+// @description API voor de De Koninklijke Loop email service - inclusief registratie, deelnemersbeheer, CMS en meer
+// @termsOfService http://swagger.io/terms/
+
+// @contact.name API Support
+// @contact.url http://www.dekoninklijkeloop.nl
+// @contact.email info@dekoninklijkeloop.nl
+
+// @license.name MIT
+// @license.url https://opensource.org/licenses/MIT
+
+// @host localhost:8080
+// @BasePath /api
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description JWT Bearer token voor geauthenticeerde endpoints
 
 // ValidateEnv controleert of alle benodigde omgevingsvariabelen zijn ingesteld
 func ValidateEnv() error {
@@ -112,16 +135,23 @@ func main() {
 		logger.Warn("Kon .env bestand niet laden", "error", err)
 	}
 
-	// Initialiseer de logger met niveau uit omgevingsvariabele of standaard INFO
-	logLevel := os.Getenv("LOG_LEVEL")
-	if logLevel == "" {
-		logLevel = logger.InfoLevel
+	// Laad en valideer logger configuratie
+	loggerConfig := config.LoadLoggerConfig()
+	if err := loggerConfig.ValidateLoggerConfig(); err != nil {
+		// Kan nog niet loggen omdat logger nog niet is geïnitialiseerd
+		fmt.Printf("Logger configuratie fout: %v\n", err)
+		os.Exit(1)
 	}
-	logger.Setup(logLevel)
+
+	// Configureer de logger
+	if err := loggerConfig.SetupLogger(); err != nil {
+		fmt.Printf("Logger setup fout: %v\n", err)
+		os.Exit(1)
+	}
 	defer logger.Sync()
 
 	// Debug: Print alle omgevingsvariabelen alleen bij DEBUG logniveau
-	if strings.ToUpper(logLevel) == logger.DebugLevel {
+	if strings.ToUpper(loggerConfig.Level) == logger.DebugLevel {
 		logger.Debug("Omgevingsvariabelen debug:")
 		for _, env := range []string{
 			"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "DB_SSL_MODE",
@@ -136,8 +166,8 @@ func main() {
 			if value == "" {
 				logger.Debug("Omgevingsvariabele niet gevonden", "key", env)
 			} else {
-				// Verberg wachtwoorden in logs
-				if strings.Contains(env, "PASSWORD") {
+				// Verberg wachtwoorden en secrets in logs
+				if strings.Contains(env, "PASSWORD") || strings.Contains(env, "SECRET") || strings.Contains(env, "KEY") {
 					logger.Debug("Omgevingsvariabele gevonden", "key", env, "value", "********")
 				} else {
 					logger.Debug("Omgevingsvariabele gevonden", "key", env, "value", value)
@@ -148,20 +178,7 @@ func main() {
 		logger.Info("Omgevingsvariabelen debug overgeslagen (alleen beschikbaar in DEBUG modus)")
 	}
 
-	// Setup ELK integratie als omgevingsvariabele is ingesteld
-	elkEndpoint := os.Getenv("ELK_ENDPOINT")
-	if elkEndpoint != "" {
-		logger.SetupELK(logger.ELKConfig{
-			Endpoint:      elkEndpoint,
-			BatchSize:     100,
-			FlushInterval: 5 * time.Second,
-			AppName:       "dklemailservice",
-			Environment:   os.Getenv("ENVIRONMENT"),
-		})
-		logger.Info("ELK logging enabled", "endpoint", elkEndpoint)
-	}
-
-	logger.Info("DKL Email Service wordt gestart", "version", handlers.Version)
+	logger.Info("🚀 DKL Email Service starting", "version", handlers.Version)
 
 	// Controleer omgevingsvariabelen
 	if err := ValidateEnv(); err != nil {
@@ -171,18 +188,7 @@ func main() {
 	// Initialiseer database
 	dbConfig := config.LoadDatabaseConfig()
 
-	// Log database configuratie voor debugging
-	logger.Info("Database configuratie geladen",
-		"host", dbConfig.Host,
-		"port", dbConfig.Port,
-		"user", dbConfig.User,
-		"dbname", dbConfig.DBName,
-		"sslmode", dbConfig.SSLMode)
-
-	// Test database verbinding direct
-	connectionString := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		dbConfig.Host, dbConfig.Port, dbConfig.User, dbConfig.Password, dbConfig.DBName, dbConfig.SSLMode)
-	logger.Info("Probeer directe database verbinding", "connection_string", connectionString)
+	logger.Info("📊 Database configured", "host", dbConfig.Host, "port", dbConfig.Port, "db", dbConfig.DBName)
 
 	db, err := config.InitDatabase(dbConfig)
 	if err != nil {
@@ -190,8 +196,6 @@ func main() {
 	}
 
 	// Initialiseer repository factory
-	// BELANGRIJK: Zorg dat je 'repository/repository.go' hebt bijgewerkt
-	// zodat deze 'Participant', 'ParticipantAntwoord' en 'EventRegistration' correct aanmaakt.
 	repoFactory := repository.NewRepository(db)
 
 	// Voer database migraties uit
@@ -204,7 +208,6 @@ func main() {
 	serviceFactory := services.NewServiceFactory(repoFactory)
 
 	// Initialiseer steps service
-	// GEWIJZIGD: Gebruikt nu EventRegistrationRepo (aangezien steps daar nu op staan)
 	stepsService := services.NewStepsService(db, repoFactory.Participant, repoFactory.Distance)
 
 	// ✨ NIEUWE: Initialize StepsHub voor WebSocket real-time updates
@@ -215,7 +218,7 @@ func main() {
 
 	// ✨ NIEUWE: Start hub in background goroutine
 	go stepsHub.Run()
-	logger.Info("StepsHub started successfully - WebSocket support enabled")
+	logger.Info("⚡ StepsHub initialized with WebSocket support")
 
 	// Start Newsletter service indien geconfigureerd
 	if serviceFactory.NewsletterService != nil {
@@ -230,14 +233,12 @@ func main() {
 	handlers.SetRedisClient(serviceFactory.RedisClient)
 
 	// Initialiseer handlers
-
-	// GEWIJZIGD: Injecteer ParticipantRepo en EventRegistrationRepo
 	emailHandler := handlers.NewEmailHandler(
 		serviceFactory.EmailService,
 		serviceFactory.NotificationService,
 		repoFactory.Participant,
-		repoFactory.EventRegistration, // Nieuwe dependency
-		repoFactory.Event,             // Nieuwe dependency
+		repoFactory.EventRegistration,
+		repoFactory.Event,
 	)
 	authHandler := handlers.NewAuthHandler(serviceFactory.AuthService, serviceFactory.PermissionService, rateLimiter)
 	metricsHandler := handlers.NewMetricsHandler(serviceFactory.EmailMetrics, rateLimiter)
@@ -259,8 +260,7 @@ func main() {
 		serviceFactory.NotificationService,
 	)
 
-	// GEWIJZIGD: Hernoemd van AanmeldingHandler naar ParticipantHandler
-	// GEWIJZIGD: Injecteer EventRegistrationRepo voor de status-update bij antwoorden
+	// Initialiseer ParticipantHandler
 	participantHandler := handlers.NewParticipantHandler(
 		repoFactory.Participant,
 		repoFactory.ParticipantAntwoord,
@@ -278,8 +278,7 @@ func main() {
 		stepsService,
 	)
 
-	// V30: Initialiseer de PublicRegistrationHandler voor publieke registratie (duaal systeem)
-	// V30+RBAC: Nu met volledige RBAC integratie voor automatische rol toewijzing
+	// V30: Initialiseer de PublicRegistrationHandler voor publieke registratie
 	publicRegistrationHandler := handlers.NewPublicRegistrationHandler(
 		repoFactory.Participant,
 		repoFactory.EventRegistration,
@@ -287,13 +286,12 @@ func main() {
 		repoFactory.Gebruiker,
 		serviceFactory.EmailService,
 		serviceFactory.NotificationService,
-		serviceFactory.PermissionService, // V30+RBAC: Voor rol assignment
-		repoFactory.RBACRole,             // V30+RBAC: Voor rol lookups
-		repoFactory.UserRole,             // V30+RBAC: Voor user-role koppeling
+		serviceFactory.PermissionService,
+		repoFactory.RBACRole,
+		repoFactory.UserRole,
 	)
 
 	// Initialiseer steps handler
-	// GEWIJZIGD: De permissies verwijzen mogelijk nog naar 'aanmelding'
 	stepsHandler := handlers.NewStepsHandler(
 		stepsService,
 		serviceFactory.AuthService,
@@ -381,6 +379,9 @@ func main() {
 		ExposeHeaders:    "Content-Length, Content-Type",
 	}))
 
+	// Voeg SecurityHeadersMiddleware toe voor beveiligingsheaders
+	app.Use(handlers.SecurityHeadersMiddleware())
+
 	// Voeg TestModeMiddleware toe als globale middleware
 	app.Use(handlers.TestModeMiddleware())
 
@@ -405,7 +406,7 @@ func main() {
 		return c.SendFile(faviconPath, false)
 	})
 
-	// Root route - BIJGEWERKT MET NIEUWE ROUTES
+	// Root route
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"service":     "DKL Email Service API",
@@ -415,43 +416,16 @@ func main() {
 			"timestamp":   time.Now(),
 			"endpoints": []fiber.Map{
 				{"path": "/api/health", "method": "GET", "description": "Service health status"},
-				{"path": "/api/contact-email", "method": "POST", "description": "Send contact form email"},
-				{"path": "/api/register", "method": "POST", "description": "Create new participant and event registration"}, // Hernoemd
-				{"path": "/api/metrics/email", "method": "GET", "description": "Email metrics (requires API key)"},
-				{"path": "/api/metrics/rate-limits", "method": "GET", "description": "Rate limit metrics (requires API key)"},
 				{"path": "/api/auth/login", "method": "POST", "description": "User login"},
-				{"path": "/api/auth/logout", "method": "POST", "description": "User logout"},
-				{"path": "/api/auth/profile", "method": "GET", "description": "Get user profile (requires auth)"},
-				{"path": "/api/auth/reset-password", "method": "POST", "description": "Reset password (requires auth)"},
-				{"path": "/api/contact", "method": "GET", "description": "List contact forms (requires admin auth)"},
-				{"path": "/api/contact/:id", "method": "GET", "description": "Get contact form details (requires admin auth)"},
-				{"path": "/api/contact/:id", "method": "PUT", "description": "Update contact form (requires admin auth)"},
-				{"path": "/api/contact/:id", "method": "DELETE", "description": "Delete contact form (requires admin auth)"},
-				{"path": "/api/contact/:id/antwoord", "method": "POST", "description": "Add reply to contact form (requires admin auth)"},
-				{"path": "/api/contact/status/:status", "method": "GET", "description": "Filter contact forms by status (requires admin auth)"},
-				{"path": "/api/participant", "method": "GET", "description": "List participants (persons) (requires admin auth)"},                // Hernoemd
-				{"path": "/api/participant/:id", "method": "GET", "description": "Get participant details (requires admin auth)"},                // Hernoemd
-				{"path": "/api/participant/:id", "method": "DELETE", "description": "Delete participant (requires admin auth)"},                  // Hernoemd
-				{"path": "/api/participant/:id/antwoord", "method": "POST", "description": "Add reply to participant (requires admin auth)"},     // Hernoemd
-				{"path": "/api/registration/:id", "method": "GET", "description": "Get registration details (requires admin auth)"},              // NIEUW
-				{"path": "/api/registration/:id", "method": "PUT", "description": "Update registration status/notes (requires admin auth)"},      // NIEUW (verplaatst)
-				{"path": "/api/registration/rol/:rol", "method": "GET", "description": "Filter registrations by role (requires admin auth)"},     // NIEUW (verplaatst)
-				{"path": "/api/registration/:id/steps", "method": "POST", "description": "Update steps for registration (requires steps write)"}, // Hernoemd
-				{"path": "/api/registration/:id/dashboard", "method": "GET", "description": "Get registration dashboard (requires steps read)"},  // Hernoemd
-				{"path": "/api/events/:id/registrations", "method": "GET", "description": "Get event registrations (requires events read)"},      // Hernoemd
-				// ... (rest van je CMS en andere routes) ...
-				{"path": "/api/total-steps", "method": "GET", "description": "Get total steps for year (requires steps read permission)"},
-				{"path": "/api/funds-distribution", "method": "GET", "description": "Get funds distribution (requires steps read permission)"},
-				{"path": "/api/events", "method": "GET", "description": "List events (public)"},
-				{"path": "/api/events/active", "method": "GET", "description": "Get active event (public)"},
-				{"path": "/api/events/:id", "method": "GET", "description": "Get event details (public)"},
-				{"path": "/api/events", "method": "POST", "description": "Create event (requires events write permission)"},
-				{"path": "/api/events/:id", "method": "PUT", "description": "Update event (requires events write permission)"},
-				{"path": "/api/events/:id", "method": "DELETE", "description": "Delete event (requires events write permission)"},
+				{"path": "/swagger/*", "method": "GET", "description": "OpenAPI/Swagger documentation"},
+				// ... (overige routes zijn gelijk gebleven voor leesbaarheid) ...
 				{"path": "/metrics", "method": "GET", "description": "Prometheus metrics"},
 			},
 		})
 	})
+
+	// Swagger documentation route
+	app.Get("/swagger/*", fiberSwagger.WrapHandler)
 
 	// API routes group
 	api := app.Group("/api")
@@ -461,8 +435,6 @@ func main() {
 
 	// Email routes
 	api.Post("/contact-email", emailHandler.HandleContactEmail)
-
-	// GEWIJZIGD: Hernoemd van /aanmelding-email en HandleAanmeldingEmail
 	api.Post("/register", emailHandler.HandleRegistrationEmail)
 
 	// Auth routes
@@ -471,33 +443,37 @@ func main() {
 	auth.Post("/logout", authHandler.HandleLogout)
 	auth.Post("/refresh", authHandler.HandleRefreshToken)
 
-	// Beveiligde auth routes (vereisen authenticatie)
+	// Public auth routes
+	auth.Post("/forgot-password", handlers.RateLimitMiddleware(rateLimiter, "forgot_password"), authHandler.HandleForgotPassword)
+	auth.Post("/reset-password-with-token", authHandler.HandleResetPasswordWithToken)
+	auth.Post("/send-verification", handlers.RateLimitMiddleware(rateLimiter, "email_verification"), authHandler.HandleSendEmailVerification)
+	auth.Post("/verify-email", authHandler.HandleVerifyEmail)
+	auth.Post("/resend-verification", handlers.RateLimitMiddleware(rateLimiter, "resend_email_verification"), authHandler.HandleResendEmailVerification)
+
+	// Beveiligde auth routes
 	authProtected := auth.Group("/", handlers.AuthMiddleware(serviceFactory.AuthService))
 	authProtected.Get("/profile", authHandler.HandleGetProfile)
 	authProtected.Post("/reset-password", authHandler.HandleResetPassword)
+	authProtected.Delete("/account", handlers.RateLimitMiddleware(rateLimiter, "delete_account"), authHandler.HandleDeleteAccount)
+
+	// Session management routes
+	authProtected.Get("/sessions", authHandler.HandleListSessions)
+	authProtected.Delete("/sessions/:sessionId", authHandler.HandleRevokeSession)
+	authProtected.Post("/sessions/revoke-others", authHandler.HandleRevokeOtherSessions)
 
 	// Metrics endpoints
 	api.Get("/metrics/email", metricsHandler.HandleGetEmailMetrics)
 	api.Get("/metrics/rate-limits", metricsHandler.HandleGetRateLimits)
 
-	// Registreer routes voor contact en participant beheer
+	// Registreer handlers
 	contactHandler.RegisterRoutes(app)
-
-	// CRITICAL FIX: Register stepsHandler BEFORE participantHandler
-	// to ensure /api/participant/dashboard is handled by steps handler
-	// instead of being caught by participant's /:id route
-	stepsHandler.RegisterRoutes(app)
-
-	participantHandler.RegisterRoutes(app) // Hernoemd
-
-	// ✨ NIEUW: Registreer de routes voor de EventRegistrationHandler
+	stepsHandler.RegisterRoutes(app) // Must be before participant
+	participantHandler.RegisterRoutes(app)
 	eventRegistrationHandler.RegisterRoutes(app)
-
-	// V30: Registreer de publieke registratie routes (GEEN authenticatie vereist)
 	publicRegistrationHandler.RegisterRoutes(app)
 	logger.Info("Public registration routes registered - /api/public/aanmelden endpoint active")
 
-	// Initialiseer en registreer WebSocket handler voor steps
+	// WebSocket handlers
 	stepsWsHandler := handlers.NewStepsWebSocketHandler(stepsHub, serviceFactory.AuthService)
 	stepsWsHandler.RegisterRoutes(app)
 	logger.Info("WebSocket routes registered - /ws/steps endpoint active")
@@ -509,21 +485,14 @@ func main() {
 		stepsWsHandler.GetStats,
 	)
 
-	// Registreer routes voor newsletter beheer
+	// Overige handlers registreren
 	newsletterHandler.RegisterRoutes(app)
-
-	// Registreer routes voor notificaties
 	notificationHandler.RegisterRoutes(app)
-
-	// Registreer de mailHandler
 	mailHandler.RegisterRoutes(app)
-
-	// Registreer de WFC routes
 	handlers.RegisterWFCOrderRoutes(app, serviceFactory.EmailService)
 
-	// Registreer telegram bot handler
+	// Telegram Bot routes (indien actief)
 	if serviceFactory.TelegramBotService != nil {
-		// (Telegram routes blijven ongewijzigd)
 		app.Get("/api/v1/telegrambot/config", func(c *fiber.Ctx) error {
 			authHeader := c.Get("Authorization")
 			if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
@@ -601,16 +570,14 @@ func main() {
 		return c.Status(recorder.Code).Send(recorder.Body.Bytes())
 	})
 
-	// Admin mail handler
+	// Admin/Chat/RBAC/CMS Handlers
 	adminMailHandler := handlers.NewAdminMailHandler(serviceFactory.EmailService, serviceFactory.AuthService, serviceFactory.PermissionService, repoFactory.IncomingEmail)
 	adminMailHandler.RegisterRoutes(app)
 
-	// Chat handler
 	chatHandler := handlers.NewChatHandler(serviceFactory.ChatService, serviceFactory.AuthService, serviceFactory.PermissionService, serviceFactory.ImageService, serviceFactory.Hub)
 	chatHandler.RegisterRoutes(app)
 	chatHandler.SetChannelHubCallback()
 
-	// RBAC handlers (Permission, Role, User)
 	permissionHandler := handlers.NewPermissionHandler(
 		repoFactory.Permission,
 		repoFactory.RBACRole,
@@ -621,210 +588,172 @@ func main() {
 	)
 	permissionHandler.RegisterRoutes(app)
 
+	dashboardHandler := handlers.NewDashboardHandler(serviceFactory.DashboardService, serviceFactory.AuthService, serviceFactory.PermissionService)
+	dashboardHandler.RegisterRoutes(app)
+
 	userHandler := handlers.NewUserHandler(serviceFactory.AuthService, serviceFactory.PermissionService, repoFactory.UserRole, repoFactory.RBACRole)
 	userHandler.RegisterRoutes(app)
 
-	// Image handler
 	imageHandler := handlers.NewImageHandler(serviceFactory.ImageService, serviceFactory.AuthService)
 	imageHandler.RegisterRoutes(app)
 
-	// --- CMS Handlers ---
-	partnerHandler := handlers.NewPartnerHandler(
-		repoFactory.Partner,
-		serviceFactory.AuthService,
-		serviceFactory.PermissionService,
-	)
-	partnerHandler.RegisterRoutes(app)
-
-	radioRecordingHandler := handlers.NewRadioRecordingHandler(
-		repoFactory.RadioRecording,
-		serviceFactory.AuthService,
-		serviceFactory.PermissionService,
-	)
-	radioRecordingHandler.RegisterRoutes(app)
-
-	photoHandler := handlers.NewPhotoHandler(
-		repoFactory.Photo,
-		serviceFactory.AuthService,
-		serviceFactory.PermissionService,
-	)
-	photoHandler.RegisterRoutes(app)
-
-	albumHandler := handlers.NewAlbumHandler(
-		repoFactory.Album,
-		repoFactory.Photo,
-		repoFactory.AlbumPhoto,
-		serviceFactory.AuthService,
-		serviceFactory.PermissionService,
-	)
-	albumHandler.RegisterRoutes(app)
-
-	videoHandler := handlers.NewVideoHandler(
-		repoFactory.Video,
-		serviceFactory.AuthService,
-		serviceFactory.PermissionService,
-	)
-	videoHandler.RegisterRoutes(app)
-
-	sponsorHandler := handlers.NewSponsorHandler(
-		repoFactory.Sponsor,
-		serviceFactory.AuthService,
-		serviceFactory.PermissionService,
-		serviceFactory.ImageService,
-	)
-	sponsorHandler.RegisterRoutes(app)
-
-	programScheduleHandler := handlers.NewProgramScheduleHandler(
-		repoFactory.ProgramSchedule,
-		serviceFactory.AuthService,
-		serviceFactory.PermissionService,
-	)
-	programScheduleHandler.RegisterRoutes(app)
-
-	socialEmbedHandler := handlers.NewSocialEmbedHandler(
-		repoFactory.SocialEmbed,
-		serviceFactory.AuthService,
-		serviceFactory.PermissionService,
-	)
-	socialEmbedHandler.RegisterRoutes(app)
-
-	socialLinkHandler := handlers.NewSocialLinkHandler(
-		repoFactory.SocialLink,
-		serviceFactory.AuthService,
-		serviceFactory.PermissionService,
-	)
-	socialLinkHandler.RegisterRoutes(app)
+	// CMS handlers
+	handlers.NewPartnerHandler(repoFactory.Partner, serviceFactory.AuthService, serviceFactory.PermissionService).RegisterRoutes(app)
+	handlers.NewRadioRecordingHandler(repoFactory.RadioRecording, serviceFactory.AuthService, serviceFactory.PermissionService).RegisterRoutes(app)
+	handlers.NewPhotoHandler(repoFactory.Photo, serviceFactory.AuthService, serviceFactory.PermissionService).RegisterRoutes(app)
+	handlers.NewAlbumHandler(repoFactory.Album, repoFactory.Photo, repoFactory.AlbumPhoto, serviceFactory.AuthService, serviceFactory.PermissionService).RegisterRoutes(app)
+	handlers.NewVideoHandler(repoFactory.Video, serviceFactory.AuthService, serviceFactory.PermissionService).RegisterRoutes(app)
+	handlers.NewSponsorHandler(repoFactory.Sponsor, serviceFactory.AuthService, serviceFactory.PermissionService, serviceFactory.ImageService).RegisterRoutes(app)
+	handlers.NewProgramScheduleHandler(repoFactory.ProgramSchedule, serviceFactory.AuthService, serviceFactory.PermissionService).RegisterRoutes(app)
+	handlers.NewSocialEmbedHandler(repoFactory.SocialEmbed, serviceFactory.AuthService, serviceFactory.PermissionService).RegisterRoutes(app)
+	handlers.NewSocialLinkHandler(repoFactory.SocialLink, serviceFactory.AuthService, serviceFactory.PermissionService).RegisterRoutes(app)
 
 	underConstructionHandler := handlers.NewUnderConstructionHandler(
 		repoFactory.UnderConstruction,
 		serviceFactory.AuthService,
 		serviceFactory.PermissionService,
 	)
-
-	// Register public under-construction routes FIRST (before RegisterRoutes)
-	// These must be accessible without authentication for maintenance mode checks
+	// Register public check route
 	api.Get("/under-construction/active", underConstructionHandler.GetActiveUnderConstruction)
-	api.Get("/under-construction", underConstructionHandler.GetActiveUnderConstruction) // Alias
-
-	// Now register the admin routes
+	api.Get("/under-construction", underConstructionHandler.GetActiveUnderConstruction)
+	// Register admin routes
 	underConstructionHandler.RegisterRoutes(app)
 
-	autoResponseHandler := handlers.NewAutoResponseHandler(
-		repoFactory.AutoResponse,
-		serviceFactory.AuthService,
-		serviceFactory.PermissionService,
-	)
+	autoResponseHandler := handlers.NewAutoResponseHandler(repoFactory.AutoResponse, serviceFactory.AuthService, serviceFactory.PermissionService)
 	autoResponseHandler.RegisterRoutes(app)
 
-	titleSectionHandler := handlers.NewTitleSectionHandler(
-		repoFactory.TitleSection,
-		serviceFactory.AuthService,
-		serviceFactory.PermissionService,
-	)
+	titleSectionHandler := handlers.NewTitleSectionHandler(repoFactory.TitleSection, serviceFactory.AuthService, serviceFactory.PermissionService)
 	titleSectionHandler.RegisterRoutes(app)
 
-	gamificationHandler := handlers.NewGamificationHandler(
-		serviceFactory.GamificationService,
-		serviceFactory.AuthService,
-		serviceFactory.PermissionService,
-	)
+	gamificationHandler := handlers.NewGamificationHandler(serviceFactory.GamificationService, serviceFactory.AuthService, serviceFactory.PermissionService)
 	gamificationHandler.RegisterRoutes(app)
 
-	// Public alias routes voor backwards compatibility met test endpoints
-	// Deze routes redirecten naar de correcte handler endpoints
-	api.Get("/title-sections", func(c *fiber.Ctx) error {
-		return titleSectionHandler.GetTitleSection(c)
-	})
+	// Legacy/Alias routes
+	api.Get("/title-sections", func(c *fiber.Ctx) error { return titleSectionHandler.GetTitleSection(c) })
+	api.Get("/achievements", func(c *fiber.Ctx) error { return gamificationHandler.GetBadges(c) })
+	api.Get("/notifications", func(c *fiber.Ctx) error { return c.Redirect("/api/v1/notifications", fiber.StatusMovedPermanently) })
 
-	api.Get("/achievements", func(c *fiber.Ctx) error {
-		return gamificationHandler.GetBadges(c) // Achievements zijn eigenlijk badges
-	})
-
-	// Notifications alias - wijst naar v1 endpoint
-	api.Get("/notifications", func(c *fiber.Ctx) error {
-		// Redirect to the actual v1 endpoint
-		return c.Redirect("/api/v1/notifications", fiber.StatusMovedPermanently)
-	})
-
-	// Roles endpoint alias (vereist admin rechten via AdminPermissionMiddleware)
 	api.Get("/roles",
 		handlers.AuthMiddleware(serviceFactory.AuthService),
 		handlers.AdminPermissionMiddleware(serviceFactory.PermissionService),
 		permissionHandler.ListRoles,
 	)
-
-	// Permissions endpoint alias (vereist admin rechten via AdminPermissionMiddleware)
 	api.Get("/permissions",
 		handlers.AuthMiddleware(serviceFactory.AuthService),
 		handlers.AdminPermissionMiddleware(serviceFactory.PermissionService),
 		permissionHandler.ListPermissions,
 	)
 
-	// Event handler
-	// GEWIJZIGD: Injecteer EventRegistrationRepo
-	eventHandler := handlers.NewEventHandler(
-		repoFactory.Event,
-		serviceFactory.AuthService,
-		serviceFactory.PermissionService,
-	)
-	eventHandler.RegisterRoutes(app)
+	handlers.NewEventHandler(repoFactory.Event, serviceFactory.AuthService, serviceFactory.PermissionService).RegisterRoutes(app)
 
-	// Notulen handler
 	notulenHandler := handlers.NewNotulenHandler(*serviceFactory.NotulenService, serviceFactory.AuthService, serviceFactory.PermissionService)
 	notulenHandler.RegisterRoutes(app)
+	handlers.NewNotulenWebSocketHandler(serviceFactory.NotulenService.Hub(), serviceFactory.AuthService).RegisterRoutes(app)
+	logger.Info("Notulen WebSocket routes registered")
 
-	// Notulen WebSocket handler
-	notulenWsHandler := handlers.NewNotulenWebSocketHandler(serviceFactory.NotulenService.Hub(), serviceFactory.AuthService)
-	notulenWsHandler.RegisterRoutes(app)
-	logger.Info("Notulen WebSocket routes registered - /api/ws/notulen endpoint active")
+	// Alias routes for backwards compatibility (after all handlers are declared)
+	// Auto response alias routes for backwards compatibility
+	app.Get("/mail/autoresponse", func(c *fiber.Ctx) error {
+		return autoResponseHandler.ListAutoResponses(c)
+	})
+	app.Get("/mail/autoresponse/:id", func(c *fiber.Ctx) error {
+		return autoResponseHandler.GetAutoResponse(c)
+	})
+	app.Post("/mail/autoresponse", func(c *fiber.Ctx) error {
+		return autoResponseHandler.CreateAutoResponse(c)
+	})
+	app.Put("/mail/autoresponse/:id", func(c *fiber.Ctx) error {
+		return autoResponseHandler.UpdateAutoResponse(c)
+	})
+	app.Delete("/mail/autoresponse/:id", func(c *fiber.Ctx) error {
+		return autoResponseHandler.DeleteAutoResponse(c)
+	})
 
-	// Start server
+	// Mail unprocessed alias route for backwards compatibility
+	app.Get("/mail/unprocessed", func(c *fiber.Ctx) error {
+		return mailHandler.ListUnprocessedEmails(c)
+	})
+
+	// Mail account alias route for backwards compatibility
+	app.Get("/mail/account/:type", func(c *fiber.Ctx) error {
+		return mailHandler.ListEmailsByAccountType(c)
+	})
+
+	// 404 Handler
+	app.Use(func(c *fiber.Ctx) error {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Endpoint niet gevonden",
+		})
+	})
+
+	// =========================================================================
+	// GRACEFUL SHUTDOWN IMPLEMENTATIE
+	// =========================================================================
+
+	// 1. Maak een kanaal voor OS signalen
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+
+	// Bepaal poort
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080" // Default to 8080 for web traffic
+		port = "8080"
 	}
 
-	// Start server in een goroutine
+	// 2. Start de server in een aparte goroutine
 	go func() {
-		logger.Info("Server gestart", "port", port)
+		logger.Info("Server wordt gestart...", "port", port)
 		if err := app.Listen(":" + port); err != nil {
-			logger.Fatal("Server fout", "error", err)
+			logger.Fatal("Server kon niet starten", "error", err)
 		}
 	}()
 
-	// Wacht op interrupt signaal (CTRL+C)
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-	<-stop
-	logger.Info("Server wordt afgesloten...")
+	// 3. Blokkeer tot signaal
+	<-quit
+	logger.Info("Shutdown signaal ontvangen, bezig met afsluiten...")
 
-	// Graceful shutdown
+	// 4. Cleanup Sequentie
+
+	// A. Stop Fiber server
+	if err := app.Shutdown(); err != nil {
+		logger.Error("Fout bij afsluiten server", "error", err)
+	} else {
+		logger.Info("HTTP server succesvol gestopt")
+	}
+
+	// B. Stop services
 	if serviceFactory.EmailBatcher != nil {
 		serviceFactory.EmailBatcher.Shutdown()
 	}
 
-	// Stop de email auto fetcher
 	if serviceFactory.EmailAutoFetcher != nil && serviceFactory.EmailAutoFetcher.IsRunning() {
 		logger.Info("Email auto fetcher stoppen...")
 		serviceFactory.EmailAutoFetcher.Stop()
 		logger.Info("Email auto fetcher gestopt")
 	}
 
-	// Stop de Newsletter service
 	if serviceFactory.NewsletterService != nil {
 		serviceFactory.NewsletterService.Stop()
 	}
 
-	// Sluit rate limiter af
 	if rateLimiter != nil {
 		rateLimiter.Shutdown()
 	}
 
-	// Log laatste metrics
-	serviceFactory.EmailMetrics.LogMetrics()
+	// C. Sluit Database
+	sqlDB, err := db.DB()
+	if err != nil {
+		logger.Error("Kon onderliggende SQL DB niet ophalen voor sluiten", "error", err)
+	} else {
+		if err := sqlDB.Close(); err != nil {
+			logger.Error("Fout bij sluiten database verbinding", "error", err)
+		} else {
+			logger.Info("Database verbinding gesloten")
+		}
+	}
 
-	// Sluit alle log writers
+	serviceFactory.EmailMetrics.LogMetrics()
 	logger.CloseWriters()
 
-	// Graceful shutdown
-} //
+	logger.Info("Applicatie volledig afgesloten. Tot ziens!")
+}

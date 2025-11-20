@@ -139,17 +139,17 @@ func defaultFatal(msg string, keysAndValues ...interface{}) {
 
 // Setup initialiseert de logger met het opgegeven niveau
 func Setup(level string) {
-	// Configuratie voor de encoder
+	// Professionele, compacte encoder configuratie
 	encoderConfig := zapcore.EncoderConfig{
-		TimeKey:        "tijd",
-		LevelKey:       "niveau",
+		TimeKey:        "t",
+		LevelKey:       "lvl",
 		NameKey:        "logger",
 		CallerKey:      "caller",
-		MessageKey:     "bericht",
+		MessageKey:     "msg",
 		StacktraceKey:  "stacktrace",
 		LineEnding:     zapcore.DefaultLineEnding,
 		EncodeLevel:    zapcore.CapitalLevelEncoder,
-		EncodeTime:     zapcore.ISO8601TimeEncoder,
+		EncodeTime:     zapcore.TimeEncoderOfLayout("15:04:05"),
 		EncodeDuration: zapcore.StringDurationEncoder,
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
@@ -234,9 +234,9 @@ func AddWriter(writer LogWriter) {
 // Helper om een log entry als map te bouwen
 func buildLogEntry(level, msg string, keysAndValues ...interface{}) map[string]interface{} {
 	entry := map[string]interface{}{
-		"level":   level,
-		"message": msg,
-		"time":    time.Now().UTC().Format(time.RFC3339),
+		"lvl": level,
+		"msg": msg,
+		"t":   time.Now().UTC().Format("15:04:05"),
 	}
 
 	// Parse extra velden

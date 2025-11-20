@@ -8,20 +8,20 @@
 -- 1. VIEW VOOR GEBRUIKER-PARTICIPANT MAPPING
 -- =====================================================
 CREATE OR REPLACE VIEW user_participant_mapping AS
-SELECT 
+SELECT
     g.id as gebruiker_id,
     g.naam as gebruiker_naam,
     g.email as gebruiker_email,
-    g.rol as legacy_rol,
+    NULL as legacy_rol,
     a.id as aanmelding_id,
     a.naam as participant_naam,
     a.email as participant_email,
     a.afstand as route,
     a.steps,
     a.status as participant_status,
-    CASE 
-        WHEN a.id IS NOT NULL THEN true 
-        ELSE false 
+    CASE
+        WHEN a.id IS NOT NULL THEN true
+        ELSE false
     END as is_participant
 FROM gebruikers g
 LEFT JOIN aanmeldingen a ON g.id = a.gebruiker_id;
@@ -125,11 +125,11 @@ CREATE TRIGGER sync_user_email_trigger
 -- 6. HELPER VIEW: USERS WITHOUT PARTICIPATION
 -- =====================================================
 CREATE OR REPLACE VIEW users_without_participation AS
-SELECT 
+SELECT
     g.id,
     g.naam,
     g.email,
-    g.rol as legacy_rol,
+    NULL as legacy_rol,
     g.is_actief,
     g.created_at,
     array_agg(r.name) as actual_roles
@@ -138,7 +138,7 @@ LEFT JOIN user_roles ur ON g.id = ur.user_id
 LEFT JOIN roles r ON ur.role_id = r.id
 LEFT JOIN aanmeldingen a ON g.id = a.gebruiker_id
 WHERE a.id IS NULL
-GROUP BY g.id, g.naam, g.email, g.rol, g.is_actief, g.created_at;
+GROUP BY g.id, g.naam, g.email, g.is_actief, g.created_at;
 
 COMMENT ON VIEW users_without_participation IS 'Users die nog geen participant/aanmelding hebben';
 

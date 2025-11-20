@@ -126,7 +126,7 @@ func BenchmarkRefreshAccessToken_Flow(b *testing.B) {
 	}
 
 	validToken := &models.RefreshToken{
-		UserID:    "refresh-bench",
+		OwnerID:   "refresh-bench",
 		Token:     "bench-refresh-token",
 		ExpiresAt: testUser.CreatedAt.Add(7 * 24 * 60 * 60 * 1000000000), // 7 days
 		IsRevoked: false,

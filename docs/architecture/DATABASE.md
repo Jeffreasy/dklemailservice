@@ -4,37 +4,44 @@ PostgreSQL database schema and design documentation for DKL Email Service.
 
 ## Overview
 
-The system uses PostgreSQL 17 with:
-- Comprehensive RBAC (Role-Based Access Control)
-- Optimized indexes for performance
-- Foreign key constraints for data integrity
-- Timestamps for audit trails
-- Proper normalization
+The system uses PostgreSQL 17 with advanced features:
+- **UUID primary keys** for all entities (gen_random_uuid())
+- **JSONB columns** for flexible data storage (geofences, event_config, device_info)
+- **Comprehensive RBAC** (Role-Based Access Control) with granular permissions
+- **Dual account system** (temporary/full accounts for participants)
+- **Optimized indexes** for performance (composite, partial, GIN indexes)
+- **Foreign key constraints** for data integrity with CASCADE/SET NULL
+- **Timestamps with time zones** for audit trails
+- **Proper normalization** with lookup tables for status types
+- **Full-text search capabilities** and advanced querying
 
 ## Core Tables
 
 ### Users & Authentication
 
 #### `gebruikers` (Users)
-Primary user accounts table.
+Primary user accounts table with UUID and RBAC integration.
 
 ```sql
 CREATE TABLE gebruikers (
-    id SERIAL PRIMARY KEY,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    wachtwoord_hash VARCHAR(255) NOT NULL,
-    naam VARCHAR(255) NOT NULL,
-    telefoon VARCHAR(50),
-    profielfoto_url TEXT,
-    actief BOOLEAN DEFAULT true,
-    geverifieerd BOOLEAN DEFAULT false,
-    laatste_login TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    naam TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    wachtwoord_hash TEXT,
+    is_actief BOOLEAN DEFAULT true,
+    newsletter_subscribed BOOLEAN DEFAULT false,
+    laatste_login TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+
+    -- RBAC backward compatibility (V38+)
+    role_id UUID
 );
 
 CREATE INDEX idx_gebruikers_email ON gebruikers(email);
-CREATE INDEX idx_gebruikers_actief ON gebruikers(actief);
+CREATE INDEX idx_gebruikers_is_actief ON gebruikers(is_actief);
+CREATE INDEX idx_gebruikers_newsletter_subscribed ON gebruikers(newsletter_subscribed);
+CREATE INDEX idx_gebruikers_role_id ON gebruikers(role_id);
 ```
 
 #### `refresh_tokens`
@@ -57,39 +64,43 @@ CREATE INDEX idx_refresh_tokens_expires ON refresh_tokens(expires_at);
 
 ### RBAC System
 
-#### `roles` (Roles)
-System roles definition.
+#### `roles` (RBAC Roles)
+System roles definition with UUID primary keys.
 
 ```sql
 CREATE TABLE roles (
-    id SERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(100) UNIQUE NOT NULL,
     description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    is_system_role BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID
 );
 
--- Default roles
-INSERT INTO roles (name, description) VALUES
-    ('admin', 'Full system access'),
-    ('moderator', 'Content moderation access'),
-    ('user', 'Standard user access'),
-    ('guest', 'Limited read-only access');
+-- Default system roles
+INSERT INTO roles (name, description, is_system_role) VALUES
+    ('admin', 'Full system access', true),
+    ('moderator', 'Content moderation access', true),
+    ('user', 'Standard user access', true),
+    ('guest', 'Limited read-only access', true);
 ```
 
 #### `permissions`
-Granular permissions.
+Granular permissions with resource:action pattern.
 
 ```sql
 CREATE TABLE permissions (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) UNIQUE NOT NULL,
-    description TEXT,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     resource VARCHAR(100) NOT NULL,
     action VARCHAR(50) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    description TEXT,
+    is_system_permission BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE UNIQUE INDEX idx_permissions_resource_action ON permissions(resource, action);
 CREATE INDEX idx_permissions_resource ON permissions(resource);
 CREATE INDEX idx_permissions_action ON permissions(action);
 ```
@@ -109,19 +120,60 @@ CREATE INDEX idx_role_permissions_permission ON role_permissions(permission_id);
 ```
 
 #### `user_roles`
-User role assignments.
+User role assignments with expiration support.
 
 ```sql
 CREATE TABLE user_roles (
-    gebruiker_id INTEGER NOT NULL REFERENCES gebruikers(id) ON DELETE CASCADE,
-    role_id INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    assigned_by INTEGER REFERENCES gebruikers(id),
-    PRIMARY KEY (gebruiker_id, role_id)
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES gebruikers(id) ON DELETE CASCADE,
+    role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    assigned_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    assigned_by UUID REFERENCES gebruikers(id),
+    expires_at TIMESTAMPTZ,
+    is_active BOOLEAN DEFAULT true
 );
 
-CREATE INDEX idx_user_roles_gebruiker ON user_roles(gebruiker_id);
-CREATE INDEX idx_user_roles_role ON user_roles(role_id);
+CREATE UNIQUE INDEX idx_user_roles_user_role ON user_roles(user_id, role_id) WHERE is_active = true;
+CREATE INDEX idx_user_roles_user_id ON user_roles(user_id);
+CREATE INDEX idx_user_roles_role_id ON user_roles(role_id);
+CREATE INDEX idx_user_roles_expires_at ON user_roles(expires_at);
+```
+
+### Session Management
+
+#### `sessions`
+Multi-device session tracking for JWT tokens.
+
+```sql
+CREATE TABLE sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id UUID NOT NULL,
+    owner_type VARCHAR(20) NOT NULL DEFAULT 'gebruiker' CHECK (owner_type IN ('gebruiker', 'participant')),
+    access_token VARCHAR(500) UNIQUE,
+    device_info JSONB,
+    ip_address INET,
+    user_agent TEXT,
+    location_info JSONB,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    is_current BOOLEAN NOT NULL DEFAULT false,
+    expires_at TIMESTAMPTZ NOT NULL,
+    last_activity TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Indexes for performance
+CREATE INDEX idx_sessions_owner_id ON sessions(owner_id);
+CREATE INDEX idx_sessions_owner_type ON sessions(owner_type);
+CREATE INDEX idx_sessions_access_token ON sessions(access_token);
+CREATE INDEX idx_sessions_is_active ON sessions(is_active);
+CREATE INDEX idx_sessions_is_current ON sessions(is_current);
+CREATE INDEX idx_sessions_expires_at ON sessions(expires_at);
+CREATE INDEX idx_sessions_last_activity ON sessions(last_activity);
+
+-- Partial index for active sessions
+CREATE INDEX idx_sessions_active_recent ON sessions(owner_id, last_activity DESC)
+WHERE is_active = true;
 ```
 
 ### Content Management
@@ -190,24 +242,29 @@ CREATE INDEX idx_videos_youtube_id ON videos(youtube_id);
 
 ### Events & Participants
 
-#### `evenementen` (Events)
-Event management.
+#### `events` (Events)
+Advanced event management with geofencing and GPS tracking.
 
 ```sql
-CREATE TABLE evenementen (
-    id SERIAL PRIMARY KEY,
-    naam VARCHAR(255) NOT NULL,
-    beschrijving TEXT,
-    datum DATE NOT NULL,
-    locatie VARCHAR(255),
-    max_deelnemers INTEGER,
-    inschrijvingen_open BOOLEAN DEFAULT true,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    description TEXT,
+    start_time TIMESTAMPTZ NOT NULL,
+    end_time TIMESTAMPTZ,
+    status TEXT DEFAULT 'upcoming',
+    geofences JSONB DEFAULT '[]',
+    event_config JSONB DEFAULT '{}',
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID
 );
 
-CREATE INDEX idx_evenementen_datum ON evenementen(datum);
-CREATE INDEX idx_evenementen_inschrijvingen ON evenementen(inschrijvingen_open);
+CREATE INDEX idx_events_start_time ON events(start_time);
+CREATE INDEX idx_events_status ON events(status);
+CREATE INDEX idx_events_is_active ON events(is_active);
+CREATE INDEX idx_events_geofences ON events USING gin(geofences);
 ```
 
 #### `aanmeldingen` (Registrations)
@@ -398,7 +455,7 @@ CREATE INDEX idx_contact_antwoorden_contact ON contact_antwoorden(contact_id);
 
 ### Participants & Registrations (V30+ Architecture)
 
-#### `participants` - DE PERSOON
+#### `participants` - DE PERSOON (Dual Account System)
 Slaat persoonsgegevens op + V30 account type informatie.
 
 **Functie:** Wie is deze persoon? Welk type account heeft deze persoon?
@@ -407,28 +464,24 @@ Slaat persoonsgegevens op + V30 account type informatie.
 CREATE TABLE participants (
     -- Identificatie
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     naam TEXT NOT NULL,
     email TEXT NOT NULL,
     telefoon TEXT,
-    
-    -- V30: Account Type Systeem
-    account_type TEXT NOT NULL DEFAULT 'temporary',  -- 'full' of 'temporary'
-    registration_year INTEGER,                        -- Voor temporary accounts
-    wachtwoord_hash TEXT,                            -- Alleen voor full accounts
-    has_app_access BOOLEAN NOT NULL DEFAULT FALSE,  -- Kan DKL Step App gebruiken?
-    
-    -- RBAC Integration
-    gebruiker_id UUID REFERENCES gebruikers(id),    -- Link naar gebruikers tabel
-    
-    -- Upgrade Tracking
+
+    -- Terms & Test Mode
+    terms BOOLEAN NOT NULL DEFAULT false,
+    gebruiker_id UUID REFERENCES gebruikers(id),
+
+    -- V30: Duaal registratiesysteem
+    account_type TEXT NOT NULL DEFAULT 'temporary' CHECK (account_type IN ('full', 'temporary')),
+    registration_year INTEGER,
+    wachtwoord_hash TEXT,
+    has_app_access BOOLEAN NOT NULL DEFAULT false,
     upgraded_to_gebruiker_id UUID REFERENCES gebruikers(id),
     upgraded_at TIMESTAMPTZ,
-    
-    -- Metadata
-    terms BOOLEAN NOT NULL DEFAULT false,
-    test_mode BOOLEAN NOT NULL DEFAULT false,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    test_mode BOOLEAN NOT NULL DEFAULT false
 );
 
 -- Indexes
@@ -474,48 +527,52 @@ CREATE TABLE event_registrations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
     participant_id UUID NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
-    
-    -- Event-specifieke keuzes (V28 verplaatst van participants)
-    participant_role_name TEXT,              -- "Deelnemer", "Begeleider", "Vrijwilliger"
-    distance_route TEXT,                     -- "2.5 KM", "6 KM", "10 KM", "15 KM"
-    ondersteuning TEXT,                      -- "Ja", "Nee", "Anders"
-    bijzonderheden TEXT,                     -- Extra info bij ondersteuning
-    
-    -- Status & Tracking
-    status TEXT DEFAULT 'registered',        -- Registratie status
-    tracking_status VARCHAR(50) DEFAULT 'registered',  -- GPS tracking status
-    
-    -- **STAPPEN WORDEN HIER BIJGEHOUDEN!**
-    steps INTEGER DEFAULT 0,                 -- Real-time stappen count via WebSocket
-    
-    -- GPS & Distance Tracking
-    total_distance DECIMAL(10,2) DEFAULT 0,
-    last_location_update TIMESTAMPTZ,
-    
-    -- Timestamps
     registered_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     check_in_time TIMESTAMPTZ,
     start_time TIMESTAMPTZ,
     finish_time TIMESTAMPTZ,
-    
+
+    -- GPS Tracking velden
+    tracking_status TEXT,
+    last_location_update TIMESTAMPTZ,
+    total_distance DECIMAL(10,2) DEFAULT 0,
+
+    -- Stappen tracking
+    steps INTEGER DEFAULT 0,
+    test_mode BOOLEAN NOT NULL DEFAULT false,
+
+    -- Event-specifieke keuzes
+    ondersteuning TEXT,
+    bijzonderheden TEXT,
+
+    -- V37: Terms veld behouden in event_registrations
+    terms BOOLEAN NOT NULL DEFAULT false,
+
+    -- Antwoorden count voor tracking
+    antwoorden_count INTEGER DEFAULT 0,
+
+    -- V37: Transport vraag
+    heeft_vervoer BOOLEAN,
+
+    -- Foreign Keys (V26 & V27)
+    status TEXT DEFAULT 'registered',
+    distance_route TEXT,
+    participant_role_name TEXT,
+
     -- Admin velden
     notities TEXT,
     behandeld_door TEXT,
     behandeld_op TIMESTAMPTZ,
     email_verzonden BOOLEAN DEFAULT false,
     email_verzonden_op TIMESTAMPTZ,
-    
-    -- Metadata
-   test_mode BOOLEAN DEFAULT false,
-    
-    UNIQUE(event_id, participant_id)  -- 1 participant = 1 registratie per event
+
+    UNIQUE(event_id, participant_id)
 );
 
 -- Indexes
 CREATE INDEX idx_event_registrations_event ON event_registrations(event_id);
 CREATE INDEX idx_event_registrations_participant ON event_registrations(participant_id);
 CREATE INDEX idx_event_registrations_status ON event_registrations(status);
-CREATE INDEX idx_event_registrations_tracking ON event_registrations(tracking_status);
 CREATE INDEX idx_event_registrations_participant_role ON event_registrations(participant_role_name);
 CREATE INDEX idx_event_registrations_distance ON event_registrations(distance_route);
 CREATE INDEX idx_event_registrations_steps ON event_registrations(steps) WHERE steps > 0;
@@ -1111,6 +1168,7 @@ INSERT INTO registration_status_types (status, description, display_name, color)
 ```
 gebruikers (Users)
     ├── 1:N → refresh_tokens
+    ├── 1:N → sessions (as owner when owner_type='gebruiker')
     ├── N:M → roles (via user_roles)
     ├── 1:N → notulen (created_by)
     ├── 1:N → albums (created_by)
@@ -1133,6 +1191,7 @@ events
     └── 1:1 → event_status_types (status FK)
 
 participants
+    ├── 1:N → sessions (as owner when owner_type='participant')
     ├── 1:N → event_registrations
     ├── 1:N → participant_antwoorden
     ├── 1:N → leaderboards
@@ -1173,9 +1232,10 @@ wfc_orders
 ### Key Relationships Explained
 
 **Users & Authentication:**
-- Each user can have multiple refresh tokens
-- Users have multiple roles (many-to-many)
+- Each user can have multiple refresh tokens and sessions across devices
+- Users have multiple roles (many-to-many) with expiration support
 - Users create various content (albums, notulen, newsletters)
+- Sessions track device information, IP addresses, and user agents
 
 **RBAC System:**
 - Roles contain multiple permissions
@@ -1207,13 +1267,16 @@ Indexes on all foreign key columns for optimal JOIN performance.
 
 ### Search Indexes
 - Email lookups: `idx_gebruikers_email`
-- Active users: `idx_gebruikers_actief`
+- Active users: `idx_gebruikers_is_actief`
 - Token validation: `idx_refresh_tokens_token`
-- Date ranges: `idx_evenementen_datum`, `idx_notulen_datum`
+- Session management: `idx_sessions_access_token`, `idx_sessions_expires_at`
+- Date ranges: `idx_events_start_time`, `idx_notulen_datum`
 
 ### Composite Indexes
 - Chat messages by channel and time: `(channel_id, created_at)`
 - User notifications: `(user_id, read, created_at)`
+- Active sessions by owner and activity: `(owner_id, last_activity DESC)` (partial)
+- User roles with active constraint: `(user_id, role_id)` (unique, partial)
 
 ### JSONB Indexes (GIN)
 - Notification data: `notifications.data` using GIN index
@@ -1222,11 +1285,15 @@ Indexes on all foreign key columns for optimal JOIN performance.
 
 ### Connection Pooling
 ```go
-// Database configuration
-MaxOpenConns:    25
-MaxIdleConns:    5
-ConnMaxLifetime: 5 * time.Minute
-ConnMaxIdleTime: 10 * time.Minute
+// Production database configuration (from config/database.go)
+sqlDB.SetMaxIdleConns(10)           // Maximum idle connections
+sqlDB.SetMaxOpenConns(100)          // Maximum open connections
+sqlDB.SetConnMaxLifetime(time.Hour) // Maximum connection lifetime
+
+// Development database configuration
+sqlDB.SetMaxIdleConns(10)
+sqlDB.SetMaxOpenConns(100)
+sqlDB.SetConnMaxLifetime(time.Hour)
 ```
 
 ### Query Optimization
@@ -1297,6 +1364,8 @@ Located in `database/migrations/`:
 - **`V32__final_schema_alignment_fixes.sql`** - Schema alignment (see [V32 Migration Docs](../migrations/V32_SCHEMA_CHANGES.md))
 - **`V33__create_auto_responses_table.sql`** - Auto responses feature (see [Auto Response API](../api/AUTO_RESPONSES.md))
 - **`V34__remove_legacy_participant_columns.sql`** - Schema cleanup (see [V34 Breaking Changes](../migrations/V34_BREAKING_CHANGES.md))
+- **`V35-V45__various_schema_updates.sql`** - Various incremental schema updates and fixes
+- **`V46__create_sessions_table.sql`** - Multi-device session management system
 
 ### Recent Critical Migrations (V30-V34)
 
@@ -1323,9 +1392,14 @@ Located in `database/migrations/`:
    - [API Documentation](../api/AUTO_RESPONSES.md)
 
 5. **V34:** Removed legacy participant columns
-   - Permanent deletion of 14 columns
-   - **DESTRUCTIVE** migration
-   - [Critical Warnings](../migrations/V34_BREAKING_CHANGES.md)
+    - Permanent deletion of 14 columns
+    - **DESTRUCTIVE** migration
+    - [Critical Warnings](../migrations/V34_BREAKING_CHANGES.md)
+
+6. **V46:** Added multi-device session management
+    - New sessions table for tracking user sessions across devices
+    - Device fingerprinting and location tracking
+    - Session expiration and activity monitoring
 
 **Migration Index:** See [Migrations README](../migrations/README.md) for complete overview.
 
@@ -1355,20 +1429,30 @@ go run database/migrations/run_migrations.go
 - Separate read-only user for analytics
 - SSL/TLS for database connections
 
+### Session Security
+Multi-device session management:
+- Device fingerprinting (OS, browser, user agent)
+- IP address tracking and geolocation
+- Session expiration and automatic cleanup
+- Concurrent session limits
+- Suspicious activity detection
+
 ### Audit Logging
 Track security-relevant operations:
-- Login attempts
-- Permission changes
+- Login attempts and session creation
+- Permission changes and role assignments
 - Data modifications by admins
+- Session termination events
 
 ## Database Monitoring
 
 ### Key Metrics
-- Connection pool usage
-- Query execution time
-- Lock wait times
-- Cache hit ratio
-- Disk I/O
+- Connection pool usage and active sessions
+- Query execution time and slow query analysis
+- Lock wait times and deadlock detection
+- Session activity and concurrent connections
+- Cache hit ratio and Redis performance
+- Disk I/O and table size monitoring
 
 ### Slow Query Log
 ```sql
@@ -1382,16 +1466,23 @@ log_min_duration_statement = 1000  -- Log queries > 1 second
 -- Check active connections
 SELECT count(*) FROM pg_stat_activity;
 
+-- Check active sessions
+SELECT count(*) FROM sessions WHERE is_active = true;
+
 -- Check database size
 SELECT pg_size_pretty(pg_database_size('dklemailservice'));
 
 -- Check table sizes
-SELECT 
+SELECT
     schemaname,
     tablename,
     pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename))
 FROM pg_tables
 ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
+
+-- Check expired sessions (should be cleaned up)
+SELECT count(*) FROM sessions
+WHERE expires_at < NOW() AND is_active = true;
 ```
 
 ## Development vs Production

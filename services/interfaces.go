@@ -81,8 +81,37 @@ type AuthService interface {
 	RevokeRefreshToken(ctx context.Context, refreshToken string) error
 	RevokeAllUserRefreshTokens(ctx context.Context, userID string) error
 
+	// Access token operations (Access Token Rotation)
+	RevokeAllUserAccessTokens(ctx context.Context, userID string) error
+	ValidateAccessToken(ctx context.Context, token string) error
+
+	// Password reset operations
+	RequestPasswordReset(ctx context.Context, email string) error
+	ResetPasswordWithToken(ctx context.Context, token, newPassword string) error
+
+	// Email verification operations
+	SendEmailVerification(ctx context.Context, email, userID, userType string) error
+	VerifyEmailWithToken(ctx context.Context, token string) error
+	ResendEmailVerification(ctx context.Context, email, userID, userType string) error
+	IsEmailVerified(ctx context.Context, userID, userType string) (bool, error)
+
 	// V30+RBAC: Participant-specifieke methoden
 	GetParticipantByGebruikerID(ctx context.Context, gebruikerID string) (*models.Participant, error)
+
+	// Email verification helpers
+	GetGebruikerByEmail(ctx context.Context, email string) (*models.Gebruiker, error)
+	GetParticipantByEmail(ctx context.Context, email string) ([]*models.Participant, error)
+
+	// Account deletion (GDPR compliance)
+	DeleteUserAccount(ctx context.Context, userID, password, reason string) error
+
+	// Session management (Multiple session management)
+	CreateSessionForLogin(ctx context.Context, userID, userType, accessToken, ipAddress, userAgent string) (*models.Session, error)
+	UpdateAccessTokenWithSession(ctx context.Context, token, sessionID string) error
+	ListUserSessions(ctx context.Context, userID string) ([]*models.Session, error)
+	RevokeSession(ctx context.Context, sessionID string) error
+	RevokeAllUserSessions(ctx context.Context, userID string) error
+	RevokeOtherUserSessions(ctx context.Context, userID, currentSessionID string) error
 }
 
 // EmailSender definieert de generieke interface voor het versturen van e-mails.
@@ -97,6 +126,9 @@ type EmailSender interface {
 	// Behoud originele signature als ze altijd de geconfigureerde afzender moeten gebruiken.
 	SendContactEmail(data *models.ContactEmailData) error
 	SendRegistrationEmail(data *models.RegistrationEmailData) error
+
+	// Email verification methods
+	SendEmailVerificationEmail(email, naam, verificationLink string, expiryHours int) error
 
 	// Methode specifiek voor WFC
 	SendWFCEmail(to, subject, body string) error

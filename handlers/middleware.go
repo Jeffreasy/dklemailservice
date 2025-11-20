@@ -3,10 +3,32 @@ package handlers
 import (
 	"dklautomationgo/logger"
 	"dklautomationgo/services"
+	"os"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
 )
+
+// MIGRATION STATUS: Legacy Role-Based Middleware Removal (V38)
+// ============================================================
+// The following legacy middleware functions have been REMOVED in V38:
+// - StaffMiddleware: Used legacy gebruiker.Rol field instead of RBAC permissions
+// - AdminMiddleware: Used legacy gebruiker.Rol field instead of RBAC permissions
+//
+// Migration completed:
+// ✅ Added deprecation warnings with removal timeline (V37)
+// ✅ Verified no active usage in current routes
+// ✅ All routes use modern permission-based middleware
+// ✅ REMOVED legacy middleware functions (V38)
+//
+// Modern alternatives:
+// - StaffPermissionMiddleware: Uses permissionService.HasPermission(userID, "staff", "access")
+// - AdminPermissionMiddleware: Uses permissionService.HasPermission(userID, "admin", "access")
+//
+// Next steps:
+// - Remove legacy Rol column from database in V39
+// - Update JWT tokens to remove legacy Role field
+// - Clean up User API to remove rol field support
 
 // AuthMiddleware is een middleware die controleert of de gebruiker is ingelogd
 func AuthMiddleware(authService services.AuthService) fiber.Handler {
@@ -58,6 +80,21 @@ func AuthMiddleware(authService services.AuthService) fiber.Handler {
 			})
 		}
 
+		// Access Token Rotation: Controleer of token niet ingetrokken is in database
+		// Dit gebeurt alleen als de JWT validatie slaagt
+		if err := authService.ValidateAccessToken(c.Context(), token); err != nil {
+			logger.Warn("Access token validatie gefaald",
+				"user_id", userID,
+				"error", err,
+				"path", c.Path(),
+				"ip", c.IP())
+
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "Access token ingetrokken of ongeldig",
+				"code":  "TOKEN_REVOKED",
+			})
+		}
+
 		// Sla gebruiker ID op in context
 		c.Locals("userID", userID)
 		c.Locals("token", token)
@@ -69,76 +106,64 @@ func AuthMiddleware(authService services.AuthService) fiber.Handler {
 	}
 }
 
-/* StaffMiddleware allows "admin" or "staff" roles */
-func StaffMiddleware(authService services.AuthService) fiber.Handler {
+// SessionValidationMiddleware valideert dat de sessie gekoppeld aan de access token nog actief is
+// Dit middleware moet NA AuthMiddleware worden gebruikt
+func SessionValidationMiddleware(authService services.AuthService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		// Haal token op uit context
+		// Haal user ID en token op uit context (gezet door AuthMiddleware)
+		userID, ok := c.Locals("userID").(string)
+		if !ok || userID == "" {
+			logger.Warn("Geen user ID gevonden in context voor session validatie", "path", c.Path())
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "Niet geautoriseerd",
+				"code":  "NO_USER_ID",
+			})
+		}
+
 		token, ok := c.Locals("token").(string)
 		if !ok || token == "" {
-			logger.Warn("Geen token gevonden in context")
+			logger.Warn("Geen token gevonden in context voor session validatie", "path", c.Path(), "user_id", userID)
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "Niet geautoriseerd",
+				"code":  "NO_TOKEN",
 			})
 		}
 
-		// Haal gebruiker op uit token
-		ctx := c.Context()
-		gebruiker, err := authService.GetUserFromToken(ctx, token)
-		if err != nil {
-			logger.Warn("Kon gebruiker niet ophalen uit token", "error", err)
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Niet geautoriseerd",
-			})
+		// Controleer of er een actieve sessie is voor deze gebruiker en token
+		// Dit gebeurt alleen als session repository beschikbaar is
+		if authService != nil {
+			sessions, err := authService.ListUserSessions(c.Context(), userID)
+			if err != nil {
+				logger.Error("Fout bij ophalen sessies voor validatie", "user_id", userID, "error", err)
+				// Graceful degradation: ga door als sessie check faalt
+				logger.Warn("Session validatie overgeslagen vanwege error", "user_id", userID, "path", c.Path())
+			} else {
+				// FIX: Zoek specifiek naar de sessie die bij DIT token hoort.
+				found := false
+				for _, session := range sessions {
+					if session.AccessToken == token {
+						if session.IsActive && !session.IsExpired() {
+							// Sessie gevonden en geldig!
+							c.Locals("sessionID", session.ID) // Sla op voor Logout handler
+							found = true
+						}
+						// We stoppen met zoeken zodra we de token match hebben,
+						// ongeacht of hij geldig is (want token is uniek per sessie).
+						break
+					}
+				}
+
+				if !found {
+					logger.Warn("Huidige sessie niet gevonden, inactief of verlopen", "user_id", userID, "path", c.Path())
+					return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+						"error": "Sessie verlopen of ingetrokken",
+						"code":  "SESSION_EXPIRED",
+					})
+				}
+
+				logger.Debug("Session validatie succesvol", "user_id", userID, "path", c.Path())
+			}
 		}
-
-		// Controleer of gebruiker admin of staff is
-		if gebruiker.Rol != "admin" && gebruiker.Rol != "staff" {
-			logger.Warn("Gebruiker is geen admin of staff", "user_id", gebruiker.ID, "role", gebruiker.Rol)
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"error": "Geen toegang",
-			})
-		}
-
-		// Sla gebruiker op in context
-		c.Locals("gebruiker", gebruiker)
-
-		// Ga door naar volgende handler
-		return c.Next()
-	}
-}
-
-// AdminMiddleware is een middleware die controleert of de gebruiker een admin is
-func AdminMiddleware(authService services.AuthService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		// Haal token op uit context
-		token, ok := c.Locals("token").(string)
-		if !ok || token == "" {
-			logger.Warn("Geen token gevonden in context")
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Niet geautoriseerd",
-			})
-		}
-
-		// Haal gebruiker op uit token
-		ctx := c.Context()
-		gebruiker, err := authService.GetUserFromToken(ctx, token)
-		if err != nil {
-			logger.Warn("Kon gebruiker niet ophalen uit token", "error", err)
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Niet geautoriseerd",
-			})
-		}
-
-		// Controleer of gebruiker admin is
-		if gebruiker.Rol != "admin" {
-			logger.Warn("Gebruiker is geen admin", "user_id", gebruiker.ID, "role", gebruiker.Rol)
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"error": "Geen toegang",
-			})
-		}
-
-		// Sla gebruiker op in context
-		c.Locals("gebruiker", gebruiker)
 
 		// Ga door naar volgende handler
 		return c.Next()
@@ -186,6 +211,45 @@ func TestModeMiddleware() fiber.Handler {
 		}
 
 		// Ga verder met de request
+		return c.Next()
+	}
+}
+
+// SecurityHeadersMiddleware voegt beveiligingsheaders toe aan alle responses
+func SecurityHeadersMiddleware() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		// Basis beveiligingsheaders
+		c.Set("X-Content-Type-Options", "nosniff")
+		c.Set("X-Frame-Options", "DENY")
+		c.Set("X-XSS-Protection", "1; mode=block")
+
+		// HSTS (HTTP Strict Transport Security) - alleen in productie
+		if os.Getenv("ENV") == "production" {
+			c.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
+
+		// Content Security Policy - configureerbaar via environment variable
+		if csp := os.Getenv("CONTENT_SECURITY_POLICY"); csp != "" {
+			c.Set("Content-Security-Policy", csp)
+		} else {
+			// Default CSP voor development - meer permissief voor Swagger UI
+			c.Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:;")
+		}
+
+		// Referrer Policy
+		if rp := os.Getenv("REFERRER_POLICY"); rp != "" {
+			c.Set("Referrer-Policy", rp)
+		} else {
+			c.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		}
+
+		// Permissions Policy (voorheen Feature Policy)
+		if pp := os.Getenv("PERMISSIONS_POLICY"); pp != "" {
+			c.Set("Permissions-Policy", pp)
+		}
+
+		logger.Debug("Security headers toegevoegd", "path", c.Path(), "production", os.Getenv("ENV") == "production")
+
 		return c.Next()
 	}
 }

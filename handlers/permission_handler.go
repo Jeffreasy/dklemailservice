@@ -7,6 +7,7 @@ import (
 	"dklautomationgo/services"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -43,10 +44,10 @@ func NewPermissionHandler(
 
 // RegisterRoutes registreert de routes voor permission en role beheer
 func (h *PermissionHandler) RegisterRoutes(app *fiber.App) {
-	// RBAC routes (vereist admin rechten)
+	// RBAC routes (vereist admin of staff rechten)
 	rbacGroup := app.Group("/api/rbac")
 	rbacGroup.Use(AuthMiddleware(h.authService))
-	rbacGroup.Use(AdminPermissionMiddleware(h.permissionService))
+	rbacGroup.Use(AdminOrStaffPermissionMiddleware(h.permissionService))
 
 	// Permission routes
 	rbacGroup.Get("/permissions", h.ListPermissions)
@@ -56,13 +57,28 @@ func (h *PermissionHandler) RegisterRoutes(app *fiber.App) {
 
 	// Role routes
 	rbacGroup.Get("/roles", h.ListRoles)
-	rbacGroup.Get("/roles/:id", h.GetRole) // Get role details
 	rbacGroup.Post("/roles", h.CreateRole)
+
+	// Menu management routes (specifiek voor admin interface) - MOETEN VOOR /roles/:id komen!
+	rbacGroup.Get("/menu/permissions", h.GetMenuPermissions)                  // Alle menu permissies
+	rbacGroup.Get("/menu/matrix", h.GetMenuPermissionMatrix)                  // Matrix view: rollen vs menu permissies
+	rbacGroup.Get("/roles/:id/menu-permissions", h.GetRoleMenuPermissions)    // Menu permissies voor specifieke rol
+	rbacGroup.Put("/roles/:id/menu-permissions", h.UpdateRoleMenuPermissions) // Update menu permissies voor rol
+
+	// Role routes (generieke routes NA specifieke routes)
+	rbacGroup.Get("/roles/:id", h.GetRole)                                               // Get role details
 	rbacGroup.Put("/roles/:id", h.UpdateRole)                                            // Update role details
 	rbacGroup.Delete("/roles/:id", h.DeleteRole)                                         // Delete role
 	rbacGroup.Put("/roles/:id/permissions", h.UpdateRolePermissions)                     // Voor bulk updates (frontend compatibiliteit)
 	rbacGroup.Post("/roles/:id/permissions/:permissionId", h.AddPermissionToRole)        // Voor individuele toevoeging
 	rbacGroup.Delete("/roles/:id/permissions/:permissionId", h.RemovePermissionFromRole) // Voor individuele verwijdering
+
+	// User-Role management routes
+	rbacGroup.Get("/users", h.ListUsersWithRoles)                      // List users with their roles
+	rbacGroup.Get("/users/:id/roles", h.GetUserRoles)                  // Get roles for specific user
+	rbacGroup.Post("/users/:id/roles", h.AssignRoleToUser)             // Assign role to user
+	rbacGroup.Delete("/users/:id/roles/:roleId", h.RevokeRoleFromUser) // Revoke role from user
+	rbacGroup.Put("/users/:id/roles/:roleId", h.UpdateUserRole)        // Update user role (activate/deactivate)
 }
 
 // ListPermissions haalt een lijst van permissions op, gegroepeerd per resource
@@ -712,5 +728,646 @@ func (h *PermissionHandler) DeleteRole(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"success": true,
 		"message": "Rol verwijderd",
+	})
+}
+
+// GetMenuPermissions haalt alle menu permissies op
+func (h *PermissionHandler) GetMenuPermissions(c *fiber.Ctx) error {
+	ctx := c.Context()
+
+	// Haal alle menu permissies op
+	permissions, err := h.permissionRepo.List(ctx, 1000, 0) // Hoge limit voor alle menu items
+	if err != nil {
+		logger.Error("Fout bij ophalen menu permissions", "error", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon menu permissions niet ophalen",
+		})
+	}
+
+	// Filter alleen menu permissies
+	var menuPermissions []*models.Permission
+	for _, perm := range permissions {
+		if perm.Resource == "menu" {
+			menuPermissions = append(menuPermissions, perm)
+		}
+	}
+
+	// Sorteer op action (menu item naam)
+	sort.Slice(menuPermissions, func(i, j int) bool {
+		return menuPermissions[i].Action < menuPermissions[j].Action
+	})
+
+	return c.JSON(fiber.Map{
+		"permissions": menuPermissions,
+		"total":       len(menuPermissions),
+	})
+}
+
+// GetMenuPermissionMatrix geeft een matrix view van rollen vs menu permissies
+func (h *PermissionHandler) GetMenuPermissionMatrix(c *fiber.Ctx) error {
+	ctx := c.Context()
+
+	// Haal alle rollen op
+	roles, err := h.roleRepo.ListWithPermissions(ctx, 100, 0)
+	if err != nil {
+		logger.Error("Fout bij ophalen roles voor matrix", "error", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon roles niet ophalen",
+		})
+	}
+
+	// Haal alle menu permissies op
+	allPermissions, err := h.permissionRepo.List(ctx, 1000, 0)
+	if err != nil {
+		logger.Error("Fout bij ophalen permissions voor matrix", "error", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon permissions niet ophalen",
+		})
+	}
+
+	// Filter menu permissies
+	var menuPermissions []*models.Permission
+	for _, perm := range allPermissions {
+		if perm.Resource == "menu" {
+			menuPermissions = append(menuPermissions, perm)
+		}
+	}
+
+	// Sorteer menu permissies
+	sort.Slice(menuPermissions, func(i, j int) bool {
+		return menuPermissions[i].Action < menuPermissions[j].Action
+	})
+
+	// Bouw matrix: rol -> menu_permission_id -> heeft_permission
+	matrix := make(map[string]map[string]bool)
+	for _, role := range roles {
+		matrix[role.ID] = make(map[string]bool)
+		for _, perm := range menuPermissions {
+			matrix[role.ID][perm.ID] = false // Default: geen toegang
+		}
+
+		// Markeer welke permissies deze rol heeft
+		for _, rolePerm := range role.Permissions {
+			if rolePerm.Resource == "menu" {
+				matrix[role.ID][rolePerm.ID] = true
+			}
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"roles":       roles,
+		"permissions": menuPermissions,
+		"matrix":      matrix,
+	})
+}
+
+// GetRoleMenuPermissions haalt menu permissies voor een specifieke rol op
+func (h *PermissionHandler) GetRoleMenuPermissions(c *fiber.Ctx) error {
+	roleID := c.Params("id")
+	if roleID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Role ID is verplicht",
+		})
+	}
+
+	ctx := c.Context()
+
+	// Haal rol op
+	role, err := h.roleRepo.GetByID(ctx, roleID)
+	if err != nil {
+		logger.Error("Fout bij ophalen rol", "error", err, "role_id", roleID)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Rol niet gevonden",
+		})
+	}
+
+	// Haal alle menu permissies op
+	allPermissions, err := h.permissionRepo.List(ctx, 1000, 0)
+	if err != nil {
+		logger.Error("Fout bij ophalen permissions", "error", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon permissions niet ophalen",
+		})
+	}
+
+	// Haal permissies voor deze rol op
+	rolePermissions, err := h.rolePermissionRepo.GetPermissionsByRole(ctx, roleID)
+	if err != nil {
+		logger.Error("Fout bij ophalen role permissions", "error", err, "role_id", roleID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon role permissions niet ophalen",
+		})
+	}
+
+	// Filter menu permissies en markeer welke de rol heeft
+	var menuPermissions []map[string]interface{}
+	rolePermissionIDs := make(map[string]bool)
+	for _, rp := range rolePermissions {
+		rolePermissionIDs[rp.ID] = true
+	}
+
+	for _, perm := range allPermissions {
+		if perm.Resource == "menu" {
+			menuPermissions = append(menuPermissions, map[string]interface{}{
+				"id":          perm.ID,
+				"action":      perm.Action,
+				"description": perm.Description,
+				"has_access":  rolePermissionIDs[perm.ID],
+			})
+		}
+	}
+
+	// Sorteer op action
+	sort.Slice(menuPermissions, func(i, j int) bool {
+		return menuPermissions[i]["action"].(string) < menuPermissions[j]["action"].(string)
+	})
+
+	return c.JSON(fiber.Map{
+		"role":        role,
+		"permissions": menuPermissions,
+		"total":       len(menuPermissions),
+	})
+}
+
+// UpdateRoleMenuPermissions werkt menu permissies bij voor een rol
+func (h *PermissionHandler) UpdateRoleMenuPermissions(c *fiber.Ctx) error {
+	roleID := c.Params("id")
+	if roleID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Role ID is verplicht",
+		})
+	}
+
+	var req struct {
+		PermissionActions []string `json:"permission_actions"` // Array van menu actions (bijv. ["dashboard", "emails"])
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Ongeldige gegevens",
+		})
+	}
+
+	// Haal userID op uit context
+	userID, ok := c.Locals("userID").(string)
+	if !ok || userID == "" {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon userID niet ophalen uit context",
+		})
+	}
+
+	ctx := c.Context()
+
+	// Haal alle menu permissies op om IDs te vinden
+	allPermissions, err := h.permissionRepo.List(ctx, 1000, 0)
+	if err != nil {
+		logger.Error("Fout bij ophalen permissions", "error", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon permissions niet ophalen",
+		})
+	}
+
+	// Maak mapping van action naar permission ID voor menu items
+	menuPermissionMap := make(map[string]string)
+	for _, perm := range allPermissions {
+		if perm.Resource == "menu" {
+			menuPermissionMap[perm.Action] = perm.ID
+		}
+	}
+
+	// Converteer actions naar permission IDs
+	var permissionIDs []string
+	for _, action := range req.PermissionActions {
+		if id, exists := menuPermissionMap[action]; exists {
+			permissionIDs = append(permissionIDs, id)
+		} else {
+			logger.Warn("Onbekende menu action", "action", action)
+		}
+	}
+
+	// Haal huidige menu permissions voor deze role op
+	currentPermissions, err := h.rolePermissionRepo.GetPermissionsByRole(ctx, roleID)
+	if err != nil {
+		logger.Error("Fout bij ophalen huidige permissions", "error", err, "role_id", roleID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon huidige permissions niet ophalen",
+		})
+	}
+
+	// Filter alleen huidige menu permissions
+	currentMenuPermissionIDs := make(map[string]bool)
+	for _, perm := range currentPermissions {
+		if perm.Resource == "menu" {
+			currentMenuPermissionIDs[perm.ID] = true
+		}
+	}
+
+	requestedPermissionIDs := make(map[string]bool)
+	for _, id := range permissionIDs {
+		requestedPermissionIDs[id] = true
+	}
+
+	// Bepaal welke permissions toegevoegd/verwijderd moeten worden
+	var toAdd []string
+	var toRemove []string
+
+	// Permissions die toegevoegd moeten worden (in request maar niet current)
+	for _, permID := range permissionIDs {
+		if !currentMenuPermissionIDs[permID] {
+			toAdd = append(toAdd, permID)
+		}
+	}
+
+	// Permissions die verwijderd moeten worden (current maar niet in request)
+	for permID := range currentMenuPermissionIDs {
+		if !requestedPermissionIDs[permID] {
+			toRemove = append(toRemove, permID)
+		}
+	}
+
+	// Voer toevoegingen uit
+	addedCount := 0
+	for _, permissionID := range toAdd {
+		rp := &models.RolePermission{
+			RoleID:       roleID,
+			PermissionID: permissionID,
+			AssignedBy:   &userID,
+		}
+
+		if err := h.rolePermissionRepo.Create(ctx, rp); err != nil {
+			logger.Error("Fout bij toevoegen menu permission", "error", err, "role_id", roleID, "permission_id", permissionID)
+			continue
+		}
+		addedCount++
+	}
+
+	// Voer verwijderingen uit
+	removedCount := 0
+	for _, permissionID := range toRemove {
+		if err := h.rolePermissionRepo.Delete(ctx, roleID, permissionID); err != nil {
+			logger.Error("Fout bij verwijderen menu permission", "error", err, "role_id", roleID, "permission_id", permissionID)
+			continue
+		}
+		removedCount++
+	}
+
+	return c.JSON(fiber.Map{
+		"success":         true,
+		"message":         "Menu permissions bijgewerkt",
+		"added_count":     addedCount,
+		"removed_count":   removedCount,
+		"total_requested": len(req.PermissionActions),
+	})
+}
+
+// ListUsersWithRoles haalt een lijst van users op met hun roles
+func (h *PermissionHandler) ListUsersWithRoles(c *fiber.Ctx) error {
+	limit := c.QueryInt("limit", 50)
+	offset := c.QueryInt("offset", 0)
+	search := c.Query("search", "")
+
+	if limit < 1 || limit > 100 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Limit moet tussen 1 en 100 liggen",
+		})
+	}
+
+	if offset < 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Offset mag niet negatief zijn",
+		})
+	}
+
+	ctx := c.Context()
+
+	// Haal users op via auth service
+	users, err := h.authService.ListUsers(ctx, limit, offset)
+	if err != nil {
+		logger.Error("Fout bij ophalen users", "error", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon users niet ophalen",
+		})
+	}
+
+	// Filter users gebaseerd op search parameter
+	var filteredUsers []*models.Gebruiker
+	for _, user := range users {
+		if search != "" {
+			searchLower := strings.ToLower(search)
+			if !strings.Contains(strings.ToLower(user.Email), searchLower) &&
+				!strings.Contains(strings.ToLower(user.Naam), searchLower) {
+				continue
+			}
+		}
+		filteredUsers = append(filteredUsers, user)
+	}
+
+	// Voor elke user, haal de roles op
+	var result []map[string]interface{}
+	for _, user := range filteredUsers {
+		userRoles, err := h.userRoleRepo.ListActiveByUser(ctx, user.ID)
+		if err != nil {
+			logger.Error("Fout bij ophalen user roles", "error", err, "user_id", user.ID)
+			continue
+		}
+
+		// Converteer naar response format
+		roles := make([]map[string]interface{}, 0, len(userRoles))
+		for _, ur := range userRoles {
+			roles = append(roles, map[string]interface{}{
+				"id":          ur.Role.ID,
+				"name":        ur.Role.Name,
+				"description": ur.Role.Description,
+				"assigned_at": ur.AssignedAt,
+				"expires_at":  ur.ExpiresAt,
+				"is_active":   ur.IsActive,
+			})
+		}
+
+		result = append(result, map[string]interface{}{
+			"id":    user.ID,
+			"email": user.Email,
+			"naam":  user.Naam,
+			"roles": roles,
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"users": result,
+		"total": len(result),
+	})
+}
+
+// GetUserRoles haalt alle roles op voor een specifieke user
+func (h *PermissionHandler) GetUserRoles(c *fiber.Ctx) error {
+	userID := c.Params("id")
+	if userID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "User ID is verplicht",
+		})
+	}
+
+	ctx := c.Context()
+
+	// Controleer of user bestaat
+	user, err := h.authService.GetUser(ctx, userID)
+	if err != nil {
+		logger.Error("Fout bij ophalen user", "error", err, "user_id", userID)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Gebruiker niet gevonden",
+		})
+	}
+
+	// Haal user roles op
+	userRoles, err := h.userRoleRepo.ListActiveByUser(ctx, userID)
+	if err != nil {
+		logger.Error("Fout bij ophalen user roles", "error", err, "user_id", userID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon user roles niet ophalen",
+		})
+	}
+
+	// Converteer naar response format
+	roles := make([]map[string]interface{}, 0, len(userRoles))
+	for _, ur := range userRoles {
+		roles = append(roles, map[string]interface{}{
+			"id":          ur.Role.ID,
+			"name":        ur.Role.Name,
+			"description": ur.Role.Description,
+			"assigned_at": ur.AssignedAt,
+			"expires_at":  ur.ExpiresAt,
+			"is_active":   ur.IsActive,
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"user": map[string]interface{}{
+			"id":    user.ID,
+			"email": user.Email,
+			"naam":  user.Naam,
+		},
+		"roles": roles,
+		"total": len(roles),
+	})
+}
+
+// AssignRoleToUser kent een role toe aan een user
+func (h *PermissionHandler) AssignRoleToUser(c *fiber.Ctx) error {
+	userID := c.Params("id")
+	if userID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "User ID is verplicht",
+		})
+	}
+
+	var req struct {
+		RoleID    string  `json:"role_id"`
+		ExpiresAt *string `json:"expires_at,omitempty"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Ongeldige gegevens",
+		})
+	}
+
+	if req.RoleID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Role ID is verplicht",
+		})
+	}
+
+	// Haal assignedBy op uit context
+	assignedBy, ok := c.Locals("userID").(string)
+	if !ok || assignedBy == "" {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon assignedBy niet ophalen uit context",
+		})
+	}
+
+	ctx := c.Context()
+
+	// Controleer of user bestaat
+	_, err := h.authService.GetUser(ctx, userID)
+	if err != nil {
+		logger.Error("Fout bij ophalen user", "error", err, "user_id", userID)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Gebruiker niet gevonden",
+		})
+	}
+
+	// Controleer of role bestaat
+	role, err := h.roleRepo.GetByID(ctx, req.RoleID)
+	if err != nil {
+		logger.Error("Fout bij ophalen role", "error", err, "role_id", req.RoleID)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Rol niet gevonden",
+		})
+	}
+
+	// Controleer of user deze role al heeft
+	existing, err := h.userRoleRepo.GetByUserAndRole(ctx, userID, req.RoleID)
+	if err != nil && err.Error() != "record not found" {
+		logger.Error("Fout bij controleren bestaande user-role relatie", "error", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon user-role relatie niet controleren",
+		})
+	}
+
+	if existing != nil {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+			"error": "Gebruiker heeft deze rol al",
+		})
+	}
+
+	// Parse expires_at indien opgegeven
+	var expiresAt *time.Time
+	if req.ExpiresAt != nil && *req.ExpiresAt != "" {
+		parsed, err := time.Parse(time.RFC3339, *req.ExpiresAt)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Ongeldig expires_at format (gebruik RFC3339)",
+			})
+		}
+		expiresAt = &parsed
+	}
+
+	// Maak user-role relatie aan
+	userRole := &models.UserRole{
+		UserID:     userID,
+		RoleID:     req.RoleID,
+		AssignedBy: &assignedBy,
+		ExpiresAt:  expiresAt,
+		IsActive:   true,
+	}
+
+	if err := h.userRoleRepo.Create(ctx, userRole); err != nil {
+		logger.Error("Fout bij toewijzen role aan user", "error", err, "user_id", userID, "role_id", req.RoleID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon role niet toewijzen aan gebruiker",
+		})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"success": true,
+		"message": "Rol toegewezen aan gebruiker",
+		"user_role": map[string]interface{}{
+			"id":          userRole.ID,
+			"user_id":     userRole.UserID,
+			"role_id":     userRole.RoleID,
+			"role_name":   role.Name,
+			"assigned_at": userRole.AssignedAt,
+			"expires_at":  userRole.ExpiresAt,
+			"is_active":   userRole.IsActive,
+		},
+	})
+}
+
+// RevokeRoleFromUser verwijdert een role van een user
+func (h *PermissionHandler) RevokeRoleFromUser(c *fiber.Ctx) error {
+	userID := c.Params("id")
+	roleID := c.Params("roleId")
+
+	if userID == "" || roleID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "User ID en Role ID zijn verplicht",
+		})
+	}
+
+	ctx := c.Context()
+
+	// Controleer of user-role relatie bestaat
+	userRole, err := h.userRoleRepo.GetByUserAndRole(ctx, userID, roleID)
+	if err != nil {
+		logger.Error("Fout bij ophalen user-role relatie", "error", err, "user_id", userID, "role_id", roleID)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "User-role relatie niet gevonden",
+		})
+	}
+
+	// Verwijder de relatie
+	if err := h.userRoleRepo.Delete(ctx, userRole.ID); err != nil {
+		logger.Error("Fout bij verwijderen user-role relatie", "error", err, "user_role_id", userRole.ID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon role niet verwijderen van gebruiker",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Rol verwijderd van gebruiker",
+	})
+}
+
+// UpdateUserRole werkt een user-role relatie bij (activate/deactivate)
+func (h *PermissionHandler) UpdateUserRole(c *fiber.Ctx) error {
+	userID := c.Params("id")
+	roleID := c.Params("roleId")
+
+	if userID == "" || roleID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "User ID en Role ID zijn verplicht",
+		})
+	}
+
+	var req struct {
+		IsActive  *bool   `json:"is_active,omitempty"`
+		ExpiresAt *string `json:"expires_at,omitempty"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Ongeldige gegevens",
+		})
+	}
+
+	ctx := c.Context()
+
+	// Controleer of user-role relatie bestaat
+	userRole, err := h.userRoleRepo.GetByUserAndRole(ctx, userID, roleID)
+	if err != nil {
+		logger.Error("Fout bij ophalen user-role relatie", "error", err, "user_id", userID, "role_id", roleID)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "User-role relatie niet gevonden",
+		})
+	}
+
+	// Update velden indien opgegeven
+	if req.IsActive != nil {
+		userRole.IsActive = *req.IsActive
+	}
+
+	if req.ExpiresAt != nil {
+		if *req.ExpiresAt == "" {
+			userRole.ExpiresAt = nil
+		} else {
+			parsed, err := time.Parse(time.RFC3339, *req.ExpiresAt)
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"error": "Ongeldig expires_at format (gebruik RFC3339)",
+				})
+			}
+			userRole.ExpiresAt = &parsed
+		}
+	}
+
+	if err := h.userRoleRepo.Update(ctx, userRole); err != nil {
+		logger.Error("Fout bij bijwerken user-role relatie", "error", err, "user_role_id", userRole.ID)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Kon user-role relatie niet bijwerken",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "User-role relatie bijgewerkt",
+		"user_role": map[string]interface{}{
+			"id":          userRole.ID,
+			"user_id":     userRole.UserID,
+			"role_id":     userRole.RoleID,
+			"assigned_at": userRole.AssignedAt,
+			"expires_at":  userRole.ExpiresAt,
+			"is_active":   userRole.IsActive,
+		},
 	})
 }

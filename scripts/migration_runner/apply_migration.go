@@ -60,7 +60,7 @@ func main() {
 	}
 
 	// Migratie bestandspad
-	migrationFile := "database/migrations/V1_32__migrate_partners_and_radio_recordings.sql"
+	migrationFile := "../../database/migrations/V37__add_transport_question.sql"
 
 	// Database verbindingsgegevens uit omgevingsvariabelen
 	dbHost := os.Getenv("DB_HOST")

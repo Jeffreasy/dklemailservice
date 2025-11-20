@@ -682,3 +682,39 @@ type AlbumPhotoRepository interface {
 	// DeleteByPhoto removes a photo from all albums
 	DeleteByPhoto(ctx context.Context, photoID string) error
 }
+
+// SessionRepository defines the interface for session management operations
+type SessionRepository interface {
+	// Create saves a new session
+	Create(ctx context.Context, session *models.Session) error
+
+	// GetByID retrieves a session by ID
+	GetByID(ctx context.Context, id string) (*models.Session, error)
+
+	// GetByAccessToken retrieves a session by access token
+	GetByAccessToken(ctx context.Context, accessToken string) (*models.Session, error)
+
+	// ListByOwnerID retrieves all active sessions for a user
+	ListByOwnerID(ctx context.Context, ownerID string) ([]*models.Session, error)
+
+	// Update updates an existing session
+	Update(ctx context.Context, session *models.Session) error
+
+	// Delete removes a session
+	Delete(ctx context.Context, id string) error
+
+	// RevokeByAccessToken revokes a session by access token
+	RevokeByAccessToken(ctx context.Context, accessToken string) error
+
+	// RevokeAllUserSessions revokes all sessions for a user except current session
+	RevokeAllUserSessions(ctx context.Context, ownerID, currentSessionID string) error
+
+	// RevokeAllUserSessionsComplete revokes all sessions for a user
+	RevokeAllUserSessionsComplete(ctx context.Context, ownerID string) error
+
+	// MarkCurrentSession marks a session as the current session
+	MarkCurrentSession(ctx context.Context, sessionID string) error
+
+	// CleanupExpiredSessions removes expired sessions
+	CleanupExpiredSessions(ctx context.Context) error
+}

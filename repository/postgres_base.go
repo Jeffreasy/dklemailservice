@@ -37,7 +37,7 @@ func (r *PostgresRepository) handleError(op string, err error) error {
 	}
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil // Geen record gevonden wordt als nil teruggegeven
+		return gorm.ErrRecordNotFound // Return the actual ErrRecordNotFound for proper error handling
 	}
 
 	logger.Error("Database fout", "operation", op, "error", err)

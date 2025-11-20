@@ -208,7 +208,8 @@ func (h *PublicRegistrationHandler) registerFullAccount(ctx context.Context, req
 		DistanceRoute:       &req.Afstand,      // ✅ Afstand in event_registrations
 		Ondersteuning:       req.Ondersteuning, // ✅ Ondersteuning in event_registrations
 		Bijzonderheden:      req.Bijzonderheden,
-		Status:              "nieuw", // ✅ V27: Gebruik 'nieuw' status (niet 'registered')
+		HeeftVervoer:        req.HeeftVervoer, // ✅ V37: Transport vraag
+		Status:              "nieuw",          // ✅ V27: Gebruik 'nieuw' status (niet 'registered')
 		TestMode:            req.TestMode,
 	}
 
@@ -268,7 +269,8 @@ func (h *PublicRegistrationHandler) registerTemporaryAccount(ctx context.Context
 		DistanceRoute:       &req.Afstand,
 		Ondersteuning:       req.Ondersteuning,
 		Bijzonderheden:      req.Bijzonderheden,
-		Status:              "nieuw", // ✅ V27: Gebruik 'nieuw' status
+		HeeftVervoer:        req.HeeftVervoer, // ✅ V37: Transport vraag
+		Status:              "nieuw",          // ✅ V27: Gebruik 'nieuw' status
 		TestMode:            req.TestMode,
 	}
 
@@ -282,6 +284,7 @@ func (h *PublicRegistrationHandler) registerTemporaryAccount(ctx context.Context
 		"afstand_pointer", registration.DistanceRoute,
 		"ondersteuning", registration.Ondersteuning,
 		"bijzonderheden", registration.Bijzonderheden,
+		"heeft_vervoer", registration.HeeftVervoer, // ✅ V37: Transport vraag
 		"status", registration.Status)
 
 	if err := h.eventRegRepo.Create(ctx, registration); err != nil {
@@ -297,7 +300,8 @@ func (h *PublicRegistrationHandler) registerTemporaryAccount(ctx context.Context
 		"saved_rol", registration.ParticipantRoleName,
 		"saved_afstand", registration.DistanceRoute,
 		"saved_ondersteuning", registration.Ondersteuning,
-		"saved_bijzonderheden", registration.Bijzonderheden)
+		"saved_bijzonderheden", registration.Bijzonderheden,
+		"saved_heeft_vervoer", registration.HeeftVervoer) // ✅ V37: Transport vraag
 
 	return &models.PublicRegistrationResponse{
 		Success:        true,
@@ -490,6 +494,11 @@ func (h *PublicRegistrationHandler) validateRegistrationRequest(req *models.Publ
 		return fmt.Errorf("bijzonderheden zijn verplicht als je ondersteuning nodig hebt")
 	}
 
+	// V37: Transport vraag verplicht
+	if req.HeeftVervoer == nil {
+		return fmt.Errorf("vervoer keuze is verplicht")
+	}
+
 	// Terms verplicht
 	if !req.Terms {
 		return fmt.Errorf("je moet akkoord gaan met de algemene voorwaarden")
@@ -616,87 +625,4 @@ func (h *PublicRegistrationHandler) sendAdminNotification(ctx context.Context, r
 	if err != nil {
 		logger.Error("Failed to send admin notification", "error", err)
 	}
-}
-
-// ==============================================================================
-// V30+RBAC: HELPER FUNCTIES VOOR ROL TOEWIJZING
-// ==============================================================================
-
-// assignParticipantUserRole wijst de basis participant_user rol toe aan een gebruiker
-func (h *PublicRegistrationHandler) assignParticipantUserRole(ctx context.Context, gebruikerID string) error {
-	// Zoek participant_user rol
-	role, err := h.roleRepo.GetByName(ctx, "participant_user")
-	if err != nil {
-		return fmt.Errorf("participant_user rol niet gevonden: %w", err)
-	}
-
-	// Wijs rol toe via PermissionService (met proper audit logging)
-	if err := h.permissionService.AssignRole(ctx, gebruikerID, role.ID, nil); err != nil {
-		// Als de fout is dat de rol al toegewezen is, negeer we deze
-		if err.Error() == "gebruiker heeft deze rol al" {
-			logger.Debug("participant_user rol al toegewezen (mogelijk via trigger)", "gebruiker_id", gebruikerID)
-			return nil
-		}
-		return fmt.Errorf("fout bij toewijzen participant_user rol: %w", err)
-	}
-
-	logger.Info("participant_user rol toegewezen", "gebruiker_id", gebruikerID, "role_id", role.ID)
-	return nil
-}
-
-// assignRoleBasedOnParticipantRole wijst een rol-specifieke RBAC rol toe op basis van event rol
-func (h *PublicRegistrationHandler) assignRoleBasedOnParticipantRole(ctx context.Context, gebruikerID string, participantRole string) error {
-	var rbacRoleName string
-
-	// Map participant event rol naar RBAC rol
-	switch participantRole {
-	case "Begeleider":
-		rbacRoleName = "participant_guide"
-	case "Vrijwilliger":
-		rbacRoleName = "participant_volunteer"
-	case "Deelnemer":
-		// Deelnemers krijgen alleen participant_user rol (geen extra rol)
-		return nil
-	default:
-		logger.Debug("Onbekende participant rol, geen extra RBAC rol", "role", participantRole)
-		return nil
-	}
-
-	// Zoek RBAC rol
-	role, err := h.roleRepo.GetByName(ctx, rbacRoleName)
-	if err != nil {
-		return fmt.Errorf("RBAC rol %s niet gevonden: %w", rbacRoleName, err)
-	}
-
-	// Wijs rol toe
-	if err := h.permissionService.AssignRole(ctx, gebruikerID, role.ID, nil); err != nil {
-		if err.Error() == "gebruiker heeft deze rol al" {
-			logger.Debug("Rol-specifieke RBAC rol al toegewezen", "gebruiker_id", gebruikerID, "role", rbacRoleName)
-			return nil
-		}
-		return fmt.Errorf("fout bij toewijzen rol %s: %w", rbacRoleName, err)
-	}
-
-	logger.Info("Rol-specifieke RBAC rol toegewezen",
-		"gebruiker_id", gebruikerID,
-		"rbac_role", rbacRoleName,
-		"participant_role", participantRole)
-	return nil
-}
-
-// getParticipantEventRole haalt de event rol op voor een participant (voor upgrade flow)
-func (h *PublicRegistrationHandler) getParticipantEventRole(ctx context.Context, participantID string) string {
-	// Haal meest recente event registratie op (gebruik ListByParticipantID)
-	registrations, err := h.eventRegRepo.ListByParticipantID(ctx, participantID)
-	if err != nil || len(registrations) == 0 {
-		logger.Debug("Geen event registraties gevonden voor participant", "participant_id", participantID)
-		return ""
-	}
-
-	// Return de rol van de meest recente registratie
-	if registrations[0].ParticipantRoleName != nil {
-		return *registrations[0].ParticipantRoleName
-	}
-
-	return ""
 }

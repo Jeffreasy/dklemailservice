@@ -563,14 +563,14 @@ func TestSecurity_TokenSecurity_CannotReuseRefreshToken(t *testing.T) {
 	}
 
 	validToken := &models.RefreshToken{
-		UserID:    "user-reuse",
+		OwnerID:   "user-reuse",
 		Token:     "one-time-token",
 		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
 		IsRevoked: false,
 	}
 
 	revokedToken := &models.RefreshToken{
-		UserID:    "user-reuse",
+		OwnerID:   "user-reuse",
 		Token:     "one-time-token",
 		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
 		IsRevoked: true, // Revoked after first use

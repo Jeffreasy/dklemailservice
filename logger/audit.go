@@ -34,9 +34,10 @@ const (
 	AuditPasswordChanged AuditEventType = "PASSWORD_CHANGED"
 
 	// User management events
-	AuditUserCreated AuditEventType = "USER_CREATED"
-	AuditUserUpdated AuditEventType = "USER_UPDATED"
-	AuditUserDeleted AuditEventType = "USER_DELETED"
+	AuditUserCreated     AuditEventType = "USER_CREATED"
+	AuditUserUpdated     AuditEventType = "USER_UPDATED"
+	AuditUserDeleted     AuditEventType = "USER_DELETED"
+	AuditAccountDeletion AuditEventType = "ACCOUNT_DELETION"
 
 	// Cache events
 	AuditCacheInvalidated AuditEventType = "CACHE_INVALIDATED"

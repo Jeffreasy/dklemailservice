@@ -76,7 +76,6 @@ func TestAanmeldingHandler_ListAanmeldingen(t *testing.T) {
 	adminUser := &models.Gebruiker{
 		ID:    "admin1",
 		Email: "admin@example.com",
-		Rol:   "admin",
 	}
 
 	// Setup auth mock
@@ -202,7 +201,6 @@ func TestAanmeldingHandler_GetAanmelding(t *testing.T) {
 	adminUser := &models.Gebruiker{
 		ID:    "admin1",
 		Email: "admin@example.com",
-		Rol:   "admin",
 	}
 
 	// Setup auth mock
@@ -306,7 +304,6 @@ func TestAanmeldingHandler_UpdateAanmelding(t *testing.T) {
 	adminUser := &models.Gebruiker{
 		ID:    "admin1",
 		Email: "admin@example.com",
-		Rol:   "admin",
 	}
 
 	// Setup auth mock
@@ -419,7 +416,6 @@ func TestAanmeldingHandler_DeleteAanmelding(t *testing.T) {
 	adminUser := &models.Gebruiker{
 		ID:    "admin1",
 		Email: "admin@example.com",
-		Rol:   "admin",
 	}
 
 	// Setup auth mock
@@ -584,7 +580,6 @@ func TestAanmeldingHandler_GetAanmeldingenByRol(t *testing.T) {
 	adminUser := &models.Gebruiker{
 		ID:    "admin1",
 		Email: "admin@example.com",
-		Rol:   "admin",
 	}
 
 	// Setup auth mock

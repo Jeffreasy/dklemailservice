@@ -146,11 +146,14 @@ func (h *MailHandler) RegisterRoutes(app *fiber.App) {
 		c.Locals("userID", userID)
 		c.Locals("token", token)
 
-		// Controleer permissies via PermissionService
-		if !h.permissionService.HasPermission(c.Context(), userID, "admin", "access") {
-			logger.Warn("Gebruiker heeft geen admin toegang", "user_id", userID)
+		// Controleer permissies via PermissionService - sta admin OF staff toe
+		hasAdminAccess := h.permissionService.HasPermission(c.Context(), userID, "admin", "access")
+		hasStaffAccess := h.permissionService.HasPermission(c.Context(), userID, "staff", "access")
+
+		if !hasAdminAccess && !hasStaffAccess {
+			logger.Warn("Gebruiker heeft geen admin of staff toegang", "user_id", userID, "has_admin", hasAdminAccess, "has_staff", hasStaffAccess)
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"error": "Geen toegang",
+				"error": "Geen toegang - admin of staff rechten vereist",
 			})
 		}
 
